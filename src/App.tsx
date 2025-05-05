@@ -567,7 +567,7 @@ function App() {
         <div className="setup-screen">
           <h2>Game Setup</h2>
           <div className="setup-actions">
-             <button onClick={handleLoadGame} disabled={!localStorage.getItem(LOCAL_STORAGE_KEY)}>Load Saved Game</button>
+             <button className="btn-secondary" onClick={handleLoadGame} disabled={!localStorage.getItem(LOCAL_STORAGE_KEY)}>Load Saved Game</button>
           </div>
           <hr/>
           <h3>Start New Game</h3>
@@ -580,7 +580,7 @@ function App() {
               onChange={(e) => setNumPlayersInput(e.target.value)}
               style={{width: "50px"}}
             />
-            <button onClick={handleConfirmNumPlayers}>Confirm</button>
+            <button className="btn-primary" onClick={handleConfirmNumPlayers}>Confirm</button>
           </div>
           {playerInputs.length > 0 && (
             <div>
@@ -602,7 +602,7 @@ function App() {
                   />
                 </div>
               ))}
-              <button onClick={handleStartNewGame} style={{marginTop: "10px"}}>Start Game</button>
+              <button className="btn-start" onClick={handleStartNewGame} style={{marginTop: "10px"}}>Start Game</button>
             </div>
           )}
         </div>
@@ -710,10 +710,10 @@ function App() {
           {/* Actions and Log Area */}
           <div>
             <div className="game-actions">
-              <button onClick={handleStartRound} disabled={gameState.roundActive || gameState.players.length < 2}>Start New Round</button>
-              <button onClick={handleAddPlayer} disabled={gameState.roundActive}>Add Player</button>
-              <button onClick={handleRemovePlayer} disabled={gameState.roundActive || gameState.players.length <= 2}>Remove Player</button>
-              <button onClick={() => setShowSetup(true)}>Back to Setup</button>
+              <button className="btn-primary" onClick={handleStartRound} disabled={gameState.roundActive || gameState.players.length < 2}>Start New Round</button>
+              <button className="btn-primary" onClick={handleAddPlayer} disabled={gameState.roundActive}>Add Player</button>
+              <button className="btn-secondary" onClick={handleRemovePlayer} disabled={gameState.roundActive || gameState.players.length <= 2}>Remove Player</button>
+              <button className="btn-secondary" onClick={() => setShowSetup(true)}>Back to Setup</button>
             </div>
 
             {gameState.roundActive && currentPlayer && (

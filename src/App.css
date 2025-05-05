@@ -5,7 +5,8 @@
   gap: 1rem;
   max-width: 1100px; /* Even wider */
   margin: auto;
-  /* padding: 1rem; /* Padding moved to body */
+  width: 100%; /* Ensure it takes full width available */
+  box-sizing: border-box; /* Include padding in width calculation */
 }
 
 .setup-screen, .game-screen {
@@ -19,7 +20,7 @@
 
 .game-screen {
     display: grid;
-    grid-template-columns: minmax(300px, 1.5fr) 3fr; /* Ensure player list has min width */
+    grid-template-columns: minmax(250px, 1.5fr) 3fr; /* Adjusted min width for player list */
     gap: 1rem;
 }
 
@@ -112,6 +113,42 @@
     gap: 0.5rem; /* Spacing between buttons */
 }
 
+/* --- General Action Button Styles --- */
+
+/* Primary action button (e.g., Start Game, New Round) */
+.btn-primary, .btn-start {
+    background-color: var(--color-primary);
+    color: var(--color-background); /* Dark text on primary color */
+    border: 1px solid var(--color-primary);
+    font-weight: bold;
+}
+
+
+.btn-primary:hover, .btn-start:hover {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+.btn-primary:disabled, .btn-start:disabled {
+    background-color: var(--color-primary); /* Keep color but use opacity */
+    border-color: var(--color-primary);
+    color: var(--color-background);
+    opacity: 0.5; /* Standard disabled opacity */
+    cursor: not-allowed;
+}
+
+/* Secondary action button (e.g., End Game, Cancel) */
+.btn-secondary {
+    background-color: var(--color-background-mute); /* More subtle background */
+    color: var(--color-text-soft);
+    border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover {
+    background-color: var(--color-border); /* Darken slightly on hover */
+    border-color: var(--color-text-muted);
+}
+
 /* --- Round Control Button Specific Colors --- */
 .round-controls .btn-bet {
     background-color: var(--color-success);
@@ -185,4 +222,43 @@
     content: '';
     /* Add logic in JS/React to conditionally apply this class */
     /* Example: position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5; */
+}
+
+/* --- Media Queries for Responsiveness --- */
+
+/* Tablet and smaller desktop */
+@media (max-width: 900px) {
+    .game-screen {
+        /* Stack player list and game area */
+        grid-template-columns: 1fr;
+    }
+
+    .player-list {
+        order: 2; /* Move player list below game area if desired */
+        margin-top: 1rem; /* Add space when stacked */
+    }
+
+    .game-area {
+        order: 1;
+    }
+}
+
+/* Mobile devices */
+@media (max-width: 600px) {
+    .app-container {
+        gap: 0.5rem; /* Reduce gap */
+    }
+
+    .setup-screen, .game-screen {
+        padding: 1rem; /* Reduce padding */
+    }
+
+    .player-list th, .player-list td {
+        padding: 0.5rem 0.6rem; /* Reduce cell padding */
+        font-size: 0.9em; /* Slightly smaller font in table */
+    }
+
+    .round-controls input[type="number"] {
+        width: 80px; /* Smaller input width */
+    }
 }
