@@ -180,11 +180,17 @@ function App() {
     setGameState(prev => ({
       ...prev,
       players: newPlayers,
-      lastWinnerId: null, // Reset winner
-      messages: ["New game started. Add players or start a round."]
+      lastWinnerId: null,       // Reset winner for a new game
+      roundActive: false,       // Ensure round is not active yet
+      currentPlayerIndex: -1,   // No player selected initially
+      currentStake: 0,          // Reset stake
+      potAmount: 0,             // Reset pot
+      foldedPlayerIds: new Set<number>(), // Reset folded players
+      messages: [`New game started with ${newPlayers.length} players. Please set the boot amount.`]
     }));
     setShowSetup(false);
-    addMessage(`New game started with ${newPlayers.length} players.`);
+    setBootAmountInput("10"); // Reset boot input to default
+    setInteractionState('gettingBoot'); // Immediately ask for boot amount
   };
 
   const handleLoadGame = () => {
