@@ -1,0 +1,188 @@
+/* Using variables from index.css */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 1100px; /* Even wider */
+  margin: auto;
+  /* padding: 1rem; /* Padding moved to body */
+}
+
+.setup-screen, .game-screen {
+  border: 1px solid var(--color-border);
+  padding: 1.5rem; /* More padding inside sections */
+  padding-top: 1rem; /* Less padding at the top */
+  border-radius: 8px;
+  background-color: var(--color-background-soft);
+  margin-bottom: 1rem; /* Add space below sections */
+}
+
+.game-screen {
+    display: grid;
+    grid-template-columns: minmax(300px, 1.5fr) 3fr; /* Ensure player list has min width */
+    gap: 1rem;
+}
+
+.player-list table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.player-list th, .player-list td {
+    border-bottom: 1px solid var(--color-border); /* Only bottom border for cleaner look */
+    padding: 0.6rem 0.8rem; /* Even more padding */
+    text-align: left;
+    vertical-align: middle;
+}
+
+.player-list th {
+    font-weight: 600;
+    text-transform: uppercase; /* Uppercase headers */
+    color: var(--color-accent);
+}
+
+.player-list .folded {
+    color: var(--color-text-muted); /* Use muted color */
+    text-decoration: line-through;
+}
+
+.player-list .current-player {
+    font-weight: bold;
+    background-color: var(--color-background-mute);
+}
+
+/* Removed hover effect for less visual noise */
+/* .player-list tbody tr:hover {
+    background-color: var(--color-background-mute);
+} */
+
+.action-log {
+    height: 200px;
+    overflow-y: auto; /* Use auto scrollbar */
+    border: 1px solid #555;
+    padding: 0.5rem;
+    margin-top: 0.5rem; /* Reduced margin */
+    background-color: var(--color-background-mute);
+    font-size: 0.9em;
+    white-space: pre-wrap; /* Preserve newlines */
+    line-height: 1.6; /* Better readability */
+    border-radius: 4px;
+}
+
+.round-controls, .game-actions, .setup-actions {
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping */
+    /* flex-direction: column; /* Remove column direction */
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.setup-actions button, .game-actions button {
+    /* flex-grow: 1; /* Make buttons fill space - removed for more natural sizing */
+}
+
+.round-info {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background-color: var(--color-background-mute);
+    border-radius: 4px;
+    border-left: 3px solid var(--color-primary);
+    font-size: 1em; /* Normal font size */
+}
+
+.round-info strong {
+    color: var(--color-accent);
+}
+
+.round-controls {
+    align-items: center; /* Align input and button group vertically */
+    gap: 0.8rem; /* Increase gap in round controls */
+}
+
+.round-controls input[type="number"] {
+    width: 100px; /* Specific width for bet input */
+    text-align: right;
+}
+
+.round-buttons {
+    display: flex;
+    align-items: center; /* Align buttons vertically */
+    flex-wrap: wrap; /* Allow buttons to wrap if needed */
+    margin-top: 0.75rem; /* Add space above the button row */
+    gap: 0.5rem; /* Spacing between buttons */
+}
+
+/* --- Round Control Button Specific Colors --- */
+.round-controls .btn-bet {
+    background-color: var(--color-success);
+    border-color: var(--color-success);
+    color: var(--color-background); /* Dark text on light green */
+}
+.round-controls .btn-bet:hover {
+    background-color: #69db7c; /* Lighter green on hover */
+    border-color: #69db7c;
+}
+
+.round-controls .btn-fold {
+    background-color: var(--color-error);
+    border-color: var(--color-error);
+    color: var(--color-background); /* Dark text on light red */
+}
+.round-controls .btn-fold:hover {
+    background-color: #ffa8a8; /* Lighter red on hover */
+    border-color: #ffa8a8;
+}
+
+.round-controls .btn-show {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #333; /* Darker text for yellow background */
+}
+.round-controls .btn-show:hover {
+    background-color: #ffd43b; /* Lighter yellow on hover */
+    border-color: #ffd43b;
+}
+
+.round-controls .btn-end {
+    /* Keep default style or add specific muted style */
+    background-color: var(--color-background-mute);
+}
+
+.inline-modal {
+    position: fixed; /* Or absolute relative to app-container */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--color-background); /* Darker modal background */
+    padding: 1.5rem 2rem;
+    border: 1px solid var(--color-border);
+    border-radius: 12px; /* More rounded modal */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    z-index: 10; /* Ensure it's on top */
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    min-width: 300px;
+}
+
+.inline-modal h3 {
+    margin-top: 0;
+    color: var(--color-primary);
+}
+
+.inline-modal label {
+    margin-right: 0.5rem;
+    color: var(--color-text-soft);
+}
+
+/* Style buttons inside modal */
+.inline-modal button {
+    margin-top: 0.5rem; /* Add space above modal buttons */
+}
+
+/* Add a subtle overlay behind the modal */
+.app-container::after {
+    content: '';
+    /* Add logic in JS/React to conditionally apply this class */
+    /* Example: position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5; */
+}
