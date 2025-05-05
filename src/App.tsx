@@ -4,7 +4,7 @@ import type { Player, GameState } from './types';
 
 const LOCAL_STORAGE_KEY = 'teenPattiGameState';
 
-function App() {
+function App() { // Assuming GameState type is defined above or imported
   const [gameState, setGameState] = useState<GameState>(() => {
     // Load initial state from localStorage or set defaults
     console.log("Attempting to load state from localStorage..."); // Debug log
@@ -14,7 +14,11 @@ function App() {
         const parsed = JSON.parse(savedState);
         console.log("Successfully parsed saved state:", parsed); // Debug log
         // Need to parse Set from array
-        return { ...parsed, foldedPlayerIds: new Set(parsed.foldedPlayerIds || []) };
+        return {
+            ...parsed,
+            foldedPlayerIds: new Set(parsed.foldedPlayerIds || []),
+            lastBootAmount: parsed.lastBootAmount || null // Load last boot amount
+        };
       } catch (error) {
         console.error("Failed to parse saved state from localStorage:", error); // Log potential error
       }
@@ -28,6 +32,7 @@ function App() {
       currentStake: 0,
       potAmount: 0,
       foldedPlayerIds: new Set<number>(),
+      lastBootAmount: null, // Initialize last boot amount
       messages: ["Welcome! Load a game or set up a new one."],
     };
   });
@@ -54,7 +59,8 @@ function App() {
     // Convert Set to array for JSON serialization
     const stateToSave = {
       ...gameState,
-      foldedPlayerIds: Array.from(gameState.foldedPlayerIds)
+      foldedPlayerIds: Array.from(gameState.foldedPlayerIds),
+      // lastBootAmount is already serializable
     };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
   }, [gameState]);
@@ -186,6 +192,7 @@ function App() {
       currentStake: 0,          // Reset stake
       potAmount: 0,             // Reset pot
       foldedPlayerIds: new Set<number>(), // Reset folded players
+      lastBootAmount: null,     // Reset last boot amount
       messages: [`New game started with ${newPlayers.length} players. Please set the boot amount.`]
     }));
     setShowSetup(false);
@@ -198,7 +205,11 @@ function App() {
      if (savedState) {
        const parsed = JSON.parse(savedState);
        if (parsed.players && parsed.players.length >= 2) {
-         setGameState({ ...parsed, foldedPlayerIds: new Set(parsed.foldedPlayerIds || []) });
+         setGameState({
+            ...parsed,
+            foldedPlayerIds: new Set(parsed.foldedPlayerIds || []),
+            lastBootAmount: parsed.lastBootAmount || null // Ensure lastBootAmount is loaded
+         });
          setShowSetup(false);
          addMessage("Saved game loaded.");
        } else {
@@ -270,6 +281,7 @@ function App() {
         potAmount: 0,
         foldedPlayerIds: new Set<number>(),
         messages: messages,
+        lastBootAmount: prev.currentStake, // Store the boot amount used for this round
       };
     });
   }, []);
@@ -280,21 +292,25 @@ function App() {
       return;
     }
 
-    // Instead of prompting, set state to show boot input
-    setInteractionState('gettingBoot');
-    let startingPlayerIndex = -1;
-
-    if (gameState.lastWinnerId !== null) {
+    // If a previous round was played and we have a last boot amount, start directly
+    if (gameState.lastWinnerId !== null && gameState.lastBootAmount && gameState.lastBootAmount > 0) {
       const winnerIndex = gameState.players.findIndex(p => p.id === gameState.lastWinnerId);
       if (winnerIndex !== -1) {
-        startingPlayerIndex = (winnerIndex + 1) % gameState.players.length;
-        addMessage(`Last winner: ${gameState.players[winnerIndex].name}. Starting with: ${gameState.players[startingPlayerIndex].name}.`);
+        const startingPlayerIndex = (winnerIndex + 1) % gameState.players.length;
+        addMessage(`Starting round with previous boot: Rs. ${gameState.lastBootAmount}.`);
+        startRoundWithPlayer(startingPlayerIndex, gameState.lastBootAmount);
+      } else {
+        // Should not happen if lastWinnerId is valid, but handle defensively
+        addMessage("Error finding last winner. Please set boot amount manually.", true);
+        setInteractionState('gettingBoot');
       }
+    } else {
+      // Otherwise (first round after loading, or no last boot amount), prompt for boot
+      addMessage("Please set the boot amount for this round.");
+      setBootAmountInput(String(gameState.lastBootAmount || 10)); // Suggest last boot or default
+      setInteractionState('gettingBoot');
     }
 
-    // Store potential starting player index temporarily if known
-    // We'll use it after getting boot amount
-    setGameState(prev => ({ ...prev, currentPlayerIndex: startingPlayerIndex }));
   };
 
   // Called after user enters boot amount
@@ -305,20 +321,25 @@ function App() {
       return;
     }
 
-    let startingPlayerIndex = gameState.currentPlayerIndex; // Get potentially pre-calculated index
+    let startingPlayerIndex = -1;
 
-    if (startingPlayerIndex === -1) {
-      // Need to select starting player
+    // Determine starting player
+    if (gameState.lastWinnerId !== null) {
+      const winnerIndex = gameState.players.findIndex(p => p.id === gameState.lastWinnerId);
+      if (winnerIndex !== -1) {
+        startingPlayerIndex = (winnerIndex + 1) % gameState.players.length;
+      }
+    }
+
+    if (startingPlayerIndex === -1) { // No last winner (first game) or error finding winner
+      // Need to select starting player manually
       setSelectedPlayerId(gameState.players.length > 0 ? String(gameState.players[0].id) : ""); // Default selection
       setInteractionState('gettingStartPlayer');
       // Store boot amount temporarily before proceeding
       setGameState(prev => ({ ...prev, currentStake: bootAmount })); // Use currentStake temporarily
       return;
-    }
-
-    // If starting player is known, proceed directly
-    startRoundWithPlayer(startingPlayerIndex, bootAmount);
-  };
+    } else { // Starting player determined automatically
+      startRoundWithPlayer(startingPlayerIndex, bootAmount); } };
 
   // Called after user selects starting player
   const handleConfirmStartingPlayer = () => {
@@ -358,6 +379,14 @@ function App() {
         };
     });
     setInteractionState('idle'); // Back to normal game state
+  };
+
+  // Handler for the new "Change Boot" button
+  const handleChangeBoot = () => {
+    if (gameState.roundActive) return; // Should be disabled anyway
+    addMessage("Changing boot amount for the next round.");
+    setBootAmountInput(String(gameState.lastBootAmount || 10)); // Pre-fill with last boot or default
+    setInteractionState('gettingBoot');
   };
 
    const handleBet = () => {
@@ -716,7 +745,13 @@ function App() {
           {/* Actions and Log Area */}
           <div>
             <div className="game-actions">
-              <button className="btn-primary" onClick={handleStartRound} disabled={gameState.roundActive || gameState.players.length < 2}>Start New Round</button>
+              <button
+                className="btn-primary"
+                onClick={handleStartRound}
+                disabled={gameState.roundActive || gameState.players.length < 2 || !gameState.lastBootAmount || gameState.lastWinnerId === null}
+                title={!gameState.lastBootAmount || gameState.lastWinnerId === null ? "Play one round first to use the same boot amount" : "Start next round with the same boot amount"}
+              >Start New Round</button>
+              <button className="btn-secondary" onClick={handleChangeBoot} disabled={gameState.roundActive || gameState.players.length < 2}>Change Boot</button>
               <button className="btn-primary" onClick={handleAddPlayer} disabled={gameState.roundActive}>Add Player</button>
               <button className="btn-secondary" onClick={handleRemovePlayer} disabled={gameState.roundActive || gameState.players.length <= 2}>Remove Player</button>
               <button className="btn-secondary" onClick={() => setShowSetup(true)}>Back to Setup</button>
