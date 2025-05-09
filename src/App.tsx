@@ -405,10 +405,10 @@ function App() { // Assuming GameState type is defined above or imported
           return;
       }
 
-      if (betAmount < gameState.currentStake) {
-          alert(`Bet must be at least the current stake of Rs. ${gameState.currentStake}.`);
-          return;
-      }
+      // if (betAmount < gameState.currentStake) {
+      //     alert(`Bet must be at least the current stake of Rs. ${gameState.currentStake}.`);
+      //     return;
+      // }
 
       // Removed the check for player.balance < betAmount to allow negative balances
 
