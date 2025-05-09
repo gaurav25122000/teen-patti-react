@@ -17,7 +17,8 @@ function App() { // Assuming GameState type is defined above or imported
         return {
             ...parsed,
             foldedPlayerIds: new Set(parsed.foldedPlayerIds || []),
-            lastBootAmount: parsed.lastBootAmount || null // Load last boot amount
+            lastBootAmount: parsed.lastBootAmount || null, // Load last boot amount
+            roundInitialBootAmount: parsed.roundInitialBootAmount || null, // Load initial boot for current round if saved mid-round
         };
       } catch (error) {
         console.error("Failed to parse saved state from localStorage:", error); // Log potential error
@@ -33,6 +34,7 @@ function App() { // Assuming GameState type is defined above or imported
       potAmount: 0,
       foldedPlayerIds: new Set<number>(),
       lastBootAmount: null, // Initialize last boot amount
+      roundInitialBootAmount: null, // Initialize the boot amount for the current round
       messages: ["Welcome! Load a game or set up a new one."],
     };
   });
@@ -281,7 +283,8 @@ function App() { // Assuming GameState type is defined above or imported
         potAmount: 0,
         foldedPlayerIds: new Set<number>(),
         messages: messages,
-        lastBootAmount: prev.currentStake, // Store the boot amount used for this round
+      lastBootAmount: prev.roundInitialBootAmount, // Store the actual boot amount that started this round
+      roundInitialBootAmount: null, // Reset for the next round
       };
     });
   }, []);
@@ -375,6 +378,7 @@ function App() { // Assuming GameState type is defined above or imported
             currentStake: bootAmount,
             potAmount: newPot,
             foldedPlayerIds: new Set<number>(),
+            roundInitialBootAmount: bootAmount, // Store the boot amount for this round
             messages: [...prev.messages, `Round started. Stake: Rs. ${bootAmount}. Turn: ${toTitleCase(updatedPlayers[startingPlayerIndex].name)}`],
         };
     });
