@@ -8,7 +8,42 @@
   width: 100%; /* Ensure it takes full width available */
   box-sizing: border-box; /* Include padding in width calculation */
 }
-
+/* General Button Styling (can be adjusted or merged if you have existing base button styles) */
+.btn-primary, .btn-secondary, .btn-action, .btn-bet, .btn-fold, .btn-show, .btn-end, .btn-start {
+    padding: 8px 15px;
+    margin: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    border: 1px solid transparent; /* Default border, overridden by specific styles */
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+  }
+  
+  /* Example: Basic Primary and Secondary button styles (if not already defined) */
+  .btn-primary {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+  }
+  
+  .btn-secondary {
+    background-color: #6c757d;
+    color: white;
+    border-color: #6c757d;
+  }
+  
+  /* Styling for Play Blind, Raise Blind, See Cards buttons */
+  .btn-action {
+    background-color: #ff4ff0; /* Amber 300: pleasant, slightly lighter amber/yellow */
+    color: #3E2723; /* Brown 800: dark brown text for good contrast and warmth */
+  }
+  
+  .btn-action:hover {
+    background-color: #FFCA28; /* Amber 400: darker shade on hover */
+    border-color: #fff; /* Amber 700: even darker border on hover */
+  }
 .setup-screen, .game-screen {
   border: 1px solid var(--color-border);
   padding: 1.5rem; /* More padding inside sections */
