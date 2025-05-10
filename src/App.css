@@ -41,7 +41,7 @@
   }
   
   .btn-action:hover {
-    background-color: #FFCA28; /* Amber 400: darker shade on hover */
+    background-color: #ff90f6; /* Amber 400: darker shade on hover */
     border-color: #fff; /* Amber 700: even darker border on hover */
   }
 .setup-screen, .game-screen {
