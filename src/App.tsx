@@ -18,6 +18,8 @@ function App() { // Assuming GameState type is defined above or imported
             ...parsed,
             foldedPlayerIds: new Set(parsed.foldedPlayerIds || []),
             lastBootAmount: parsed.lastBootAmount || null, // Load last boot amount
+            blindPlayerIds: new Set(parsed.blindPlayerIds || []), // Load blind players
+            lastActorWasBlind: parsed.lastActorWasBlind || false, // Load last actor status
             roundInitialBootAmount: parsed.roundInitialBootAmount || null, // Load initial boot for current round if saved mid-round
         };
       } catch (error) {
@@ -34,6 +36,8 @@ function App() { // Assuming GameState type is defined above or imported
       potAmount: 0,
       foldedPlayerIds: new Set<number>(),
       lastBootAmount: null, // Initialize last boot amount
+      blindPlayerIds: new Set<number>(), // Initialize blind players set
+      lastActorWasBlind: false, // Initialize last actor status
       roundInitialBootAmount: null, // Initialize the boot amount for the current round
       messages: ["Welcome! Load a game or set up a new one."],
     };
@@ -43,6 +47,7 @@ function App() { // Assuming GameState type is defined above or imported
   const [numPlayersInput, setNumPlayersInput] = useState("2");
   const [playerInputs, setPlayerInputs] = useState<{ name: string; balance: string }[]>([]);
   const [betAmountInput, setBetAmountInput] = useState("");
+  const [blindRaiseAmountInput, setBlindRaiseAmountInput] = useState("");
 
   // State for inline forms/modals replacement
   const [interactionState, setInteractionState] = useState<'idle' | 'gettingBoot' | 'gettingStartPlayer' | 'addingPlayer' | 'removingPlayer' | 'selectingWinner' | 'showingCards'>('idle');
@@ -55,6 +60,55 @@ function App() { // Assuming GameState type is defined above or imported
   // Ref for the action log container
   const logContainerRef = useRef<HTMLDivElement>(null);
 
+  // --- Utility Functions (Core, no complex dependencies or for early use) ---
+  const toTitleCase = (str: string): string => {
+    if (!str) return "";
+    return str.toLowerCase().split(' ').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  // --- Primary Derived State Calculation Functions (depend only on gameState) ---
+  const getCurrentPlayer = useCallback((): Player | null => {
+    if (!gameState.roundActive || gameState.currentPlayerIndex < 0 || gameState.currentPlayerIndex >= gameState.players.length) {
+      return null;
+    }
+    return gameState.players[gameState.currentPlayerIndex];
+  }, [gameState.roundActive, gameState.currentPlayerIndex, gameState.players]);
+
+  const getActivePlayers = useCallback((): Player[] => {
+    return gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
+  }, [gameState.players, gameState.foldedPlayerIds]);
+
+  // --- Derived State Values (calculated on every render) ---
+  // These are now defined before the useEffects that use them.
+  const currentPlayer = getCurrentPlayer();
+  const activePlayers = getActivePlayers();
+
+  // --- Secondary Utility Functions (may depend on derived state like currentPlayer) ---
+  const findPrecedingActivePlayer = useCallback((): Player | null => {
+    const numPlayers = gameState.players.length;
+    if (numPlayers < 2 || !currentPlayer) return null; // Uses currentPlayer
+
+    let currentIndex = gameState.currentPlayerIndex;
+    let attempts = 0;
+
+    do {
+      currentIndex = (currentIndex - 1 + numPlayers) % numPlayers; // Move backwards
+      const precedingPlayer = gameState.players[currentIndex];
+
+      // Check if it's an active player and not the current player
+      if (
+        precedingPlayer.id !== currentPlayer.id &&
+        !gameState.foldedPlayerIds.has(precedingPlayer.id)
+      ) {
+        return precedingPlayer;
+      }
+      attempts++;
+    } while (attempts < numPlayers);
+    return null; // Should only happen if only one active player left
+  }, [gameState.players, gameState.currentPlayerIndex, gameState.foldedPlayerIds, currentPlayer]);
+
   // --- Persistence ---
   useEffect(() => {
     // Save state to localStorage whenever it changes
@@ -62,18 +116,33 @@ function App() { // Assuming GameState type is defined above or imported
     const stateToSave = {
       ...gameState,
       foldedPlayerIds: Array.from(gameState.foldedPlayerIds),
+      blindPlayerIds: Array.from(gameState.blindPlayerIds), // Serialize blindPlayerIds
+      // lastActorWasBlind is already serializable
       // lastBootAmount is already serializable
     };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
   }, [gameState]);
 
-  // Effect to auto-fill bet amount input with current stake
+  // Effect to auto-fill bet amount input and blind raise input
   useEffect(() => {
-    if (gameState.roundActive) {
-      // Set the input field to the current minimum bet (stake)
-      setBetAmountInput(String(gameState.currentStake));
+    if (gameState.roundActive && currentPlayer) {
+        if (gameState.blindPlayerIds.has(currentPlayer.id)) {
+            // Player is blind
+            setBetAmountInput(String(gameState.currentStake));
+            setBlindRaiseAmountInput(String(gameState.currentStake * 2)); // Suggest double for raise
+        } else { // Player is Chaal (Seen)
+            const minChaalBet = gameState.lastActorWasBlind
+                ? 2 * gameState.currentStake
+                : gameState.currentStake;
+            setBetAmountInput(String(minChaalBet));
+            setBlindRaiseAmountInput(""); // Clear if not blind player's turn
+        }
+    } else if (!gameState.roundActive) {
+        setBetAmountInput(""); // Clear if round is not active
+        setBlindRaiseAmountInput(""); // Clear if round is not active
     }
-  }, [gameState.roundActive, gameState.currentPlayerIndex, gameState.currentStake]); // Re-run when turn changes or stake changes
+  }, [gameState.roundActive, gameState.currentPlayerIndex, gameState.currentStake, gameState.blindPlayerIds, gameState.lastActorWasBlind, currentPlayer]);
+
 
   // Effect to scroll action log to bottom
   useEffect(() => {
@@ -92,55 +161,6 @@ function App() { // Assuming GameState type is defined above or imported
       messages: [...prev.messages.slice(-100), `${isError ? "ERROR: " : ""}${message}`] // Keep last 100 messages
     }));
   }, []);
-
-  // Helper function for Title Case
-  const toTitleCase = (str: string): string => {
-    if (!str) return "";
-    return str.toLowerCase().split(' ').map(word =>
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-  };
-
-  // --- Utility Functions --- Moved Up ---
-  const getCurrentPlayer = (): Player | null => {
-    if (!gameState.roundActive || gameState.currentPlayerIndex < 0 || gameState.currentPlayerIndex >= gameState.players.length) {
-      return null;
-    }
-    return gameState.players[gameState.currentPlayerIndex];
-  };
-
-  const getActivePlayers = (): Player[] => {
-    return gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
-  };
-
-  // Helper to find the active player immediately before the current one
-  const findPrecedingActivePlayer = (): Player | null => {
-    const numPlayers = gameState.players.length;
-    if (numPlayers < 2 || !currentPlayer) return null;
-
-    let currentIndex = gameState.currentPlayerIndex;
-    let attempts = 0;
-
-    do {
-      currentIndex = (currentIndex - 1 + numPlayers) % numPlayers; // Move backwards
-      const precedingPlayer = gameState.players[currentIndex];
-
-      // Check if it's an active player and not the current player
-      if (
-        precedingPlayer.id !== currentPlayer.id &&
-        !gameState.foldedPlayerIds.has(precedingPlayer.id)
-      ) {
-        return precedingPlayer;
-      }
-      attempts++;
-    } while (attempts < numPlayers);
-
-    return null; // Should only happen if only one active player left
-  };
-
-  // --- Derived State --- Moved Down ---
-  const activePlayers = getActivePlayers(); // Calculate once
-  const currentPlayer = getCurrentPlayer(); // Calculate once
 
   // --- Setup Logic ---
   const handleConfirmNumPlayers = () => {
@@ -285,6 +305,8 @@ function App() { // Assuming GameState type is defined above or imported
         messages: messages,
       lastBootAmount: prev.roundInitialBootAmount, // Store the actual boot amount that started this round
       roundInitialBootAmount: null, // Reset for the next round
+      blindPlayerIds: new Set<number>(), // Reset blind players
+      lastActorWasBlind: false, // Reset last actor status
       };
     });
   }, []);
@@ -369,15 +391,19 @@ function App() { // Assuming GameState type is defined above or imported
             newPot += bootAmount;
             return {...p, balance: p.balance - bootAmount};
         });
+        const initialBlindPlayerIds = new Set(updatedPlayers.map(p => p.id)); // All players start blind
+
         addMessage(`Collecting Boot Amount: Rs. ${bootAmount} from each player. Pot: Rs. ${newPot}`);
         return {
             ...prev,
             players: updatedPlayers,
             roundActive: true,
+            blindPlayerIds: initialBlindPlayerIds,
             currentPlayerIndex: startingPlayerIndex,
             currentStake: bootAmount,
             potAmount: newPot,
             foldedPlayerIds: new Set<number>(),
+            lastActorWasBlind: true, // Boot collection acts as a universal blind bet
             roundInitialBootAmount: bootAmount, // Store the boot amount for this round
             messages: [...prev.messages, `Round started. Stake: Rs. ${bootAmount}. Turn: ${toTitleCase(updatedPlayers[startingPlayerIndex].name)}`],
         };
@@ -393,9 +419,102 @@ function App() { // Assuming GameState type is defined above or imported
     setInteractionState('gettingBoot');
   };
 
+  const handlePlayStandardBlind = () => {
+    const player = getCurrentPlayer();
+    if (!player || !gameState.blindPlayerIds.has(player.id)) {
+        addMessage("Error: Only blind players can play a standard blind.", true);
+        return;
+    }
+
+    const actualBetAmount = gameState.currentStake;
+    // Assuming player has enough balance or allowing negative balance as per current logic
+    // if (player.balance < actualBetAmount) {
+    //     addMessage(`${toTitleCase(player.name)} does not have enough balance to bet Rs. ${actualBetAmount}.`, true);
+    //     return;
+    // }
+
+    setGameState(prev => {
+        if (!player) return prev; // Should be caught, for type safety
+        const updatedPlayers = prev.players.map(p =>
+            p.id === player.id ? { ...p, balance: p.balance - actualBetAmount } : p
+        );
+
+        return {
+            ...prev,
+            players: updatedPlayers,
+            potAmount: prev.potAmount + actualBetAmount,
+            // currentStake does NOT change for a standard blind play
+            lastActorWasBlind: true, // This action was a blind play
+            messages: [...prev.messages, `${toTitleCase(player.name)} plays blind for Rs. ${actualBetAmount}.`],
+        };
+    });
+    advanceTurn();
+  };
+
+  const handleConfirmBlindRaise = () => {
+    const player = getCurrentPlayer();
+    if (!player || !gameState.blindPlayerIds.has(player.id)) {
+        addMessage("Error: Only blind players can raise blind.", true);
+        return;
+    }
+
+    const raiseAmount = parseInt(blindRaiseAmountInput);
+
+    if (isNaN(raiseAmount)) {
+        alert("Invalid raise amount.");
+        return;
+    }
+    if (raiseAmount <= gameState.currentStake) {
+        alert(`Blind raise must be greater than the current stake of Rs. ${gameState.currentStake}.`);
+        return;
+    }
+    // Balance check (currently commented out elsewhere too)
+    // if (player.balance < raiseAmount) { ... }
+
+    setGameState(prev => {
+        if (!player) return prev;
+        const updatedPlayers = prev.players.map(p =>
+            p.id === player.id ? { ...p, balance: p.balance - raiseAmount } : p
+        );
+        return {
+            ...prev,
+            players: updatedPlayers,
+            potAmount: prev.potAmount + raiseAmount,
+            currentStake: raiseAmount, // The raise amount becomes the new current stake
+            lastActorWasBlind: true, // This action was a blind play
+            messages: [...prev.messages, `${toTitleCase(player.name)} raises blind to Rs. ${raiseAmount}.`],
+        };
+    });
+    advanceTurn();
+  };
+
+  const handleSeeCards = () => {
+    const player = getCurrentPlayer();
+    if (!player || !gameState.blindPlayerIds.has(player.id)) {
+        addMessage("Error: Only blind players can 'See Cards'.", true);
+        return;
+    }
+
+    setGameState(prev => {
+        const newBlindPlayerIds = new Set(prev.blindPlayerIds);
+        newBlindPlayerIds.delete(player.id);
+        // Player's turn does not advance yet. They must now make a Chaal move.
+        // lastActorWasBlind remains as it was, as no bet/action affecting next player's min bet has occurred.
+        return {
+            ...prev,
+            blindPlayerIds: newBlindPlayerIds,
+            messages: [...prev.messages, `${toTitleCase(player.name)} sees their cards. Must now play Chaal, Show, or Fold.`],
+        };
+    });
+    // useEffect for betAmountInput will update the input field for Chaal play.
+  };
+
    const handleBet = () => {
       const player = getCurrentPlayer();
-      if (!player) return;
+      if (!player || gameState.blindPlayerIds.has(player.id)) {
+          addMessage("Error: Seen players use 'Bet/Chaal'. Blind players use 'Play Blind' or 'See Cards' first.", true);
+          return;
+      }
 
       const betAmount = parseInt(betAmountInput);
 
@@ -409,29 +528,51 @@ function App() { // Assuming GameState type is defined above or imported
           return;
       }
 
-      // if (betAmount < gameState.currentStake) {
-      //     alert(`Bet must be at least the current stake of Rs. ${gameState.currentStake}.`);
-      //     return;
-      // }
+      const minChaalBet = gameState.lastActorWasBlind
+          ? 2 * gameState.currentStake
+          : gameState.currentStake;
+
+      if (betAmount < minChaalBet) {
+          alert(`Bet must be at least Rs. ${minChaalBet}.`);
+          return;
+      }
 
       // Removed the check for player.balance < betAmount to allow negative balances
 
       // Process bet
       setGameState(prev => {
+          if (!player) return prev; // Should be caught earlier, but for type safety
           const newPlayers = prev.players.map(p =>
               p.id === player.id ? { ...p, balance: p.balance - betAmount } : p
           );
-          const newStake = Math.max(prev.currentStake, betAmount);
-          let messages = [...prev.messages, `${toTitleCase(player.name)} bets Rs. ${betAmount}.`];
-          if (newStake > prev.currentStake) {
-              messages.push(`Stake increased to Rs. ${newStake}.`);
+
+          let newCalculatedStake = prev.currentStake;
+          let stakeMessage = "";
+
+          if (prev.lastActorWasBlind) { // Previous was blind, current is Chaal
+              const potentialNewStake = Math.floor(betAmount / 2);
+              if (potentialNewStake > prev.currentStake) {
+                  newCalculatedStake = potentialNewStake;
+              }
+          } else { // Previous was Chaal, current is Chaal
+              if (betAmount > prev.currentStake) {
+                  newCalculatedStake = betAmount;
+              }
           }
+          // Ensure stake doesn't go below initial boot amount for the round
+          const finalNewStake = Math.max(newCalculatedStake, prev.roundInitialBootAmount || 0);
+
+          if (finalNewStake > prev.currentStake) {
+              stakeMessage = ` Stake (for blind) updated to Rs. ${finalNewStake}.`;
+          }
+          let messages = [...prev.messages, `${toTitleCase(player.name)} bets Rs. ${betAmount}.${stakeMessage}`];
 
           return {
               ...prev,
               players: newPlayers,
               potAmount: prev.potAmount + betAmount,
-              currentStake: newStake,
+              currentStake: finalNewStake,
+              lastActorWasBlind: false, // This action was a Chaal play
               messages: messages,
           };
       });
@@ -459,6 +600,25 @@ function App() { // Assuming GameState type is defined above or imported
   // --- Simplified Show/End Betting (using prompts/confirms) ---
   // A real app would use modal components here
   // Updated handleShow to use inline modal
+  const calculateShowCost = useCallback((): number => {
+    if (!currentPlayer || !gameState.roundActive) return 0;
+    const precedingPlayer = findPrecedingActivePlayer();
+    if (!precedingPlayer) return 0;
+
+    const isRequesterBlind = gameState.blindPlayerIds.has(currentPlayer.id);
+    const isTargetBlind = gameState.blindPlayerIds.has(precedingPlayer.id);
+
+    if (isRequesterBlind) { // Blind player initiating show
+        return gameState.currentStake;
+    } else { // Chaal (Seen) player initiating show
+        if (isTargetBlind) { // Chaal showing against Blind
+            return 2 * gameState.currentStake;
+        } else { // Chaal showing against Chaal
+            return gameState.currentStake;
+        }
+    }
+}, [currentPlayer, gameState.roundActive, gameState.blindPlayerIds, gameState.currentStake, findPrecedingActivePlayer]);
+
   const handleShow = () => {
       if (!currentPlayer || !gameState.roundActive) return;
 
@@ -469,7 +629,11 @@ function App() { // Assuming GameState type is defined above or imported
           return;
       }
 
-      const showCost = gameState.currentStake;
+      const showCost = calculateShowCost();
+      if (showCost === 0 && precedingPlayer) { // calculateShowCost might return 0 if precedingPlayer is null but we checked earlier
+          addMessage("Error calculating show cost.", true);
+          return;
+      }
       // Removed balance check: if (currentPlayer.balance < showCost) ...
 
       // Deduct cost, update pot, set state for modal
@@ -729,8 +893,15 @@ function App() { // Assuming GameState type is defined above or imported
                   const isFolded = gameState.foldedPlayerIds.has(p.id);
                   const isCurrent = gameState.roundActive && currentPlayer?.id === p.id;
                   let status = "Waiting";
-                  if (gameState.roundActive) {
-                      status = isFolded ? "Folded" : (isCurrent ? "Current Turn" : "Active");
+                  if (gameState.roundActive && !isFolded) {
+                      if (gameState.blindPlayerIds.has(p.id)) {
+                          status = "Blind";
+                      } else {
+                          status = "Seen (Chaal)";
+                      }
+                      if (isCurrent) status += " (Current Turn)";
+                  } else if (isFolded) {
+                      status = "Folded";
                   }
                   const className = `${isFolded ? 'folded' : ''} ${isCurrent ? 'current-player' : ''}`;
                   return (
@@ -768,16 +939,41 @@ function App() { // Assuming GameState type is defined above or imported
                     <div>Current Stake: Rs. {gameState.currentStake}</div>
                     <div>Pot Amount: Rs. {gameState.potAmount}</div>
                  </div>
-                 <input
-                    type="number"
-                    placeholder="Bet Amount"
-                    value={betAmountInput}
-                    onChange={(e) => setBetAmountInput(e.target.value)}
-                    min="0"
-                 />
-                 <button onClick={handleBet} className="btn-bet">Bet / Chaal</button>
+                 {gameState.blindPlayerIds.has(currentPlayer.id) ? (
+                    <>
+                        <button onClick={handlePlayStandardBlind} className="btn-action">
+                            Play Blind (Cost: Rs. {gameState.currentStake})
+                        </button>
+                        <div className="inline-input-group">
+                            <input
+                                type="number"
+                                value={blindRaiseAmountInput}
+                                onChange={(e) => setBlindRaiseAmountInput(e.target.value)}
+                                placeholder={`Min Raise: ${gameState.currentStake + 1}`}
+                                min={gameState.currentStake + 1}
+                            />
+                            <button onClick={handleConfirmBlindRaise} className="btn-action">Raise Blind</button>
+                        </div>
+                        <button onClick={handleSeeCards} className="btn-action">
+                            See Cards
+                        </button>
+                    </>
+                 ) : (
+                    <>
+                        <input
+                            type="number"
+                            placeholder="Bet Amount"
+                            value={betAmountInput}
+                            onChange={(e) => setBetAmountInput(e.target.value)}
+                            min="0" // Dynamic min enforced in handleBet
+                        />
+                        <button onClick={handleBet} className="btn-bet">
+                            Bet / Chaal
+                        </button>
+                    </>
+                 )}
                  <button onClick={handleFold} className="btn-fold">Fold (0)</button>
-                 <button onClick={handleShow} title="Show UI not fully implemented" className="btn-show">Show (-2)</button>
+                 <button onClick={handleShow} className="btn-show">Show (Cost: Rs. {calculateShowCost()})</button>
                  <button onClick={handleEndBetting} className="btn-end">End Betting (-1)</button>
               </div>
             )}
