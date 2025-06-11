@@ -124,6 +124,7 @@ function App() { // Assuming GameState type is defined above or imported
   }, [gameState]);
 
   // Effect to auto-fill bet amount input and blind raise input
+    // Effect to auto-fill bet amount input and blind raise input
   useEffect(() => {
     if (gameState.roundActive && currentPlayer) {
         if (gameState.blindPlayerIds.has(currentPlayer.id)) {
@@ -131,9 +132,8 @@ function App() { // Assuming GameState type is defined above or imported
             setBetAmountInput(String(gameState.currentStake));
             setBlindRaiseAmountInput(String(gameState.currentStake * 2)); // Suggest double for raise
         } else { // Player is Chaal (Seen)
-            const minChaalBet = gameState.lastActorWasBlind
-                ? 2 * gameState.currentStake
-                : gameState.currentStake;
+            // A seen player's minimum bet is always double the current blind stake
+            const minChaalBet = 2 * gameState.currentStake; // This is the change
             setBetAmountInput(String(minChaalBet));
             setBlindRaiseAmountInput(""); // Clear if not blind player's turn
         }
@@ -141,7 +141,7 @@ function App() { // Assuming GameState type is defined above or imported
         setBetAmountInput(""); // Clear if round is not active
         setBlindRaiseAmountInput(""); // Clear if round is not active
     }
-  }, [gameState.roundActive, gameState.currentPlayerIndex, gameState.currentStake, gameState.blindPlayerIds, gameState.lastActorWasBlind, currentPlayer]);
+  }, [gameState.roundActive, gameState.currentPlayerIndex, gameState.currentStake, gameState.blindPlayerIds, currentPlayer]); // Removed lastActorWasBlind from dependency array because it's not needed for the current player's own minimum bet calculation
 
 
   // Effect to scroll action log to bottom
@@ -530,7 +530,7 @@ function App() { // Assuming GameState type is defined above or imported
   }, [gameState.roundActive, gameState.currentPlayerIndex, gameState.currentStake, gameState.blindPlayerIds, gameState.lastActorWasBlind, currentPlayer]);
 
 
-     const handleBet = () => {
+       const handleBet = () => {
       const player = getCurrentPlayer();
       if (!player || gameState.blindPlayerIds.has(player.id)) {
           addMessage("Error: Seen players use 'Bet/Chaal'. Blind players use 'Play Blind' or 'See Cards' first.", true);
@@ -549,12 +549,11 @@ function App() { // Assuming GameState type is defined above or imported
           return;
       }
 
-      const minChaalBet = gameState.lastActorWasBlind
-          ? 2 * gameState.currentStake
-          : gameState.currentStake;
+      // Re-calculate minChaalBet here for validation, similar to useEffect
+      const minChaalBetForValidation = 2 * gameState.currentStake; // Always 2x for seen player
 
-      if (betAmount < minChaalBet) {
-          alert(`Bet must be at least Rs. ${minChaalBet}.`);
+      if (betAmount < minChaalBetForValidation) { // Use the explicitly calculated minimum
+          alert(`Bet must be at least Rs. ${minChaalBetForValidation}.`);
           return;
       }
 
@@ -566,14 +565,53 @@ function App() { // Assuming GameState type is defined above or imported
 
           let newCalculatedStake = prev.currentStake; // Default to old stake
 
-          // Calculate the new 'blind equivalent' stake based on the bet made by the SEEN player
-          const betAsEquivalentBlindStake = prev.lastActorWasBlind
-              ? Math.floor(betAmount / 2) // If prev was blind, current bet (Chaal) is double the blind stake
-              : betAmount;               // If prev was chaal, current bet (Chaal) is the current blind stake
+          // How the new 'currentStake' (blind equivalent) is determined:
+          // If the current bet (betAmount) is made by a SEEN player:
+          //   - If the LAST actor was BLIND, then this bet (betAmount) is effectively 2 * the blind stake.
+          //     So, the new equivalent blind stake is betAmount / 2.
+          //   - If the LAST actor was SEEN, then this bet (betAmount) is effectively the blind stake.
+          //     So, the new equivalent blind stake is betAmount.
+          // In either case, the new `currentStake` should be the maximum of the `prev.currentStake`
+          // and the calculated `betAsEquivalentBlindStake`.
 
-          // The new currentStake should be the maximum of the old stake and this new equivalent stake
-          // This ensures the stake only goes up, or stays the same if the bet was the minimum required.
-          newCalculatedStake = Math.max(prev.currentStake, betAsEquivalentBlindStake);
+          const betAsEquivalentBlindStake = prev.lastActorWasBlind
+              ? Math.floor(betAmount / 2) // Prev was blind, current seen bet is 2x current stake
+              : betAmount;               // Prev was seen, current seen bet is 1x current stake (no, this isn't right for teen patti)
+
+          // Let's simplify the stake update logic for Chaal bets.
+          // The `currentStake` should always represent the highest *blind equivalent* value bet so far.
+          // If a Chaal player bets `X`, then the effective blind value for this bet is `X / 2`.
+          // If a Blind player bets `Y`, then the effective blind value for this bet is `Y`.
+          // The `currentStake` should always be `Math.max(old_currentStake, new_effective_blind_value_of_this_bet)`.
+
+          // Re-evaluate `currentStake` logic:
+          // `currentStake` needs to be the highest *blind* stake that has been paid by a blind player,
+          // OR half of the highest *seen* stake that has been paid by a seen player.
+          // This ensures that the minimum bet for a blind player is `currentStake`,
+          // and for a seen player is `2 * currentStake`.
+
+          // When a seen player (Chaal) bets `betAmount`:
+          // The new stake, for calculation purposes, is `betAmount`.
+          // This `betAmount` effectively *becomes* the new `currentStake` if it's higher than the previous `currentStake`,
+          // BUT only if the previous action was also by a Chaal player.
+          // If the previous action was by a Blind player, then this `betAmount` (from a Chaal player)
+          // is equivalent to `2 * currentStake`. So, the `currentStake` should become `betAmount / 2`.
+
+          // Simplified stake update:
+          // The `currentStake` must always be equal to the current amount that a BLIND player would have to bet.
+          // If a BLIND player bets `X`, then `currentStake` becomes `X`.
+          // If a SEEN player bets `Y`, then `currentStake` becomes `Y / 2`.
+          // We take the max of the current `currentStake` and the newly calculated one.
+
+          let newStakeBasedOnThisBet;
+          if (gameState.blindPlayerIds.has(player.id)) { // This branch should not be reachable for `handleBet`
+              newStakeBasedOnThisBet = betAmount; // Only happens for handlePlayStandardBlind or handleConfirmBlindRaise
+          } else { // Current player is Seen (Chaal)
+              newStakeBasedOnThisBet = Math.floor(betAmount / 2); // A seen bet is always 2x the equivalent blind stake
+          }
+
+          // The new `currentStake` is the maximum of the previous one and the one derived from this bet.
+          newCalculatedStake = Math.max(prev.currentStake, newStakeBasedOnThisBet);
 
 
           let messages = [...prev.messages, `${toTitleCase(player.name)} bets Rs. ${betAmount}.`];
@@ -586,12 +624,13 @@ function App() { // Assuming GameState type is defined above or imported
               players: newPlayers,
               potAmount: prev.potAmount + betAmount,
               currentStake: newCalculatedStake, // This is the new 'blind equivalent' stake
-              lastActorWasBlind: false, // This action was a Chaal play
+              lastActorWasBlind: false, // This action was by a Seen player
               messages: messages,
           };
       });
       advanceTurn();
   };
+ 
 
 
   const handleFold = () => {
