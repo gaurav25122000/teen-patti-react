@@ -488,7 +488,7 @@ function App() { // Assuming GameState type is defined above or imported
     advanceTurn();
   };
 
-  const handleSeeCards = () => {
+    const handleSeeCards = () => {
     const player = getCurrentPlayer();
     if (!player || !gameState.blindPlayerIds.has(player.id)) {
         addMessage("Error: Only blind players can 'See Cards'.", true);
@@ -508,6 +508,27 @@ function App() { // Assuming GameState type is defined above or imported
     });
     // useEffect for betAmountInput will update the input field for Chaal play.
   };
+
+  // Effect to auto-fill bet amount input and blind raise input
+  useEffect(() => {
+    if (gameState.roundActive && currentPlayer) {
+        if (gameState.blindPlayerIds.has(currentPlayer.id)) {
+            // Player is blind
+            setBetAmountInput(String(gameState.currentStake));
+            setBlindRaiseAmountInput(String(gameState.currentStake * 2)); // Suggest double for raise
+        } else { // Player is Chaal (Seen)
+            const minChaalBet = gameState.lastActorWasBlind
+                ? 2 * gameState.currentStake
+                : gameState.currentStake;
+            setBetAmountInput(String(minChaalBet));
+            setBlindRaiseAmountInput(""); // Clear if not blind player's turn
+        }
+    } else if (!gameState.roundActive) {
+        setBetAmountInput(""); // Clear if round is not active
+        setBlindRaiseAmountInput(""); // Clear if round is not active
+    }
+  }, [gameState.roundActive, gameState.currentPlayerIndex, gameState.currentStake, gameState.blindPlayerIds, gameState.lastActorWasBlind, currentPlayer]);
+
 
    const handleBet = () => {
       const player = getCurrentPlayer();
