@@ -55,7 +55,7 @@
 
 .game-screen {
     display: grid;
-    grid-template-columns: minmax(250px, 1.5fr) 3fr; /* Adjusted min width for player list */
+    grid-template-columns: minmax(250px, 2.5fr) 3fr; /* Adjusted min width for player list */
     gap: 1rem;
 }
 
@@ -78,13 +78,16 @@
 }
 
 .player-list .folded {
-    color: var(--color-text-muted); /* Use muted color */
+    color: white; /* Use muted color */
     text-decoration: line-through;
+    opacity: 0.7;
+    background-color: lightcoral;
 }
 
 .player-list .current-player {
     font-weight: bold;
-    background-color: var(--color-background-mute);
+    background-color: white;
+          color: black;
 }
 
 /* Removed hover effect for less visual noise */
