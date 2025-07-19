@@ -55,9 +55,28 @@
 
 .game-screen {
     display: grid;
-    grid-template-columns: minmax(250px, 2.5fr) 3fr; /* Adjusted min width for player list */
+    grid-template-columns: 2fr 3fr; /* Adjusted min width for player list */
     gap: 1rem;
+    /* Define grid areas for easier reordering */
+    grid-template-areas:
+        "player-list game-controls"
+        "player-list action-log";
 }
+
+.player-list {
+    grid-area: player-list;
+}
+
+.game-controls-container { /* New container for actions and log */
+    grid-area: game-controls;
+    display: flex;
+    flex-direction: column;
+}
+
+.action-log {
+    grid-area: action-log;
+}
+
 
 .player-list table {
     width: 100%;
@@ -131,6 +150,15 @@
 
 .round-info strong {
     color: var(--color-accent);
+}
+.round-info .current-stake {
+    color: lightblue;
+}
+
+.round-info .pot-info strong {
+    color: lightgoldenrodyellow ;
+    font: bold;
+    font-size: large;
 }
 
 .round-controls {
@@ -269,15 +297,15 @@
     .game-screen {
         /* Stack player list and game area */
         grid-template-columns: 1fr;
+        /* Reorder grid areas for smaller screens */
+        grid-template-areas:
+            "game-controls"
+            "player-list"
+            "action-log";
     }
 
     .player-list {
-        order: 2; /* Move player list below game area if desired */
-        margin-top: 1rem; /* Add space when stacked */
-    }
-
-    .game-area {
-        order: 1;
+        margin-top: -2rem; /* Add space when stacked */
     }
 }
 

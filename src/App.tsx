@@ -443,7 +443,10 @@ function App() {
 
   // Handler for the new "Change Boot" button
   const handleChangeBoot = () => {
-    if (gameState.roundActive) return; // Should be disabled anyway
+    if (gameState.roundActive) {
+      alert("Cannot change boot during an active round.");
+      return;
+    }
     addMessage("Changing boot amount for the next round.");
     setBootAmountInput(String(gameState.lastBootAmount || 10)); // Pre-fill with last boot or default
     setInteractionState('gettingBoot');
@@ -963,7 +966,7 @@ function App() {
               </div>
 
               {/* Actions and Log Area */}
-              <div>
+              <div className="game-controls-container"> {/* New container */}
                 <div className="game-actions">
                   <button
                     className="btn-primary"
@@ -981,8 +984,8 @@ function App() {
                   <div className="round-controls">
                     <div className="round-info">
                       <div><strong>Turn: {toTitleCase(currentPlayer.name)} (ID: {currentPlayer.id})</strong></div>
-                      <div>Current Stake: Rs. {gameState.blindPlayerIds.has(currentPlayer.id) ? gameState.currentStake : gameState.currentStake*2}</div>
-                      <div>Pot Amount: Rs. {gameState.potAmount}</div>
+                      <div className='current-stake'>Current Stake: Rs. {gameState.blindPlayerIds.has(currentPlayer.id) ? gameState.currentStake : gameState.currentStake*2}</div>
+                      <div className="pot-info"><strong>Pot Amount: Rs. {gameState.potAmount}</strong></div>
                     </div>
                     {gameState.blindPlayerIds.has(currentPlayer.id) ? (
                       <>
@@ -1027,12 +1030,12 @@ function App() {
                     <button onClick={handleEndBetting} className="btn-end">End Betting (-1)</button>
                   </div>
                 )}
+              </div> {/* End of game-controls-container */}
 
-                <div className="action-log" ref={logContainerRef}> {/* Assign the ref here */}
-                  {gameState.messages.map((msg, index) => (
-                    <div key={index}>{msg}</div>
-                  ))}
-                </div>
+              <div className="action-log" ref={logContainerRef}> {/* Assign the ref here */}
+                {gameState.messages.map((msg, index) => (
+                  <div key={index}>{msg}</div>
+                ))}
               </div>
             </div>
           )}
