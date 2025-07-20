@@ -1,28 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
-// Assuming Player and GameState types are defined elsewhere, e.g., in ./types.ts
-// For this code to run, you'd need these types:
-// export type Player = {
-//   id: number;
-//   name: string;
-//   balance: number;
-// };
-//
-// export type GameState = {
-//   players: Player[];
-//   lastWinnerId: number | null;
-//   roundActive: boolean;
-//   currentPlayerIndex: number;
-//   currentStake: number;
-//   potAmount: number;
-//   foldedPlayerIds: Set<number>;
-//   lastBootAmount: number | null;
-//   blindPlayerIds: Set<number>;
-//   lastActorWasBlind: boolean;
-//   roundInitialBootAmount: number | null;
-//   roundContributions: Map<number, number>;
-//   messages: string[];
-// };
 
 const LOCAL_STORAGE_KEY = 'teenPattiGameState';
 
@@ -666,7 +643,7 @@ function App() {
       return;
     }
     const isTargetBlind = gameState.blindPlayerIds.has(precedingPlayer.id);
-    if (isTargetBlind) {
+    if (isTargetBlind && !((gameState.blindPlayerIds.has(currentPlayer.id)) || (gameState.players.length===2) )) {
       alert("Cannot Show: Target player is blind.");
       return;
     }
