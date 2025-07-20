@@ -70,12 +70,16 @@ function App() {
   const [blindRaiseAmountInput, setBlindRaiseAmountInput] = useState("");
 
   // State for inline forms/modals replacement
-  const [interactionState, setInteractionState] = useState<'idle' | 'gettingBoot' | 'gettingStartPlayer' | 'addingPlayer' | 'removingPlayer' | 'selectingWinner' | 'showingCards'>('idle');
+  const [interactionState, setInteractionState] = useState<'idle' | 'gettingBoot' | 'gettingStartPlayer' | 'addingPlayer' | 'removingPlayer' | 'selectingWinner' | 'showingCards' | 'reorderingPlayers'>('idle');
   const [bootAmountInput, setBootAmountInput] = useState("10");
   const [addPlayerNameInput, setAddPlayerNameInput] = useState("");
   const [addPlayerBalanceInput, setAddPlayerBalanceInput] = useState("0");
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(""); // For selections (start, remove, win)
   const [showPrecedingPlayerId, setShowPrecedingPlayerId] = useState<number | null>(null); // Store the ID of the player being shown against
+
+  // State to hold players for reordering (a temporary copy)
+  const [reorderablePlayers, setReorderablePlayers] = useState<Player[]>([]);
+
 
   // Ref for the action log container
   const logContainerRef = useRef<HTMLDivElement>(null);
@@ -350,6 +354,7 @@ function App() {
         addMessage("Error finding last winner. Please set boot amount manually.", true);
         setInteractionState('gettingBoot');
       } else {
+        // Directly proceed to start round with determined starting player (after winner)
         const startingPlayerIndex = (winnerIndex + 1) % gameState.players.length;
         addMessage(`Starting round with previous boot: Rs. ${gameState.lastBootAmount}.`);
         startRoundWithPlayer(startingPlayerIndex, gameState.lastBootAmount);
@@ -810,6 +815,57 @@ function App() {
     setInteractionState('idle');
   };
 
+  // --- Reorder Player Functionality ---
+  const handleReorderPlayers = () => {
+    if (gameState.roundActive) {
+      alert("Cannot reorder players during an active round.");
+      return;
+    }
+    if (gameState.players.length < 2) {
+      alert("Need at least 2 players to reorder.");
+      return;
+    }
+    setReorderablePlayers([...gameState.players]); // Initialize with current order
+    setInteractionState('reorderingPlayers');
+    addMessage("Reorder players for the next round. The top player will start.");
+  };
+
+  const movePlayer = (index: number, direction: 'up' | 'down') => {
+    setReorderablePlayers(prevPlayers => {
+      const newPlayers = [...prevPlayers];
+      const playerToMove = newPlayers[index];
+
+      if (direction === 'up') {
+        if (index === 0) return prevPlayers; // Already at the top
+        newPlayers.splice(index, 1); // Remove from current position
+        newPlayers.splice(index - 1, 0, playerToMove); // Insert one position up
+      } else { // direction === 'down'
+        if (index === newPlayers.length - 1) return prevPlayers; // Already at the bottom
+        newPlayers.splice(index, 1); // Remove from current position
+        newPlayers.splice(index + 1, 0, playerToMove); // Insert one position down
+      }
+      return newPlayers;
+    });
+  };
+
+  const handleConfirmReorder = () => {
+    setGameState(prev => ({
+      ...prev,
+      players: reorderablePlayers,
+      // Reset last winner and current player index after reordering
+      lastWinnerId: null,
+      currentPlayerIndex: -1,
+      messages: [...prev.messages, "Players reordered. The first player in the list will start the next round."]
+    }));
+    setInteractionState('idle');
+  };
+
+  const handleCancelReorder = () => {
+    setReorderablePlayers([]); // Clear temporary state
+    setInteractionState('idle');
+    addMessage("Player reordering cancelled.");
+  };
+
   return (
     <div className="app-container">
       {/* For demonstration. It's better to move these styles to App.css */}
@@ -925,6 +981,25 @@ function App() {
               <button onClick={() => { setInteractionState('idle'); setShowPrecedingPlayerId(null); }}>Cancel</button>
             </div>
           )}
+          {interactionState === 'reorderingPlayers' && (
+            <div className="inline-modal">
+              <h3>Reorder Players</h3>
+              <p>Drag and drop or use arrows to change the player order. The player at the top will be the first player in the next round.</p>
+              <ul className="reorder-list">
+                {reorderablePlayers.map((player, index) => (
+                  <li key={player.id}>
+                    <span>{toTitleCase(player.name)}</span>
+                    <div className="reorder-buttons">
+                      <button onClick={() => movePlayer(index, 'up')} disabled={index === 0}>⬆️</button>
+                      <button onClick={() => movePlayer(index, 'down')} disabled={index === reorderablePlayers.length - 1}>⬇️</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <button onClick={handleConfirmReorder}>Confirm Order</button>
+              <button onClick={handleCancelReorder}>Cancel</button>
+            </div>
+          )}
 
           {/* Main Game Screen (Hidden if an interaction is active) */}
           {interactionState === 'idle' && (
@@ -977,6 +1052,7 @@ function App() {
                   <button className="btn-secondary" onClick={handleChangeBoot} disabled={gameState.roundActive || gameState.players.length < 2}>Change Boot</button>
                   <button className="btn-primary" onClick={handleAddPlayer} disabled={gameState.roundActive}>Add Player</button>
                   <button className="btn-secondary" onClick={handleRemovePlayer} disabled={gameState.roundActive || gameState.players.length <= 2}>Remove Player</button>
+                  <button className="btn-secondary" onClick={handleReorderPlayers} disabled={gameState.roundActive || gameState.players.length < 2}>Reorder Players</button> {/* New button */}
                   <button className="btn-secondary" onClick={() => setShowSetup(true)}>Back to Setup</button>
                 </div>
 

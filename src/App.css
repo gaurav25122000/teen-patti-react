@@ -290,6 +290,55 @@
     /* Example: position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5; */
 }
 
+.inline-modal .reorder-list {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  max-height: 200px; /* Make it scrollable if many players */
+  overflow-y: auto;
+}
+
+.inline-modal .reorder-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+  background-color: black;
+}
+
+.inline-modal .reorder-list li:last-child {
+  border-bottom: none;
+}
+
+.inline-modal .reorder-buttons button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 5px 8px;
+  margin-left: 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8em;
+  transition: background-color 0.2s ease;
+}
+
+.inline-modal .reorder-buttons button:hover:enabled {
+  background-color: #0056b3;
+}
+
+.inline-modal .reorder-buttons button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.inline-modal p {
+  font-size: 0.9em;
+  color: white;
+}
+
 /* --- Media Queries for Responsiveness --- */
 
 /* Tablet and smaller desktop */
