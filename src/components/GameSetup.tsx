@@ -79,7 +79,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
                             />
                         </div>
                     ))}
-                    <button className="btn-start" onClick={handleStartGame}>Start Game</button>
+                    <button className="btn btn-start rainbow-outline" onClick={handleStartGame}>Start Game</button>
                 </div>
             )}
         </div>

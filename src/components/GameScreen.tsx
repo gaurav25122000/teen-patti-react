@@ -175,7 +175,30 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
 
             case 'reorderingPlayers':
                 title = "Reorder Players"; theme = 'default'; icon = <IconList />;
-                body = <><p>Change the seating order. The first player deals next.</p><ul className="reorder-list">{reorderablePlayers.map((player, index) => (<li key={player.id}><span>{toTitleCase(player.name)}</span><div className="reorder-buttons"><button onClick={() => movePlayer(index, 'up')} disabled={index === 0}>⬆️</button><button onClick={() => movePlayer(index, 'down')} disabled={index === reorderablePlayers.length - 1}>⬇️</button></div></li>))}</ul></>;
+                body = (
+                    <>
+                        <p>Change the seating order. The first player deals next.</p>
+                        <ul className="reorder-list">
+                            {reorderablePlayers.map((player, index) => (
+                                <li key={player.id}>
+                                    <span>{toTitleCase(player.name)}</span>
+                                    <div className="reorder-buttons">
+                                        <button onClick={() => movePlayer(index, 'up')} disabled={index === 0} aria-label="Move Up">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="reorder-icon">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                                            </svg>
+                                        </button>
+                                        <button onClick={() => movePlayer(index, 'down')} disabled={index === reorderablePlayers.length - 1} aria-label="Move Down">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="reorder-icon">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </>
+                );
                 primaryAction = () => {
                     actions.reorderPlayers(reorderablePlayers);
                     closeModal();
@@ -183,7 +206,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                 break;
         }
 
-        footer = <><button className="btn-modal btn-modal-secondary" onClick={closeModal}>Cancel</button><button className={`btn-modal btn-modal-primary theme-${theme}`} onClick={primaryAction}>{confirmText}</button></>;
+        footer = (
+            <>
+                <button className="btn-modal btn-modal-secondary" onClick={closeModal}>Cancel</button>
+                <button className={`btn-modal btn-modal-primary theme-${theme} rainbow-outline`} onClick={primaryAction}>
+                    {confirmText}
+                </button>
+            </>
+        );
         return { title, theme, icon, body, footer };
     }, [interaction, gameState.players, gameState.lastWinnerId, gameState.roundInitialBootAmount, bootAmount, selectedPlayerId, addPlayerName, addPlayerBalance, reorderablePlayers, activePlayers, tempData, actions]);
 

@@ -159,11 +159,14 @@ h1 {
   box-shadow: inset 0 0 10px 0 var(--color-glow-cyan), 0 0 10px 0 var(--color-glow-cyan);
 }
 
-.btn-primary:hover:not(:disabled),
-.btn-start:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled) {
   background-color: rgba(0, 255, 255, 0.1);
 }
 
+.btn-start:hover{
+  color: #000;
+
+}
 .btn-secondary {
   border-color: var(--color-text-muted);
   color: var(--color-text-muted);
@@ -632,24 +635,35 @@ h1 {
 }
 
 .reorder-buttons button {
-  background: transparent;
-  border: 1px solid var(--color-text-muted);
-  color: var(--color-text-muted);
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: border-color 0.2s ease, color 0.2s ease;
+    background: transparent;
+    border: 1px solid var(--color-text-muted);
+    color: var(--color-text-muted);
+    padding: 4px; /* Adjust padding for icons */
+    border-radius: 50%; /* Make them circular */
+    cursor: pointer;
+    display: flex; /* Center the icon inside */
+    align-items: center;
+    justify-content: center;
+    width: 28px;  /* Explicit size */
+    height: 28px; /* Explicit size */
+    transition: all 0.2s ease;
 }
 
 .reorder-buttons button:hover:enabled {
-  border-color: var(--color-glow-cyan);
-  color: var(--color-glow-cyan);
+    border-color: var(--color-glow-cyan);
+    color: var(--color-glow-cyan);
+    background-color: rgba(0, 255, 255, 0.1);
 }
 
 .reorder-buttons button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* New style for the SVG icons */
+.reorder-icon {
+    width: 18px;
+    height: 18px;
 }
 
 .modal-footer {
@@ -896,4 +910,52 @@ h1 {
     padding: 1rem;
     /* Slightly more padding for modals */
   }
+}
+/* src/App.css */
+
+/* --- 10. Special Effects --- */
+
+@keyframes rainbow-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.rainbow-outline {
+  position: relative;
+}
+
+.rainbow-outline::before {
+  content: '';
+  position: absolute;
+  top: -3px; 
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  z-index: -1;
+  
+  /* The rainbow gradient */
+  background: linear-gradient(
+    90deg,
+    var(--color-glow-magenta),
+    var(--color-glow-gold),
+    var(--color-glow-lime),
+    var(--color-glow-cyan),
+    var(--color-glow-magenta)
+  );
+  
+  background-size: 400%;
+  border-radius: 10px; /* Slightly larger than the button's border-radius */
+  
+  /* Apply the animation */
+  animation: rainbow-shimmer 4s linear infinite;
+  
+  /* A subtle blur to make it glowy */
+  filter: blur(3px);
 }
