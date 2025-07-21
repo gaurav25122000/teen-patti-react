@@ -43,13 +43,14 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
             const className = `${isFolded ? 'folded' : ''} ${isCurrent ? 'current-player' : ''}`;
 
             return (
-              <tr key={p.id} className={className}>
-                <td>{p.id}</td>
-                <td>{toTitleCase(p.name)}</td>
-                <td>Rs. {p.balance}</td>
-                <td>Rs. {contribution}</td>
-                <td>{status}</td>
-              </tr>
+             <tr key={p.id} className={className}>
+                <td data-label="ID">{p.id}</td>
+                <td data-label="Name">{toTitleCase(p.name)}</td>
+                <td data-label="Balance">Rs. {p.balance}</td>
+                <td data-label="Contribution">Rs. {contribution}</td>
+                <td data-label="Status">{status}</td>
+            </tr>
+
             );
           })}
         </tbody>

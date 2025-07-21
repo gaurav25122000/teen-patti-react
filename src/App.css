@@ -1,7 +1,9 @@
-/* ============================================= */
-/* Teen Patti Manager - NEON CASINO REVAMP        */
-/* ============================================= */
-
+/* --- 0. Global Reset --- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 /* --- 1. Root Variables & NEON Theme --- */
 :root {
   --color-bg: #0d0d1a; /* Deep, dark space blue */
@@ -480,19 +482,133 @@ h1 {
 .modal-footer .btn-modal-primary.theme-default:hover:not(:disabled) { background-color: var(--color-text); }
 
 /* --- 9. Responsive Design --- */
+
+/* For tablets and smaller desktops */
 @media (max-width: 900px) {
     .game-screen {
         grid-template-columns: 1fr;
-        grid-template-areas: "game-controls" "player-list" "action-log";
+        grid-template-areas:
+            "game-controls"
+            "player-list"
+            "action-log";
     }
 }
 
+/* For mobile devices */
 @media (max-width: 600px) {
-    h1 { font-size: 1.8rem; }
-    .app-container { margin: 1rem auto; gap: 1rem; }
-    .setup-screen, .game-screen { padding: 1rem; }
-    .btn { padding: 10px 16px; font-size: 1em; }
-    .round-info { flex-direction: column; align-items: stretch; text-align: center; gap: 0.75rem; }
-    .round-info > div { text-align: center !important; }
-    .inline-modal { width: 95vw; min-width: unset; padding: 1.5rem; }
+    .app-container {
+        margin: 1rem 0; /* Remove side margin to use full width */
+        padding: 0 0.5rem; /* Consistent side padding */
+        gap: 1rem;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+        letter-spacing: 0;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Make the main game container more compact */
+    .setup-screen, .game-screen {
+        padding: 0.75rem; /* Reduced padding */
+        border-width: 1px;
+    }
+
+    /* --- MOBILE PLAYER LIST (from previous fix) --- */
+    .player-list table, 
+    .player-list thead, 
+    .player-list tbody, 
+    .player-list th, 
+    .player-list td, 
+    .player-list tr {
+        display: block;
+    }
+
+    .player-list thead {
+        display: none;
+    }
+
+    .player-list tr {
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        padding: 0.75rem; /* Reduced padding */
+    }
+    
+    .player-list .current-player {
+        border: 2px solid var(--color-glow-cyan);
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        animation: none;
+    }
+    
+    .player-list .current-player td,
+    .player-list .current-player td:first-child,
+    .player-list .current-player td:last-child {
+        background-color: transparent;
+        border: none;
+        animation: none;
+    }
+
+
+    .player-list td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px dashed var(--color-border);
+        font-size: 0.9rem; /* Slightly smaller text */
+    }
+
+    .player-list td:last-child {
+        border-bottom: none;
+    }
+
+    .player-list td:before {
+        content: attr(data-label);
+        font-weight: bold;
+        color: var(--color-text-muted);
+        margin-right: 1rem;
+    }
+
+    /* --- MOBILE BUTTON & CONTROLS FIX --- */
+    .btn {
+        padding: 10px 14px; /* Reduced horizontal padding */
+        font-size: 0.85em; /* Smaller font size */
+        letter-spacing: 0.5px; /* Tighter letter spacing */
+        width: 100%;
+    }
+
+    .game-actions, .round-controls {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        gap: 0.5rem; /* Tighter gap */
+    }
+    
+    .inline-input-group {
+        width: 100%;
+        gap: 0.5rem;
+    }
+    
+    .inline-input-group input {
+        flex-grow: 1;
+    }
+    
+    /* Make the info box more compact */
+    .round-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.75rem; /* Reduced padding */
+    }
+
+    /* --- MOBILE MODAL FIX --- */
+    .modal-container {
+        width: calc(100% - 1rem); /* Full width with small margins */
+        max-width: none;
+    }
+
+    .modal-header, .modal-body, .modal-footer {
+        padding: 1rem; /* Slightly more padding for modals */
+    }
 }

@@ -32,7 +32,7 @@ function App() {
   // This is the normal game view
   return (
     <div className={`app-container ${isModalOpen ? 'modal-open' : ''}`}>
-      <h1>Teen Patti Manager</h1>
+      <h1>Bets Manager</h1>
       {showSetup ? (
         <GameSetup
           onStartNewGame={handleStartNewGame}
