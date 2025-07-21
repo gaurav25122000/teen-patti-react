@@ -49,7 +49,7 @@ export const useTeenPattiGame = () => {
     }
     return gameState.players[gameState.currentPlayerIndex];
   }, [gameState.roundActive, gameState.currentPlayerIndex, gameState.players]);
-  
+
   const activePlayers = getActivePlayers();
   const currentPlayer = getCurrentPlayer();
 
@@ -64,17 +64,17 @@ export const useTeenPattiGame = () => {
       do {
         nextIndex = (nextIndex + 1) % prev.players.length;
       } while (prev.foldedPlayerIds.has(prev.players[nextIndex].id));
-      
+
       return { ...prev, currentPlayerIndex: nextIndex };
     });
   }, []);
-  
+
   const checkForWinner = useCallback((currentPlayers: Player[], foldedIds: Set<number>): Player | null => {
     const active = currentPlayers.filter(p => !foldedIds.has(p.id));
     return active.length === 1 ? active[0] : null;
   }, []);
 
-const endRound = useCallback((winner: Player | null) => {
+  const endRound = useCallback((winner: Player | null) => {
     setGameState(prev => {
       const finalMessages = [...prev.messages];
       let finalPlayers = prev.players;
@@ -105,7 +105,7 @@ const endRound = useCallback((winner: Player | null) => {
         roundContributions: new Map<number, number>(),
         lastActorWasBlind: false,
         // **This is the important addition**
-        roundInitialBootAmount: lastBootFromRound, 
+        roundInitialBootAmount: lastBootFromRound,
         messages: finalMessages,
       };
     });
@@ -129,7 +129,7 @@ const endRound = useCallback((winner: Player | null) => {
     addMessage("No valid saved game found.", true);
     return false;
   };
-  
+
   const startRound = (startingPlayerIndex: number, bootAmount: number) => {
     setGameState(prev => {
       let newPot = 0;
@@ -160,72 +160,72 @@ const endRound = useCallback((winner: Player | null) => {
   };
 
   const playBlind = (isRaise: boolean, amount: number) => {
-      if (!currentPlayer || !gameState.blindPlayerIds.has(currentPlayer.id)) return;
+    if (!currentPlayer || !gameState.blindPlayerIds.has(currentPlayer.id)) return;
 
-      setGameState(prev => {
-          const updatedPlayers = prev.players.map(p => 
-              p.id === currentPlayer.id ? { ...p, balance: p.balance - amount } : p
-          );
-          const newContributions = new Map(prev.roundContributions);
-          newContributions.set(currentPlayer.id, (newContributions.get(currentPlayer.id) || 0) + amount);
-          
-          const message = isRaise 
-              ? `${toTitleCase(currentPlayer.name)} raises blind to ₹ ${amount}.`
-              : `${toTitleCase(currentPlayer.name)} plays blind for ₹ ${amount}.`;
+    setGameState(prev => {
+      const updatedPlayers = prev.players.map(p =>
+        p.id === currentPlayer.id ? { ...p, balance: p.balance - amount } : p
+      );
+      const newContributions = new Map(prev.roundContributions);
+      newContributions.set(currentPlayer.id, (newContributions.get(currentPlayer.id) || 0) + amount);
 
-          return {
-              ...prev,
-              players: updatedPlayers,
-              potAmount: prev.potAmount + amount,
-              roundContributions: newContributions,
-              currentStake: isRaise ? amount : prev.currentStake,
-              lastActorWasBlind: true,
-              messages: [...prev.messages, message],
-          };
-      });
-      advanceTurn();
+      const message = isRaise
+        ? `${toTitleCase(currentPlayer.name)} raises blind to ₹ ${amount}.`
+        : `${toTitleCase(currentPlayer.name)} plays blind for ₹ ${amount}.`;
+
+      return {
+        ...prev,
+        players: updatedPlayers,
+        potAmount: prev.potAmount + amount,
+        roundContributions: newContributions,
+        currentStake: isRaise ? amount : prev.currentStake,
+        lastActorWasBlind: true,
+        messages: [...prev.messages, message],
+      };
+    });
+    advanceTurn();
   };
-  
+
   const seeCards = () => {
-      if (!currentPlayer || !gameState.blindPlayerIds.has(currentPlayer.id)) return;
-      setGameState(prev => {
-          const newBlindPlayerIds = new Set(prev.blindPlayerIds);
-          newBlindPlayerIds.delete(currentPlayer.id);
-          return {
-              ...prev,
-              blindPlayerIds: newBlindPlayerIds,
-              messages: [...prev.messages, `${toTitleCase(currentPlayer.name)} sees their cards.`],
-          };
-      });
+    if (!currentPlayer || !gameState.blindPlayerIds.has(currentPlayer.id)) return;
+    setGameState(prev => {
+      const newBlindPlayerIds = new Set(prev.blindPlayerIds);
+      newBlindPlayerIds.delete(currentPlayer.id);
+      return {
+        ...prev,
+        blindPlayerIds: newBlindPlayerIds,
+        messages: [...prev.messages, `${toTitleCase(currentPlayer.name)} sees their cards.`],
+      };
+    });
   };
 
   const betChaal = (amount: number) => {
     if (!currentPlayer || gameState.blindPlayerIds.has(currentPlayer.id)) return;
 
     setGameState(prev => {
-        const newPlayers = prev.players.map(p =>
-            p.id === currentPlayer.id ? { ...p, balance: p.balance - amount } : p
-        );
-        const newContributions = new Map(prev.roundContributions);
-        newContributions.set(currentPlayer.id, (newContributions.get(currentPlayer.id) || 0) + amount);
+      const newPlayers = prev.players.map(p =>
+        p.id === currentPlayer.id ? { ...p, balance: p.balance - amount } : p
+      );
+      const newContributions = new Map(prev.roundContributions);
+      newContributions.set(currentPlayer.id, (newContributions.get(currentPlayer.id) || 0) + amount);
 
-        const effectiveBlindStake = Math.floor(amount / 2);
-        const newCurrentStake = Math.max(prev.currentStake, effectiveBlindStake);
-        
-        const messages = [...prev.messages, `${toTitleCase(currentPlayer.name)} bets ₹ ${amount}.`];
-        if (newCurrentStake > prev.currentStake) {
-            messages.push(` Stake (for blind) updated to ₹ ${newCurrentStake}.`);
-        }
+      const effectiveBlindStake = Math.floor(amount / 2);
+      const newCurrentStake = Math.max(prev.currentStake, effectiveBlindStake);
 
-        return {
-            ...prev,
-            players: newPlayers,
-            potAmount: prev.potAmount + amount,
-            currentStake: newCurrentStake,
-            roundContributions: newContributions,
-            lastActorWasBlind: false,
-            messages,
-        };
+      const messages = [...prev.messages, `${toTitleCase(currentPlayer.name)} bets ₹ ${amount}.`];
+      if (newCurrentStake > prev.currentStake) {
+        messages.push(` Stake (for blind) updated to ₹ ${newCurrentStake}.`);
+      }
+
+      return {
+        ...prev,
+        players: newPlayers,
+        potAmount: prev.potAmount + amount,
+        currentStake: newCurrentStake,
+        roundContributions: newContributions,
+        lastActorWasBlind: false,
+        messages,
+      };
     });
     advanceTurn();
   };
@@ -235,12 +235,12 @@ const endRound = useCallback((winner: Player | null) => {
 
     addMessage(`${toTitleCase(currentPlayer.name)} folds.`);
     const newFoldedIds = new Set(gameState.foldedPlayerIds).add(currentPlayer.id);
-    
+
     const winner = checkForWinner(gameState.players, newFoldedIds);
     if (winner) {
       addMessage(`${toTitleCase(winner.name)} is the last player remaining and wins!`);
       // Use a temp state update to show the fold message before ending the round
-      setGameState(prev => ({...prev, messages: [...prev.messages, `${toTitleCase(winner.name)} wins!`]}));
+      setGameState(prev => ({ ...prev, messages: [...prev.messages, `${toTitleCase(winner.name)} wins!`] }));
       endRound(winner);
     } else {
       setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
@@ -249,44 +249,44 @@ const endRound = useCallback((winner: Player | null) => {
   };
 
   const requestShow = (cost: number) => {
-      if (!currentPlayer) return;
-      setGameState(prev => {
-          const updatedPlayers = prev.players.map(p =>
-              p.id === currentPlayer.id ? { ...p, balance: p.balance - cost } : p
-          );
-          const newContributions = new Map(prev.roundContributions);
-          newContributions.set(currentPlayer.id, (newContributions.get(currentPlayer.id) || 0) + cost);
-          return {
-              ...prev,
-              players: updatedPlayers,
-              potAmount: prev.potAmount + cost,
-              roundContributions: newContributions,
-          };
-      });
+    if (!currentPlayer) return;
+    setGameState(prev => {
+      const updatedPlayers = prev.players.map(p =>
+        p.id === currentPlayer.id ? { ...p, balance: p.balance - cost } : p
+      );
+      const newContributions = new Map(prev.roundContributions);
+      newContributions.set(currentPlayer.id, (newContributions.get(currentPlayer.id) || 0) + cost);
+      return {
+        ...prev,
+        players: updatedPlayers,
+        potAmount: prev.potAmount + cost,
+        roundContributions: newContributions,
+      };
+    });
   };
 
   const resolveShow = (loserId: number) => {
-      const loser = gameState.players.find(p => p.id === loserId);
-      if (!loser) return;
+    const loser = gameState.players.find(p => p.id === loserId);
+    if (!loser) return;
 
-      addMessage(`${toTitleCase(loser.name)} folds after the Show.`);
-      const newFoldedIds = new Set(gameState.foldedPlayerIds).add(loserId);
-      const winner = checkForWinner(gameState.players, newFoldedIds);
+    addMessage(`${toTitleCase(loser.name)} folds after the Show.`);
+    const newFoldedIds = new Set(gameState.foldedPlayerIds).add(loserId);
+    const winner = checkForWinner(gameState.players, newFoldedIds);
 
-      if (winner) {
-          endRound(winner);
-      } else {
-          setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
-          advanceTurn();
-      }
+    if (winner) {
+      endRound(winner);
+    } else {
+      setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
+      advanceTurn();
+    }
   };
 
   const addPlayer = (name: string, balance: number) => {
     const newId = gameState.players.length > 0 ? Math.max(...gameState.players.map(p => p.id)) + 1 : 1;
     const newPlayer: Player = { id: newId, name: toTitleCase(name), balance };
     setGameState(prev => ({
-        ...prev,
-        players: [...prev.players, newPlayer]
+      ...prev,
+      players: [...prev.players, newPlayer]
     }));
     addMessage(`Player ${toTitleCase(name)} added.`);
   };
@@ -294,33 +294,33 @@ const endRound = useCallback((winner: Player | null) => {
   const removePlayer = (playerId: number) => {
     const playerToRemove = gameState.players.find(p => p.id === playerId);
     if (!playerToRemove) return;
-    
-    setGameState(prev => {
-        const newPlayers = prev.players.filter(p => p.id !== playerId);
-        const newBlindIds = new Set(prev.blindPlayerIds); newBlindIds.delete(playerId);
-        const newFoldedIds = new Set(prev.foldedPlayerIds); newFoldedIds.delete(playerId);
-        const newContributions = new Map(prev.roundContributions); newContributions.delete(playerId);
 
-        return {
-            ...prev,
-            players: newPlayers,
-            lastWinnerId: prev.lastWinnerId === playerId ? null : prev.lastWinnerId,
-            blindPlayerIds: newBlindIds,
-            foldedPlayerIds: newFoldedIds,
-            roundContributions: newContributions,
-        };
+    setGameState(prev => {
+      const newPlayers = prev.players.filter(p => p.id !== playerId);
+      const newBlindIds = new Set(prev.blindPlayerIds); newBlindIds.delete(playerId);
+      const newFoldedIds = new Set(prev.foldedPlayerIds); newFoldedIds.delete(playerId);
+      const newContributions = new Map(prev.roundContributions); newContributions.delete(playerId);
+
+      return {
+        ...prev,
+        players: newPlayers,
+        lastWinnerId: prev.lastWinnerId === playerId ? null : prev.lastWinnerId,
+        blindPlayerIds: newBlindIds,
+        foldedPlayerIds: newFoldedIds,
+        roundContributions: newContributions,
+      };
     });
     addMessage(`Player ${toTitleCase(playerToRemove.name)} removed.`);
   };
 
   const reorderPlayers = (reordered: Player[]) => {
-      setGameState(prev => ({
-          ...prev,
-          players: reordered,
-          lastWinnerId: null,
-          currentPlayerIndex: -1,
-          messages: [...prev.messages, "Player order updated."],
-      }));
+    setGameState(prev => ({
+      ...prev,
+      players: reordered,
+      lastWinnerId: null,
+      currentPlayerIndex: -1,
+      messages: [...prev.messages, "Player order updated."],
+    }));
   };
 
   return {

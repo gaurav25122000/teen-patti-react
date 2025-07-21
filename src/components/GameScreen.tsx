@@ -19,244 +19,246 @@ const IconUsers = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" view
 const IconPlay = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg>;
 
 interface GameScreenProps {
-  gameHook: ReturnType<typeof useTeenPattiGame>;
-  onShowSetup: () => void;
-  onInteractionChange: (isModalOpen: boolean) => void;
+    gameHook: ReturnType<typeof useTeenPattiGame>;
+    onShowSetup: () => void;
+    onInteractionChange: (isModalOpen: boolean) => void;
 }
 
 const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onInteractionChange }) => {
-  const { gameState, addMessage, activePlayers, currentPlayer, actions } = gameHook;
-  
-  // --- Modal State ---
-  const [interaction, setInteraction] = useState<InteractionType>('idle');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [tempData, setTempData] = useState<any>({});
-  
-  // --- Local State for Modal Inputs ---
-  const [bootAmount, setBootAmount] = useState('10');
-  const [selectedPlayerId, setSelectedPlayerId] = useState('');
-  const [addPlayerName, setAddPlayerName] = useState('');
-  const [addPlayerBalance, setAddPlayerBalance] = useState('0');
-  const [reorderablePlayers, setReorderablePlayers] = useState<Player[]>([]);
+    const { gameState, addMessage, activePlayers, currentPlayer, actions } = gameHook;
 
-  useEffect(() => {
-    onInteractionChange(interaction !== 'idle');
-    // Pre-select the first player in lists when a relevant modal opens
-    if (interaction === 'removingPlayer' && gameState.players.length > 0) setSelectedPlayerId(String(gameState.players[0].id));
-    if (interaction === 'gettingStartPlayer' && gameState.players.length > 0) setSelectedPlayerId(String(gameState.players[0].id));
-    if (interaction === 'selectingWinner' && activePlayers.length > 0) setSelectedPlayerId(String(activePlayers[0].id));
-  }, [interaction, onInteractionChange, gameState.players, activePlayers]);
+    // --- Modal State ---
+    const [interaction, setInteraction] = useState<InteractionType>('idle');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [tempData, setTempData] = useState<any>({});
 
-  const openModal = (type: InteractionType) => {
-    if (type === 'gettingBoot') setBootAmount(String(gameState.roundInitialBootAmount || 10));
-    if (type === 'addingPlayer') { setAddPlayerName(''); setAddPlayerBalance('0'); }
-    if (type === 'reorderingPlayers') setReorderablePlayers([...gameState.players]);
-    setInteraction(type);
-  };
-  const closeModal = () => {
-    setInteraction('idle');
-    setTempData({}); // Clear temporary data on any close
-  };
-  
-  const movePlayer = (index: number, direction: 'up' | 'down') => {
-      const newPlayers = [...reorderablePlayers];
-      const [playerToMove] = newPlayers.splice(index, 1);
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      newPlayers.splice(newIndex, 0, playerToMove);
-      setReorderablePlayers(newPlayers);
-  };
+    // --- Local State for Modal Inputs ---
+    const [bootAmount, setBootAmount] = useState('10');
+    const [selectedPlayerId, setSelectedPlayerId] = useState('');
+    const [addPlayerName, setAddPlayerName] = useState('');
+    const [addPlayerBalance, setAddPlayerBalance] = useState('0');
+    const [reorderablePlayers, setReorderablePlayers] = useState<Player[]>([]);
 
-  const findPrecedingActivePlayer = useCallback((): Player | null => {
-    if (!currentPlayer) return null;
-    const numPlayers = gameState.players.length;
-    let currentIndex = gameState.currentPlayerIndex;
-    let attempts = 0;
-    do {
-      currentIndex = (currentIndex - 1 + numPlayers) % numPlayers;
-      const precedingPlayer = gameState.players[currentIndex];
-      if (precedingPlayer.id !== currentPlayer.id && !gameState.foldedPlayerIds.has(precedingPlayer.id)) {
-        return precedingPlayer;
-      }
-      attempts++;
-    } while (attempts < numPlayers);
-    return null;
-  }, [gameState.players, gameState.currentPlayerIndex, gameState.foldedPlayerIds, currentPlayer]);
+    useEffect(() => {
+        onInteractionChange(interaction !== 'idle');
+        // Pre-select the first player in lists when a relevant modal opens
+        if (interaction === 'removingPlayer' && gameState.players.length > 0) setSelectedPlayerId(String(gameState.players[0].id));
+        if (interaction === 'gettingStartPlayer' && gameState.players.length > 0) setSelectedPlayerId(String(gameState.players[0].id));
+        if (interaction === 'selectingWinner' && activePlayers.length > 0) setSelectedPlayerId(String(activePlayers[0].id));
+    }, [interaction, onInteractionChange, gameState.players, activePlayers]);
 
-  const modalContent = useMemo(() => {
-    if (interaction === 'idle') return null;
+    const openModal = (type: InteractionType) => {
+        if (type === 'gettingBoot') setBootAmount(String(gameState.roundInitialBootAmount || 10));
+        if (type === 'addingPlayer') { setAddPlayerName(''); setAddPlayerBalance('0'); }
+        if (type === 'reorderingPlayers') setReorderablePlayers([...gameState.players]);
+        setInteraction(type);
+    };
+    const closeModal = () => {
+        setInteraction('idle');
+        setTempData({}); // Clear temporary data on any close
+    };
 
-    let title = '';
-    let theme: 'confirmation' | 'danger' | 'success' | 'default' = 'default';
-    let icon: React.ReactNode = null;
-    let body: React.ReactNode = null;
-    let footer: React.ReactNode = null;
-    let primaryAction = () => {};
-    let confirmText = "Confirm";
+    const movePlayer = (index: number, direction: 'up' | 'down') => {
+        const newPlayers = [...reorderablePlayers];
+        const [playerToMove] = newPlayers.splice(index, 1);
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        newPlayers.splice(newIndex, 0, playerToMove);
+        setReorderablePlayers(newPlayers);
+    };
 
-    switch (interaction) {
-      case 'gettingBoot':
-        title = 'Set Boot Amount'; theme = 'default'; icon = <IconCash />;
-        body = <div className="form-group"><label htmlFor="boot-amount">Enter amount for all players</label><input id="boot-amount" type="number" value={bootAmount} onChange={e => setBootAmount(e.target.value)} min="1" autoFocus/></div>;
-        confirmText = "Set & Continue";
-        primaryAction = () => {
-            const boot = parseInt(bootAmount, 10);
-            if (isNaN(boot) || boot <= 0) return alert('Invalid boot amount.');
-            const winnerIndex = gameState.players.findIndex(p => p.id === gameState.lastWinnerId);
-            if (winnerIndex !== -1) {
-              actions.startRound((winnerIndex + 1) % gameState.players.length, boot);
-              closeModal();
-            } else {
-              setTempData({ bootAmount: boot });
-              openModal('gettingStartPlayer');
+    const findPrecedingActivePlayer = useCallback((): Player | null => {
+        if (!currentPlayer) return null;
+        const numPlayers = gameState.players.length;
+        let currentIndex = gameState.currentPlayerIndex;
+        let attempts = 0;
+        do {
+            currentIndex = (currentIndex - 1 + numPlayers) % numPlayers;
+            const precedingPlayer = gameState.players[currentIndex];
+            if (precedingPlayer.id !== currentPlayer.id && !gameState.foldedPlayerIds.has(precedingPlayer.id)) {
+                return precedingPlayer;
             }
-        };
-        break;
+            attempts++;
+        } while (attempts < numPlayers);
+        return null;
+    }, [gameState.players, gameState.currentPlayerIndex, gameState.foldedPlayerIds, currentPlayer]);
 
-      case 'gettingStartPlayer':
-        title = "Select Starting Player"; theme = 'confirmation'; icon = <IconPlay/>;
-        body = <div className="form-group"><label htmlFor="start-player-select">Who is starting the round?</label><select id="start-player-select" value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div>;
-        primaryAction = () => {
-            const playerId = parseInt(selectedPlayerId, 10);
-            const playerIndex = gameState.players.findIndex(p => p.id === playerId);
-            if (playerIndex === -1) return alert("Invalid player selected.");
-            actions.startRound(playerIndex, tempData.bootAmount);
-            closeModal();
-        };
-        break;
+    const modalContent = useMemo(() => {
+        if (interaction === 'idle') return null;
 
-      case 'selectingWinner':
-        title = "Select Round Winner"; theme = 'success'; icon = <IconTrophy />;
-        body = <div className="form-group"><label htmlFor="winner-select">Who won the hand? The pot will be awarded to them.</label><select id="winner-select" value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{activePlayers.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div>;
-        confirmText = "Award Pot";
-        primaryAction = () => {
-            const winnerId = parseInt(selectedPlayerId, 10);
-            const winner = activePlayers.find(p => p.id === winnerId);
-            if (winner) actions.endRound(winner);
-            closeModal();
-        };
-        break;
-      
-      case 'showingCards':
-        { title = "Showdown!"; theme = 'confirmation'; icon = <IconUsers />;
-        const { requester, target } = tempData.showContext || {};
-        body = requester && target ? <div className="form-group"><p>Between <strong>{toTitleCase(requester.name)}</strong> and <strong>{toTitleCase(target.name)}</strong>.</p><label htmlFor="loser-select">Select which player folds (loses the show):</label><select id="loser-select" value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}><option value={requester.id}>{toTitleCase(requester.name)}</option><option value={target.id}>{toTitleCase(target.name)}</option></select></div> : <p>Error: Players not found for show.</p>;
-        primaryAction = () => {
-            const loserId = parseInt(selectedPlayerId, 10);
-            if (isNaN(loserId)) return;
-            actions.resolveShow(loserId);
-            closeModal();
-        };
-        break; }
-      
-      case 'addingPlayer':
-        title = "Add New Player"; theme = 'success'; icon = <IconUserPlus/>;
-        body = <><div className="form-group"><label htmlFor="add-player-name">Player Name</label><input id="add-player-name" type="text" value={addPlayerName} onChange={e => setAddPlayerName(e.target.value)} /></div><div className="form-group"><label htmlFor="add-player-balance">Starting Balance</label><input id="add-player-balance" type="number" value={addPlayerBalance} onChange={e => setAddPlayerBalance(e.target.value)} /></div></>;
-        primaryAction = () => {
-            const balance = parseInt(addPlayerBalance, 10);
-            if (!addPlayerName || isNaN(balance)) return alert('Invalid name or balance.');
-            actions.addPlayer(addPlayerName, balance);
-            closeModal();
-        };
-        break;
+        let title = '';
+        let theme: 'confirmation' | 'danger' | 'success' | 'default' = 'default';
+        let icon: React.ReactNode = null;
+        let body: React.ReactNode = null;
+        let footer: React.ReactNode = null;
+        let primaryAction = () => { };
+        let confirmText = "Confirm";
 
-      case 'removingPlayer':
-        title = 'Remove Player'; theme = 'danger'; icon = <IconUserMinus />;
-        body = <><p>Are you sure to remove this player? This action cannot be undone.</p><div className="form-group"><label htmlFor="remove-player-select">Select player to remove</label><select id="remove-player-select" value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div></>;
-        confirmText = "Yes, Remove";
-        primaryAction = () => {
-            const playerId = parseInt(selectedPlayerId, 10);
-            if (isNaN(playerId)) return;
-            actions.removePlayer(playerId);
-            closeModal();
-        };
-        break;
-      
-      case 'reorderingPlayers':
-        title = "Reorder Players"; theme = 'default'; icon = <IconList/>;
-        body = <><p>Change the seating order. The first player deals next.</p><ul className="reorder-list">{reorderablePlayers.map((player, index) => (<li key={player.id}><span>{toTitleCase(player.name)}</span><div className="reorder-buttons"><button onClick={() => movePlayer(index, 'up')} disabled={index === 0}>⬆️</button><button onClick={() => movePlayer(index, 'down')} disabled={index === reorderablePlayers.length - 1}>⬇️</button></div></li>))}</ul></>;
-        primaryAction = () => {
-            actions.reorderPlayers(reorderablePlayers);
-            closeModal();
-        };
-        break;
-    }
-    
-    footer = <><button className="btn-modal btn-modal-secondary" onClick={closeModal}>Cancel</button><button className={`btn-modal btn-modal-primary theme-${theme}`} onClick={primaryAction}>{confirmText}</button></>;
-    return { title, theme, icon, body, footer };
-  }, [interaction, gameState.players, gameState.lastWinnerId, gameState.roundInitialBootAmount, bootAmount, selectedPlayerId, addPlayerName, addPlayerBalance, reorderablePlayers, activePlayers, tempData, actions]);
+        switch (interaction) {
+            case 'gettingBoot':
+                title = 'Set Boot Amount'; theme = 'default'; icon = <IconCash />;
+                body = <div className="form-group"><label htmlFor="boot-amount">Enter amount for all players</label><input id="boot-amount" type="number" value={bootAmount} onChange={e => setBootAmount(e.target.value)} min="1" autoFocus /></div>;
+                confirmText = "Set & Continue";
+                primaryAction = () => {
+                    const boot = parseInt(bootAmount, 10);
+                    if (isNaN(boot) || boot <= 0) return alert('Invalid boot amount.');
+                    const winnerIndex = gameState.players.findIndex(p => p.id === gameState.lastWinnerId);
+                    if (winnerIndex !== -1) {
+                        actions.startRound((winnerIndex + 1) % gameState.players.length, boot);
+                        closeModal();
+                    } else {
+                        setTempData({ bootAmount: boot });
+                        openModal('gettingStartPlayer');
+                    }
+                };
+                break;
 
-  const handleStartRound = () => {
-    const winnerIndex = gameState.players.findIndex(p => p.id === gameState.lastWinnerId);
-    if (gameState.lastWinnerId !== null && gameState.roundInitialBootAmount && winnerIndex !== -1) {
-      actions.startRound((winnerIndex + 1) % gameState.players.length, gameState.roundInitialBootAmount);
-    } else {
-      openModal('gettingBoot');
-    }
-  };
-  
-  const handleShowClick = () => {
-    const requester = currentPlayer;
-    const target = findPrecedingActivePlayer();
-    if (!requester || !target) {
-        alert("Cannot Show: No valid opponent found.");
-        return;
-    }
+            case 'gettingStartPlayer':
+                title = "Select Starting Player"; theme = 'confirmation'; icon = <IconPlay />;
+                body = <div className="form-group"><label htmlFor="start-player-select">Who is starting the round?</label><select id="start-player-select" value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div>;
+                primaryAction = () => {
+                    const playerId = parseInt(selectedPlayerId, 10);
+                    const playerIndex = gameState.players.findIndex(p => p.id === playerId);
+                    if (playerIndex === -1) return alert("Invalid player selected.");
+                    actions.startRound(playerIndex, tempData.bootAmount);
+                    closeModal();
+                };
+                break;
 
-    const cost = gameState.blindPlayerIds.has(requester.id) ? gameState.currentStake : gameState.currentStake * 2;
-    actions.requestShow(cost);
-    addMessage(`${toTitleCase(requester.name)} pays ₹ ${cost} for Show with ${toTitleCase(target.name)}.`);
-    
-    // Pre-select the requester as the default loser
-    setSelectedPlayerId(String(requester.id));
-    setTempData({ showContext: { requester, target } });
-    openModal('showingCards');
-  };
+            case 'selectingWinner':
+                title = "Select Round Winner"; theme = 'success'; icon = <IconTrophy />;
+                body = <div className="form-group"><label htmlFor="winner-select">Who won the hand? The pot will be awarded to them.</label><select id="winner-select" value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{activePlayers.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div>;
+                confirmText = "Award Pot";
+                primaryAction = () => {
+                    const winnerId = parseInt(selectedPlayerId, 10);
+                    const winner = activePlayers.find(p => p.id === winnerId);
+                    if (winner) actions.endRound(winner);
+                    closeModal();
+                };
+                break;
 
-  return (
-    <>
-      <div className="game-screen">
-        <PlayerList players={gameState.players} gameState={gameState} currentPlayer={currentPlayer} />
-        <div className="game-controls-container">
-          <GameControls
-            gameState={gameState}
-            onStartRound={handleStartRound}
-            onChangeBoot={() => openModal('gettingBoot')}
-            onAddPlayer={() => openModal('addingPlayer')}
-            onRemovePlayer={() => openModal('removingPlayer')}
-            onReorderPlayers={() => openModal('reorderingPlayers')}
-            onShowSetup={onShowSetup}
-          />
-          {gameState.roundActive && currentPlayer && (
-            <RoundControls
-              gameState={gameState}
-              currentPlayer={currentPlayer}
-              activePlayers={activePlayers}
-              actions={{
-                playBlind: actions.playBlind,
-                seeCards: actions.seeCards,
-                betChaal: actions.betChaal,
-                fold: actions.fold,
-                onShowClick: handleShowClick,
-                onEndBettingClick: () => openModal('selectingWinner')
-              }}
-            />
-          )}
-        </div>
-        <ActionLog messages={gameState.messages} />
-      </div>
-      
-      <InteractionModal
-        isOpen={interaction !== 'idle'}
-        onClose={closeModal}
-        title={modalContent?.title || ''}
-        theme={modalContent?.theme}
-        icon={modalContent?.icon}
-        footerContent={modalContent?.footer}
-      >
-        {modalContent?.body}
-      </InteractionModal>
-    </>
-  );
+            case 'showingCards':
+                {
+                    title = "Showdown!"; theme = 'confirmation'; icon = <IconUsers />;
+                    const { requester, target } = tempData.showContext || {};
+                    body = requester && target ? <div className="form-group"><p>Between <strong>{toTitleCase(requester.name)}</strong> and <strong>{toTitleCase(target.name)}</strong>.</p><label htmlFor="loser-select">Select which player folds (loses the show):</label><select id="loser-select" value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}><option value={requester.id}>{toTitleCase(requester.name)}</option><option value={target.id}>{toTitleCase(target.name)}</option></select></div> : <p>Error: Players not found for show.</p>;
+                    primaryAction = () => {
+                        const loserId = parseInt(selectedPlayerId, 10);
+                        if (isNaN(loserId)) return;
+                        actions.resolveShow(loserId);
+                        closeModal();
+                    };
+                    break;
+                }
+
+            case 'addingPlayer':
+                title = "Add New Player"; theme = 'success'; icon = <IconUserPlus />;
+                body = <><div className="form-group"><label htmlFor="add-player-name">Player Name</label><input id="add-player-name" type="text" value={addPlayerName} onChange={e => setAddPlayerName(e.target.value)} /></div><div className="form-group"><label htmlFor="add-player-balance">Starting Balance</label><input id="add-player-balance" type="number" value={addPlayerBalance} onChange={e => setAddPlayerBalance(e.target.value)} /></div></>;
+                primaryAction = () => {
+                    const balance = parseInt(addPlayerBalance, 10);
+                    if (!addPlayerName || isNaN(balance)) return alert('Invalid name or balance.');
+                    actions.addPlayer(addPlayerName, balance);
+                    closeModal();
+                };
+                break;
+
+            case 'removingPlayer':
+                title = 'Remove Player'; theme = 'danger'; icon = <IconUserMinus />;
+                body = <><p>Are you sure to remove this player? This action cannot be undone.</p><div className="form-group"><label htmlFor="remove-player-select">Select player to remove</label><select id="remove-player-select" value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div></>;
+                confirmText = "Yes, Remove";
+                primaryAction = () => {
+                    const playerId = parseInt(selectedPlayerId, 10);
+                    if (isNaN(playerId)) return;
+                    actions.removePlayer(playerId);
+                    closeModal();
+                };
+                break;
+
+            case 'reorderingPlayers':
+                title = "Reorder Players"; theme = 'default'; icon = <IconList />;
+                body = <><p>Change the seating order. The first player deals next.</p><ul className="reorder-list">{reorderablePlayers.map((player, index) => (<li key={player.id}><span>{toTitleCase(player.name)}</span><div className="reorder-buttons"><button onClick={() => movePlayer(index, 'up')} disabled={index === 0}>⬆️</button><button onClick={() => movePlayer(index, 'down')} disabled={index === reorderablePlayers.length - 1}>⬇️</button></div></li>))}</ul></>;
+                primaryAction = () => {
+                    actions.reorderPlayers(reorderablePlayers);
+                    closeModal();
+                };
+                break;
+        }
+
+        footer = <><button className="btn-modal btn-modal-secondary" onClick={closeModal}>Cancel</button><button className={`btn-modal btn-modal-primary theme-${theme}`} onClick={primaryAction}>{confirmText}</button></>;
+        return { title, theme, icon, body, footer };
+    }, [interaction, gameState.players, gameState.lastWinnerId, gameState.roundInitialBootAmount, bootAmount, selectedPlayerId, addPlayerName, addPlayerBalance, reorderablePlayers, activePlayers, tempData, actions]);
+
+    const handleStartRound = () => {
+        const winnerIndex = gameState.players.findIndex(p => p.id === gameState.lastWinnerId);
+        if (gameState.lastWinnerId !== null && gameState.roundInitialBootAmount && winnerIndex !== -1) {
+            actions.startRound((winnerIndex + 1) % gameState.players.length, gameState.roundInitialBootAmount);
+        } else {
+            openModal('gettingBoot');
+        }
+    };
+
+    const handleShowClick = () => {
+        const requester = currentPlayer;
+        const target = findPrecedingActivePlayer();
+        if (!requester || !target) {
+            alert("Cannot Show: No valid opponent found.");
+            return;
+        }
+
+        const cost = gameState.blindPlayerIds.has(requester.id) ? gameState.currentStake : gameState.currentStake * 2;
+        actions.requestShow(cost);
+        addMessage(`${toTitleCase(requester.name)} pays ₹ ${cost} for Show with ${toTitleCase(target.name)}.`);
+
+        // Pre-select the requester as the default loser
+        setSelectedPlayerId(String(requester.id));
+        setTempData({ showContext: { requester, target } });
+        openModal('showingCards');
+    };
+
+    return (
+        <>
+            <div className="game-screen">
+                <PlayerList players={gameState.players} gameState={gameState} currentPlayer={currentPlayer} />
+                <div className="game-controls-container">
+                    <GameControls
+                        gameState={gameState}
+                        onStartRound={handleStartRound}
+                        onChangeBoot={() => openModal('gettingBoot')}
+                        onAddPlayer={() => openModal('addingPlayer')}
+                        onRemovePlayer={() => openModal('removingPlayer')}
+                        onReorderPlayers={() => openModal('reorderingPlayers')}
+                        onShowSetup={onShowSetup}
+                    />
+                    {gameState.roundActive && currentPlayer && (
+                        <RoundControls
+                            gameState={gameState}
+                            currentPlayer={currentPlayer}
+                            activePlayers={activePlayers}
+                            actions={{
+                                playBlind: actions.playBlind,
+                                seeCards: actions.seeCards,
+                                betChaal: actions.betChaal,
+                                fold: actions.fold,
+                                onShowClick: handleShowClick,
+                                onEndBettingClick: () => openModal('selectingWinner')
+                            }}
+                        />
+                    )}
+                </div>
+                <ActionLog messages={gameState.messages} />
+            </div>
+
+            <InteractionModal
+                isOpen={interaction !== 'idle'}
+                onClose={closeModal}
+                title={modalContent?.title || ''}
+                theme={modalContent?.theme}
+                icon={modalContent?.icon}
+                footerContent={modalContent?.footer}
+            >
+                {modalContent?.body}
+            </InteractionModal>
+        </>
+    );
 };
 
 export default GameScreen;
