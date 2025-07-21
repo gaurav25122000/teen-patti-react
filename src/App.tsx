@@ -643,7 +643,7 @@ function App() {
       return;
     }
     const isTargetBlind = gameState.blindPlayerIds.has(precedingPlayer.id);
-    if (isTargetBlind && !((gameState.blindPlayerIds.has(currentPlayer.id)) || (gameState.players.length===2) )) {
+    if (isTargetBlind && !((gameState.blindPlayerIds.has(currentPlayer.id)) || (activePlayers.length===2) )) {
       alert("Cannot Show: Target player is blind.");
       return;
     }
@@ -987,7 +987,7 @@ function App() {
                 {gameState.players.length === 0 && <p>No players yet. Add some!</p>}
                 <table>
                   <thead>
-                    <tr><th>ID</th><th>Name</th><th>Balance</th><th>Contribution</th><th>Status</th></tr>
+                    <tr><th>ID</th><th>Name</th><th>Balance</th><th>Current Pot contribution</th><th>Status</th></tr>
                   </thead>
                   <tbody>
                     {gameState.players.map(p => {
