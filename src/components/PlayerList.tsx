@@ -46,8 +46,8 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
              <tr key={p.id} className={className}>
                 <td data-label="ID">{p.id}</td>
                 <td data-label="Name">{toTitleCase(p.name)}</td>
-                <td data-label="Balance">Rs. {p.balance}</td>
-                <td data-label="Contribution">Rs. {contribution}</td>
+                <td data-label="Balance">₹ {p.balance}</td>
+                <td data-label="Contribution">₹ {contribution}</td>
                 <td data-label="Status">{status}</td>
             </tr>
 

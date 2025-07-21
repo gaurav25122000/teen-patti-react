@@ -204,7 +204,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
 
     const cost = gameState.blindPlayerIds.has(requester.id) ? gameState.currentStake : gameState.currentStake * 2;
     actions.requestShow(cost);
-    addMessage(`${toTitleCase(requester.name)} pays Rs. ${cost} for Show with ${toTitleCase(target.name)}.`);
+    addMessage(`${toTitleCase(requester.name)} pays ₹ ${cost} for Show with ${toTitleCase(target.name)}.`);
     
     // Pre-select the requester as the default loser
     setSelectedPlayerId(String(requester.id));

@@ -64,7 +64,7 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
   const handleConfirmBlindRaise = () => {
     const raiseAmount = parseInt(blindRaiseAmountInput);
     if (isNaN(raiseAmount) || raiseAmount <= currentStake) {
-      alert(`Blind raise must be greater than the current stake of Rs. ${currentStake}.`);
+      alert(`Blind raise must be greater than the current stake of ₹ ${currentStake}.`);
       return;
     }
     actions.playBlind(true, raiseAmount);
@@ -74,7 +74,7 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
     const betAmount = parseInt(betAmountInput);
     const minChaalBet = 2 * currentStake;
     if (isNaN(betAmount) || betAmount < minChaalBet) {
-      alert(`Bet must be at least Rs. ${minChaalBet}.`);
+      alert(`Bet must be at least ₹ ${minChaalBet}.`);
       return;
     }
     actions.betChaal(betAmount);
@@ -88,16 +88,16 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
       <div className="round-info">
         <div className='turn-info'>Turn: <strong>{toTitleCase(currentPlayer.name)}</strong></div>
         <div className='current-stake'>
-          Current Stake: Rs. {blindPlayerIds.has(currentPlayer.id) ? currentStake : currentStake * 2}
+          Current Stake: ₹ {blindPlayerIds.has(currentPlayer.id) ? currentStake : currentStake * 2}
         </div>
-        <div className="pot-info"><strong>Pot Amount: Rs. {potAmount}</strong></div>
+        <div className="pot-info"><strong>Pot Amount: ₹ {potAmount}</strong></div>
       </div>
       
       {blindPlayerIds.has(currentPlayer.id) ? (
         // --- Actions for BLIND players ---
         <>
           <button onClick={() => actions.playBlind(false, currentStake)} className="btn btn-primary">
-            Play Blind (Cost: Rs. {currentStake})
+            Play Blind (Cost: ₹ {currentStake})
           </button>
           <div className="inline-input-group">
             <input
@@ -129,7 +129,7 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
       {/* --- Common Actions for ALL players --- */}
       <button onClick={actions.fold} className="btn btn-error">Fold</button>
       <button onClick={actions.onShowClick} className="btn btn-accent" disabled={isShowDisabled} title={showTitle}>
-        Show (Cost: Rs. {calculateShowCost()})
+        Show (Cost: ₹ {calculateShowCost()})
       </button>
       <button onClick={actions.onEndBettingClick} className="btn btn-secondary">End Betting</button>
     </div>

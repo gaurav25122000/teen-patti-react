@@ -83,7 +83,7 @@ const endRound = useCallback((winner: Player | null) => {
       const lastBootFromRound = prev.roundInitialBootAmount;
 
       if (winner) {
-        finalMessages.push(`Congratulations! ${winner.name} won the pot of Rs. ${prev.potAmount}`);
+        finalMessages.push(`Congratulations! ${winner.name} won the pot of ₹ ${prev.potAmount}`);
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
         );
@@ -141,7 +141,7 @@ const endRound = useCallback((winner: Player | null) => {
       });
       const initialBlindPlayerIds = new Set(updatedPlayers.map(p => p.id));
 
-      addMessage(`Collecting Boot Amount: Rs. ${bootAmount} from each player. Pot: Rs. ${newPot}`);
+      addMessage(`Collecting Boot Amount: ₹ ${bootAmount} from each player. Pot: ₹ ${newPot}`);
       return {
         ...prev,
         players: updatedPlayers,
@@ -154,7 +154,7 @@ const endRound = useCallback((winner: Player | null) => {
         roundContributions: newContributions,
         lastActorWasBlind: true,
         roundInitialBootAmount: bootAmount,
-        messages: [...prev.messages, `Round started. Stake: Rs. ${bootAmount}. Turn: ${toTitleCase(updatedPlayers[startingPlayerIndex].name)}`],
+        messages: [...prev.messages, `Round started. Stake: ₹ ${bootAmount}. Turn: ${toTitleCase(updatedPlayers[startingPlayerIndex].name)}`],
       };
     });
   };
@@ -170,8 +170,8 @@ const endRound = useCallback((winner: Player | null) => {
           newContributions.set(currentPlayer.id, (newContributions.get(currentPlayer.id) || 0) + amount);
           
           const message = isRaise 
-              ? `${toTitleCase(currentPlayer.name)} raises blind to Rs. ${amount}.`
-              : `${toTitleCase(currentPlayer.name)} plays blind for Rs. ${amount}.`;
+              ? `${toTitleCase(currentPlayer.name)} raises blind to ₹ ${amount}.`
+              : `${toTitleCase(currentPlayer.name)} plays blind for ₹ ${amount}.`;
 
           return {
               ...prev,
@@ -212,9 +212,9 @@ const endRound = useCallback((winner: Player | null) => {
         const effectiveBlindStake = Math.floor(amount / 2);
         const newCurrentStake = Math.max(prev.currentStake, effectiveBlindStake);
         
-        const messages = [...prev.messages, `${toTitleCase(currentPlayer.name)} bets Rs. ${amount}.`];
+        const messages = [...prev.messages, `${toTitleCase(currentPlayer.name)} bets ₹ ${amount}.`];
         if (newCurrentStake > prev.currentStake) {
-            messages.push(` Stake (for blind) updated to Rs. ${newCurrentStake}.`);
+            messages.push(` Stake (for blind) updated to ₹ ${newCurrentStake}.`);
         }
 
         return {
