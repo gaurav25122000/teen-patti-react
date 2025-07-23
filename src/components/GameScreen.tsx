@@ -31,7 +31,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
 
     // --- Modal State ---
     const [interaction, setInteraction] = useState<InteractionType>('idle');
-    const [isMusicPlayerOpen, setIsMusicPlayerOpen] = useState(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [tempData, setTempData] = useState<any>({});
 
@@ -263,7 +262,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                             onRemovePlayer={() => openModal('removingPlayer')}
                             onReorderPlayers={() => openModal('reorderingPlayers')}
                             onShowSetup={onShowSetup}
-                            onOpenMusicPlayer={() => setIsMusicPlayerOpen(true)}
                         />
                         {gameState.roundActive && currentPlayer && (
                             <RoundControls
@@ -284,6 +282,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                     <div className="side-panel-container">
                         <ActionLog messages={gameState.messages} />
                         <Notes />
+                        <MusicPlayer />
                     </div>
                 </div>
             </div>
@@ -299,10 +298,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                 {modalContent?.body}
             </InteractionModal>
 
-            <MusicPlayer
-                isOpen={isMusicPlayerOpen}
-                onClose={() => setIsMusicPlayerOpen(false)}
-            />
         </>
     );
 };

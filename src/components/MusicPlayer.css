@@ -1,50 +1,38 @@
 /* src/components/MusicPlayer.css */
-.music-player-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 101;
-}
-
-.music-player-content {
+.music-player-container {
     background-color: var(--color-surface);
-    padding: 2rem;
-    border-radius: 12px;
     border: 2px solid var(--color-glow-cyan);
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
-    position: relative;
-    text-align: center;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
 }
 
-.music-player-content .close-btn {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    background: none;
-    border: none;
-    color: var(--color-text);
-    font-size: 2rem;
-    cursor: pointer;
+.music-player-container .toggle-btn {
+    width: 100%;
+    margin-bottom: 1rem;
 }
 
-.music-player-content h3 {
+.music-player-container .player-content {
+    display: none;
+}
+
+.music-player-container.visible .player-content {
+    display: block;
+}
+
+.music-player-container h3 {
     font-family: var(--font-display);
     color: var(--color-glow-cyan);
     text-shadow: 0 0 5px var(--color-glow-cyan);
+    text-align: center;
     margin-bottom: 1rem;
 }
 
-.music-player-content .video-container {
+.music-player-container .video-container {
     margin-bottom: 1rem;
 }
 
-.music-player-content .controls input {
+.music-player-container .controls input {
     width: 100%;
     padding: 0.5rem;
     background-color: var(--color-bg);

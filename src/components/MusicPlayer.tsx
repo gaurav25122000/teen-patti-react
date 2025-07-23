@@ -3,28 +3,16 @@ import React, { useState } from 'react';
 import YouTube from 'react-youtube';
 import './MusicPlayer.css';
 
-interface MusicPlayerProps {
-    isOpen: boolean;
-    onClose: () => void;
-}
-
-const MusicPlayer: React.FC<MusicPlayerProps> = ({ isOpen, onClose }) => {
+const MusicPlayer: React.FC = () => {
     const [videoId, setVideoId] = useState('jfKfPfyJRdk'); // Default video
-
-    if (!isOpen) {
-        return null;
-    }
+    const [isVisible, setIsVisible] = useState(false);
 
     const opts = {
-        height: '390',
-        width: '640',
+        height: '150',
+        width: '100%',
         playerVars: {
             autoplay: 1,
         },
-    };
-
-    const handleVideoIdChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setVideoId(event.target.value);
     };
 
     const extractVideoId = (url: string) => {
@@ -49,11 +37,12 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isOpen, onClose }) => {
         }
     };
 
-
     return (
-        <div className="music-player-modal">
-            <div className="music-player-content">
-                <button className="close-btn" onClick={onClose}>&times;</button>
+        <div className={`music-player-container ${isVisible ? 'visible' : ''}`}>
+            <button className="toggle-btn" onClick={() => setIsVisible(!isVisible)}>
+                {isVisible ? 'Hide' : 'Show'} Music Player
+            </button>
+            <div className="player-content">
                 <h3>YouTube Music</h3>
                 <div className="video-container">
                     <YouTube videoId={videoId} opts={opts} />
