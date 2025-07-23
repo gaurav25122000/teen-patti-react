@@ -137,3 +137,26 @@ select:focus {
   border-color: var(--color-primary);
   outline: none;
 }
+
+@media (max-width: 768px) {
+  body {
+    padding: 0.5rem;
+  }
+
+  h1 {
+    font-size: 2em;
+  }
+
+  .game-screen {
+    flex-direction: column;
+  }
+
+  .main-content-container {
+    flex-direction: column;
+  }
+
+  .side-panel-container {
+    width: 100%;
+    margin-top: 1rem;
+  }
+}

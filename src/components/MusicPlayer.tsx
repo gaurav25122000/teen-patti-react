@@ -5,6 +5,7 @@ import './MusicPlayer.css';
 
 const MusicPlayer: React.FC = () => {
     const [videoId, setVideoId] = useState('jfKfPfyJRdk'); // Default video
+    const [playlistId, setPlaylistId] = useState<string | null>(null);
     const [isVisible, setIsVisible] = useState(false);
 
     const opts = {
@@ -12,29 +13,29 @@ const MusicPlayer: React.FC = () => {
         width: '100%',
         playerVars: {
             autoplay: 1,
+            listType: 'playlist',
+            list: playlistId,
         },
     };
 
-    const extractVideoId = (url: string) => {
+    const extractIds = (url: string) => {
         try {
             const urlObj = new URL(url);
-            if (urlObj.hostname === 'youtu.be') {
-                return urlObj.pathname.slice(1);
-            } else if (urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com') {
-                return urlObj.searchParams.get('v');
-            }
+            const video = urlObj.searchParams.get('v');
+            const playlist = urlObj.searchParams.get('list');
+            return { video, playlist };
         } catch (e) {
             // Not a valid URL, assume it's an ID
-            return url;
+            return { video: url, playlist: null };
         }
-        return null;
     }
 
     const handleUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const newVideoId = extractVideoId(event.target.value);
-        if (newVideoId) {
-            setVideoId(newVideoId);
+        const { video, playlist } = extractIds(event.target.value);
+        if (video) {
+            setVideoId(video);
         }
+        setPlaylistId(playlist);
     };
 
     return (

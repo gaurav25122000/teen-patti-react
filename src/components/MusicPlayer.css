@@ -1,10 +1,23 @@
 /* src/components/MusicPlayer.css */
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
 .music-player-container {
     background-color: var(--color-surface);
     border: 2px solid var(--color-glow-cyan);
     border-radius: 8px;
     padding: 1rem;
     box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+
+.music-player-container.visible .player-content {
+    animation: bounce 2s infinite;
 }
 
 .music-player-container .toggle-btn {
