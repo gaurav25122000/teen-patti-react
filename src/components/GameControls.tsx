@@ -11,10 +11,11 @@ interface GameControlsProps {
     onRemovePlayer: () => void;
     onReorderPlayers: () => void;
     onShowSetup: () => void;
+    onOpenMusicPlayer: () => void;
 }
 
 const GameControls: React.FC<GameControlsProps> = (props) => {
-    const { gameState, onStartRound, onChangeBoot, onAddPlayer, onRemovePlayer, onReorderPlayers, onShowSetup } = props;
+    const { gameState, onStartRound, onChangeBoot, onAddPlayer, onRemovePlayer, onReorderPlayers, onShowSetup, onOpenMusicPlayer } = props;
     const { roundActive, players, roundInitialBootAmount: lastBootAmount, lastWinnerId } = gameState;
 
     const canStartRound = !roundActive && players.length >= 2 && (lastBootAmount || lastWinnerId === null);
@@ -39,6 +40,9 @@ const GameControls: React.FC<GameControlsProps> = (props) => {
             </button>
             <button className="btn-secondary" onClick={onShowSetup}>
                 Back to Setup
+            </button>
+            <button className="btn btn-accent" onClick={onOpenMusicPlayer}>
+                Music
             </button>
         </div>
     );

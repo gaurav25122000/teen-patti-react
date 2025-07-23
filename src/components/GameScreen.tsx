@@ -3,9 +3,11 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTeenPattiGame } from '../hooks/useTeenPattiGame';
 import PlayerList from './PlayerList';
 import ActionLog from './ActionLog';
+import Notes from './Notes';
 import GameControls from './GameControls';
 import RoundControls from './RoundControls';
 import InteractionModal from './InteractionModal';
+import MusicPlayer from './MusicPlayer';
 import type { InteractionType, Player } from '../types/gameTypes';
 import { toTitleCase } from '../utils/formatters';
 
@@ -29,6 +31,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
 
     // --- Modal State ---
     const [interaction, setInteraction] = useState<InteractionType>('idle');
+    const [isMusicPlayerOpen, setIsMusicPlayerOpen] = useState(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [tempData, setTempData] = useState<any>({});
 
@@ -247,34 +250,42 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
     return (
         <>
             <div className="game-screen">
-                <PlayerList players={gameState.players} gameState={gameState} currentPlayer={currentPlayer} />
-                <div className="game-controls-container">
-                    <GameControls
-                        gameState={gameState}
-                        onStartRound={handleStartRound}
-                        onChangeBoot={() => openModal('gettingBoot')}
-                        onAddPlayer={() => openModal('addingPlayer')}
-                        onRemovePlayer={() => openModal('removingPlayer')}
-                        onReorderPlayers={() => openModal('reorderingPlayers')}
-                        onShowSetup={onShowSetup}
-                    />
-                    {gameState.roundActive && currentPlayer && (
-                        <RoundControls
-                            gameState={gameState}
-                            currentPlayer={currentPlayer}
-                            activePlayers={activePlayers}
-                            actions={{
-                                playBlind: actions.playBlind,
-                                seeCards: actions.seeCards,
-                                betChaal: actions.betChaal,
-                                fold: actions.fold,
-                                onShowClick: handleShowClick,
-                                onEndBettingClick: () => openModal('selectingWinner')
-                            }}
-                        />
-                    )}
+                <div className="player-list-container">
+                    <PlayerList players={gameState.players} gameState={gameState} currentPlayer={currentPlayer} />
                 </div>
-                <ActionLog messages={gameState.messages} />
+                <div className="main-content-container">
+                    <div className="game-controls-container">
+                        <GameControls
+                            gameState={gameState}
+                            onStartRound={handleStartRound}
+                            onChangeBoot={() => openModal('gettingBoot')}
+                            onAddPlayer={() => openModal('addingPlayer')}
+                            onRemovePlayer={() => openModal('removingPlayer')}
+                            onReorderPlayers={() => openModal('reorderingPlayers')}
+                            onShowSetup={onShowSetup}
+                            onOpenMusicPlayer={() => setIsMusicPlayerOpen(true)}
+                        />
+                        {gameState.roundActive && currentPlayer && (
+                            <RoundControls
+                                gameState={gameState}
+                                currentPlayer={currentPlayer}
+                                activePlayers={activePlayers}
+                                actions={{
+                                    playBlind: actions.playBlind,
+                                    seeCards: actions.seeCards,
+                                    betChaal: actions.betChaal,
+                                    fold: actions.fold,
+                                    onShowClick: handleShowClick,
+                                    onEndBettingClick: () => openModal('selectingWinner')
+                                }}
+                            />
+                        )}
+                    </div>
+                    <div className="side-panel-container">
+                        <ActionLog messages={gameState.messages} />
+                        <Notes />
+                    </div>
+                </div>
             </div>
 
             <InteractionModal
@@ -287,6 +298,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
             >
                 {modalContent?.body}
             </InteractionModal>
+
+            <MusicPlayer
+                isOpen={isMusicPlayerOpen}
+                onClose={() => setIsMusicPlayerOpen(false)}
+            />
         </>
     );
 };

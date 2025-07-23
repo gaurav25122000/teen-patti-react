@@ -145,6 +145,7 @@ h1 {
 .btn:hover:not(:disabled) {
   transform: translateY(-3px);
   text-shadow: 0 0 5px #fff;
+  box-shadow: 0 0 15px var(--color-glow-cyan);
 }
 
 .btn:active:not(:disabled) {
@@ -226,12 +227,26 @@ h1 {
 }
 
 .game-screen {
-  display: grid;
-  grid-template-columns: 2fr 3fr;
-  gap: 2rem;
-  grid-template-areas:
-    "player-list game-controls"
-    "player-list action-log";
+    display: flex;
+    gap: 2rem;
+}
+
+.player-list-container {
+    flex: 2;
+}
+
+.main-content-container {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.side-panel-container {
+    grid-area: side-panel;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
 /* --- 5. Player List (Digital Display) --- */
@@ -272,6 +287,10 @@ h1 {
 .player-list tr td:last-child {
   border-top-right-radius: 8px;
   border-bottom-right-radius: 8px;
+}
+
+.player-list tr:hover td {
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .player-list .folded {
@@ -759,13 +778,9 @@ h1 {
 
 /* For tablets and smaller desktops */
 @media (max-width: 900px) {
-  .game-screen {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "game-controls"
-      "player-list"
-      "action-log";
-  }
+    .game-screen {
+        flex-direction: column;
+    }
 }
 
 /* For mobile devices */
