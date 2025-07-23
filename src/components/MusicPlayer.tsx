@@ -52,7 +52,7 @@ const MusicPlayer: React.FC = () => {
         }
         try {
             const response = await fetch(
-                `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&key=${apiKey}`
+                `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&relatedToVideoId=${videoId}&key=${apiKey}`
             );
             const data = await response.json();
             setPlaylist(data.items);
@@ -62,16 +62,16 @@ const MusicPlayer: React.FC = () => {
     };
 
     const handleNext = () => {
-        const currentIndex = playlist.findIndex((item) => item.snippet.resourceId.videoId === videoId);
+        const currentIndex = playlist.findIndex((item) => item.id.videoId === videoId);
         if (currentIndex < playlist.length - 1) {
-            setVideoId(playlist[currentIndex + 1].snippet.resourceId.videoId);
+            setVideoId(playlist[currentIndex + 1].id.videoId);
         }
     };
 
     const handlePrevious = () => {
-        const currentIndex = playlist.findIndex((item) => item.snippet.resourceId.videoId === videoId);
+        const currentIndex = playlist.findIndex((item) => item.id.videoId === videoId);
         if (currentIndex > 0) {
-            setVideoId(playlist[currentIndex - 1].snippet.resourceId.videoId);
+            setVideoId(playlist[currentIndex - 1].id.videoId);
         }
     };
 
@@ -114,7 +114,7 @@ const MusicPlayer: React.FC = () => {
                     <h4>Playlist</h4>
                     <ul>
                         {playlist.map((item, index) => (
-                            <li key={index} onClick={() => setVideoId(item.snippet.resourceId.videoId)}>
+                            <li key={index} onClick={() => setVideoId(item.id.videoId)}>
                                 <img src={item.snippet.thumbnails.default.url} alt={item.snippet.title} />
                                 <span>{item.snippet.title}</span>
                             </li>
