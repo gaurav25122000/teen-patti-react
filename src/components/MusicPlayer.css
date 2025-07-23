@@ -1,0 +1,55 @@
+/* src/components/MusicPlayer.css */
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.music-player-container {
+    background-color: var(--color-surface);
+    border: 2px solid var(--color-glow-cyan);
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+
+.music-player-container.visible .player-content {
+    animation: bounce 2s infinite;
+}
+
+.music-player-container .toggle-btn {
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.music-player-container .player-content {
+    display: none;
+}
+
+.music-player-container.visible .player-content {
+    display: block;
+}
+
+.music-player-container h3 {
+    font-family: var(--font-display);
+    color: var(--color-glow-cyan);
+    text-shadow: 0 0 5px var(--color-glow-cyan);
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.music-player-container .video-container {
+    margin-bottom: 1rem;
+}
+
+.music-player-container .controls input {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: var(--color-bg);
+    border: 2px solid var(--color-text-muted);
+    border-radius: 6px;
+    color: var(--color-text);
+}
