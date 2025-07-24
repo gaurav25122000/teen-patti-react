@@ -29,4 +29,5 @@ export type InteractionType =
   | 'removingPlayer'
   | 'selectingWinner'
   | 'showingCards'
-  | 'reorderingPlayers';
+  | 'reorderingPlayers'
+  | 'deductAndDistribute';
