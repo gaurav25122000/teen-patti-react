@@ -282,7 +282,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                     <div className="side-panel-container">
                         <Notes />
                         <ActionLog messages={gameState.messages} />
-                        <MusicPlayer />
+                        {/* <MusicPlayer /> */}
                     </div>
                 </div>
             </div>
