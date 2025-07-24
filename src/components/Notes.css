@@ -26,7 +26,7 @@
     color: var(--color-text);
     padding: 10px;
     font-family: var(--font-body);
-    font-size: 1rem;
+    font-size: 2rem;
     resize: vertical;
     transition: all 0.2s ease;
 }
