@@ -223,7 +223,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                         </div>
                         <div className="form-group">
                             <label htmlFor="deduct-amount">Amount to deduct & distribute</label>
-                            <input id="deduct-amount" type="number" value={deductAmount} onChange={e => setDeductAmount(e.target.value)} min="1" />
+                            <input id="deduct-amount" type="number" value={deductAmount} onChange={e => setDeductAmount(e.target.value)} min="1" placeholder="Enter amount" />
                         </div>
                     </>
                 );
