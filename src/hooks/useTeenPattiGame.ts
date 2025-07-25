@@ -323,6 +323,33 @@ export const useTeenPattiGame = () => {
     }));
   };
 
+  const deductAndDistribute = (playerId: number, amount: number) => {
+    setGameState(prev => {
+      const { players } = prev;
+      const playerToDeduct = players.find(p => p.id === playerId);
+      if (!playerToDeduct) {
+        addMessage(`Player with ID ${playerId} not found.`, true);
+        return prev;
+      }
+      if (players.length < 2) {
+        addMessage("Cannot distribute with less than two players.", true);
+        return prev;
+      }
+
+      const amountToDistribute = Math.floor(amount / (players.length - 1));
+      const updatedPlayers = players.map(p => {
+        if (p.id === playerId) {
+          return { ...p, balance: p.balance - amount };
+        } else {
+          return { ...p, balance: p.balance + amountToDistribute };
+        }
+      });
+
+      addMessage(`Deducted ₹ ${amount} from ${toTitleCase(playerToDeduct.name)} and distributed ₹ ${amountToDistribute} to everyone else.`);
+      return { ...prev, players: updatedPlayers };
+    });
+  };
+
   return {
     gameState,
     setGameState, // Exposing for direct manipulation if needed (e.g., in modals)
@@ -343,6 +370,7 @@ export const useTeenPattiGame = () => {
       addPlayer,
       removePlayer,
       reorderPlayers,
+      deductAndDistribute,
     }
   };
 };

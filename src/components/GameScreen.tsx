@@ -39,12 +39,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
     const [addPlayerName, setAddPlayerName] = useState('');
     const [addPlayerBalance, setAddPlayerBalance] = useState('0');
+    const [deductAmount, setDeductAmount] = useState('0');
     const [reorderablePlayers, setReorderablePlayers] = useState<Player[]>([]);
 
     useEffect(() => {
         onInteractionChange(interaction !== 'idle');
         // Pre-select the first player in lists when a relevant modal opens
-        if (interaction === 'removingPlayer' && gameState.players.length > 0) setSelectedPlayerId(String(gameState.players[0].id));
+        if ((interaction === 'removingPlayer' || interaction === 'deductAndDistribute') && gameState.players.length > 0) {
+            setSelectedPlayerId(String(gameState.players[0].id));
+        }
         if (interaction === 'gettingStartPlayer' && gameState.players.length > 0) setSelectedPlayerId(String(gameState.players[0].id));
         if (interaction === 'selectingWinner' && activePlayers.length > 0) setSelectedPlayerId(String(activePlayers[0].id));
     }, [interaction, onInteractionChange, gameState.players, activePlayers]);
@@ -52,6 +55,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
     const openModal = (type: InteractionType) => {
         if (type === 'gettingBoot') setBootAmount(String(gameState.roundInitialBootAmount || 10));
         if (type === 'addingPlayer') { setAddPlayerName(''); setAddPlayerBalance('0'); }
+        if (type === 'deductAndDistribute') { setDeductAmount('0'); }
         if (type === 'reorderingPlayers') setReorderablePlayers([...gameState.players]);
         setInteraction(type);
     };
@@ -206,6 +210,32 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                     closeModal();
                 };
                 break;
+
+            case 'deductAndDistribute':
+                title = "Deduct & Distribute"; theme = 'danger'; icon = <IconCash />;
+                body = (
+                    <>
+                        <div className="form-group">
+                            <label htmlFor="deduct-player-select">Select player to deduct from</label>
+                            <select id="deduct-player-select" value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>
+                                {gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="deduct-amount">Amount to deduct & distribute</label>
+                            <input id="deduct-amount" type="number" value={deductAmount} onChange={e => setDeductAmount(e.target.value)} min="1" placeholder="Enter amount" />
+                        </div>
+                    </>
+                );
+                confirmText = "Confirm & Distribute";
+                primaryAction = () => {
+                    const playerId = parseInt(selectedPlayerId, 10);
+                    const amount = parseInt(deductAmount, 10);
+                    if (isNaN(playerId) || isNaN(amount) || amount <= 0) return alert('Invalid player or amount.');
+                    actions.deductAndDistribute(playerId, amount);
+                    closeModal();
+                };
+                break;
         }
 
         footer = (
@@ -261,6 +291,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                             onAddPlayer={() => openModal('addingPlayer')}
                             onRemovePlayer={() => openModal('removingPlayer')}
                             onReorderPlayers={() => openModal('reorderingPlayers')}
+                            onDeductAndDistribute={() => openModal('deductAndDistribute')}
                             onShowSetup={onShowSetup}
                         />
                         {gameState.roundActive && currentPlayer && (
