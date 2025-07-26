@@ -21,7 +21,7 @@ function App() {
   // Memoize the callback to prevent re-renders
   const handleInteractionChange = useCallback((isOpen: boolean) => {
     setIsModalOpen(isOpen);
-  }, []);
+  }, [setIsModalOpen]);
 
   // Teen Patti Hooks
   const teenPattiHook = useTeenPattiGame();
