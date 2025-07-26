@@ -11,7 +11,8 @@ const createInitialPokerState = (): PokerGameState => ({
     gameStage: 'pre-deal',
     pot: [],
     currentBet: 0,
-    lastRaiserId: null, // Still useful for determining min-raise, but not for ending rounds
+    lastRaiserId: null,
+    lastRaiseAmount: null,
     activePlayerIndex: -1,
     dealerButtonIndex: -1,
     smallBlindIndex: -1,
@@ -81,12 +82,11 @@ export const usePokerGame = () => {
         const newStage = nextStageMap[currentState.gameStage];
         addMessage(`--- Moving to ${toTitleCase(newStage)} ---`);
 
-        // Reset round-specific data and find the first player to act
         const newPlayers = currentState.players.map(p => ({ ...p, roundBet: 0, hasActed: false }));
         let newActiveIndex = currentState.dealerButtonIndex;
         do { newActiveIndex = (newActiveIndex + 1) % newPlayers.length; } while (!newPlayers[newActiveIndex].inHand || newPlayers[newActiveIndex].isAllIn);
 
-        return { ...currentState, players: newPlayers, gameStage: newStage, currentBet: 0, lastRaiserId: null, activePlayerIndex: newActiveIndex };
+        return { ...currentState, players: newPlayers, gameStage: newStage, currentBet: 0, lastRaiserId: null, lastRaiseAmount: currentState.bigBlindAmount, activePlayerIndex: newActiveIndex };
     }, [addMessage]);
 
     const getEndOfHandState = useCallback((winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameState: PokerGameState): PokerGameState => {
@@ -115,11 +115,12 @@ export const usePokerGame = () => {
 
     const handlePlayerAction = useCallback((action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in', amount = 0) => {
         setGameState(prev => {
-            const players = JSON.parse(JSON.stringify(prev.players)); // Deep copy to ensure immutability
+            const players = JSON.parse(JSON.stringify(prev.players));
             const player = players[prev.activePlayerIndex];
             if (!player) return prev;
 
             let newCurrentBet = prev.currentBet;
+            let newLastRaiseAmount = prev.lastRaiseAmount;
 
             player.hasActed = true;
 
@@ -144,21 +145,33 @@ export const usePokerGame = () => {
                 case 'bet':
                 case 'raise': {
                     const isRaise = newCurrentBet > 0;
-                    const minAmount = isRaise ? newCurrentBet * 2 : prev.bigBlindAmount;
-                    if (amount < minAmount) {
-                        addMessage(`Invalid ${isRaise ? 'raise' : 'bet'}. Must be at least ${minAmount}.`);
-                        return prev;
-                    }
+                    const minRaise = newLastRaiseAmount || prev.bigBlindAmount;
                     const costToPlayer = amount - player.roundBet;
+
                     if (costToPlayer > player.stack) {
                         addMessage("Cannot bet more than your stack.");
                         return prev;
                     }
+                    
+                    if (isRaise) {
+                        const raiseAmount = amount - newCurrentBet;
+                        if (raiseAmount < minRaise) {
+                            addMessage(`Raise must be by at least ${minRaise}. Total bet must be at least ${newCurrentBet + minRaise}.`);
+                            return prev;
+                        }
+                        newLastRaiseAmount = raiseAmount;
+                    } else {
+                        if (amount < minRaise) {
+                            addMessage(`Bet must be at least ${minRaise}.`);
+                            return prev;
+                        }
+                        newLastRaiseAmount = amount;
+                    }
+
                     player.stack -= costToPlayer;
                     player.totalPotContribution += costToPlayer;
                     player.roundBet = amount;
                     newCurrentBet = amount;
-                    // When a player raises, all others must act again
                     players.forEach((p: PokerPlayer) => { if (p.id !== player.id) p.hasActed = false });
                     break;
                 }
@@ -170,8 +183,13 @@ export const usePokerGame = () => {
                     player.stack = 0;
                     player.isAllIn = true;
                     if (totalBet > newCurrentBet) {
+                        const raiseAmount = totalBet - newCurrentBet;
+                        const minRaise = newLastRaiseAmount || prev.bigBlindAmount;
+                        if (raiseAmount >= minRaise) {
+                           newLastRaiseAmount = raiseAmount;
+                           players.forEach((p: PokerPlayer) => { if (p.id !== player.id) p.hasActed = false });
+                        }
                         newCurrentBet = totalBet;
-                        players.forEach((p: PokerPlayer) => { if (p.id !== player.id) p.hasActed = false });
                     }
                     break;
                 }
@@ -182,16 +200,14 @@ export const usePokerGame = () => {
                 return getEndOfHandState(playersLeftInHand[0], players, prev);
             }
 
-            // --- Check for End of Betting Round ---
             const activeBettors = players.filter((p: PokerPlayer) => p.inHand && !p.isAllIn);
             const allBetsMatched = activeBettors.every((p: { roundBet: number; }) => p.roundBet === newCurrentBet);
-            const allHaveActed = activeBettors.every((p: { hasActed: never; }) => p.hasActed);
+            const allHaveActed = activeBettors.every((p: { hasActed: boolean; }) => p.hasActed);
 
             if (allBetsMatched && allHaveActed) {
-                return advanceToNextStageOrShowdown({ ...prev, players, currentBet: newCurrentBet });
+                return advanceToNextStageOrShowdown({ ...prev, players, currentBet: newCurrentBet, lastRaiseAmount: newLastRaiseAmount });
             }
 
-            // --- Find Next Player ---
             let nextIndex = prev.activePlayerIndex;
             for (let i = 1; i <= players.length; i++) {
                 nextIndex = (prev.activePlayerIndex + i) % players.length;
@@ -200,13 +216,14 @@ export const usePokerGame = () => {
                 }
             }
 
-            return { ...prev, players, currentBet: newCurrentBet, activePlayerIndex: nextIndex };
+            return { ...prev, players, currentBet: newCurrentBet, lastRaiseAmount: newLastRaiseAmount, activePlayerIndex: nextIndex };
         });
     }, [addMessage, advanceToNextStageOrShowdown, getEndOfHandState]);
 
     const setupGame = useCallback((players: { name: string, stack: number }[], blinds: { sb: number, bb: number }) => {
         const initialPlayers: PokerPlayer[] = players.map((p, i) => ({
             id: i + 1, name: toTitleCase(p.name), stack: p.stack,
+            totalBuyIn: p.stack, // Initial buy-in is the starting stack
             inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false
         }));
 
@@ -254,13 +271,8 @@ export const usePokerGame = () => {
             let firstToActIndex = newBigBlindIndex;
             do { firstToActIndex = (firstToActIndex + 1) % prev.players.length; } while (!newPlayers[firstToActIndex].inHand);
 
-            // The big blind gets a special `hasActed` status pre-flop
-            // because they can still raise even if others just call.
-            // We handle this by not setting their `hasActed` to true initially.
-            // Small blind's action is forced, so they have "acted".
             newPlayers[newSmallBlindIndex].hasActed = true;
-
-
+            
             addMessage(`--- New Hand Started. Dealer: ${newPlayers[newDealerIndex].name} ---`);
             addMessage(`${sbPlayer.name} posts small blind of ${sbAmount}.`);
             addMessage(`${bbPlayer.name} posts big blind of ${bbAmount}.`);
@@ -271,6 +283,7 @@ export const usePokerGame = () => {
                 gameStage: 'pre-flop',
                 pot: [],
                 currentBet: prev.bigBlindAmount,
+                lastRaiseAmount: prev.bigBlindAmount,
                 activePlayerIndex: firstToActIndex,
                 dealerButtonIndex: newDealerIndex,
                 smallBlindIndex: newSmallBlindIndex,
@@ -317,7 +330,17 @@ export const usePokerGame = () => {
                 return prev;
             }
             const newId = prev.players.length > 0 ? Math.max(...prev.players.map(p => p.id)) + 1 : 1;
-            const newPlayer: PokerPlayer = { id: newId, name: toTitleCase(name), stack, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false };
+            const newPlayer: PokerPlayer = { 
+                id: newId, 
+                name: toTitleCase(name), 
+                stack, 
+                totalBuyIn: stack, // New player's buy-in is their starting stack
+                inHand: false, 
+                isAllIn: false, 
+                roundBet: 0, 
+                totalPotContribution: 0, 
+                hasActed: false 
+            };
             addMessage(`Player ${name} has been added to the game.`);
             return { ...prev, players: [...prev.players, newPlayer] };
         });
@@ -348,7 +371,11 @@ export const usePokerGame = () => {
             const newPlayers = prev.players.map(p => {
                 if (p.id === playerId) {
                     addMessage(`Added ${amount} chips to ${p.name}.`);
-                    return { ...p, stack: p.stack + amount };
+                    return { 
+                        ...p, 
+                        stack: p.stack + amount,
+                        totalBuyIn: p.totalBuyIn + amount // Add rebuy to total buy-in
+                    };
                 }
                 return p;
             });

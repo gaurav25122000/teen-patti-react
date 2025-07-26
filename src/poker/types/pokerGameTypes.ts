@@ -5,6 +5,7 @@ export interface PokerPlayer {
     id: number;
     name: string;
     stack: number;
+    totalBuyIn: number; // <-- ADDED THIS LINE
     inHand: boolean;
     isAllIn: boolean;
     roundBet: number; // Amount bet in the current betting round
@@ -24,6 +25,7 @@ export interface PokerGameState {
     pot: Pot[];
     currentBet: number;
     lastRaiserId: number | null;
+    lastRaiseAmount: number | null;
     activePlayerIndex: number;
     dealerButtonIndex: number;
     smallBlindIndex: number;
