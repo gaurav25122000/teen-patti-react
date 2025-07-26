@@ -39,7 +39,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
     const [addPlayerName, setAddPlayerName] = useState('');
     const [addPlayerBalance, setAddPlayerBalance] = useState('0');
-    const [deductAmount, setDeductAmount] = useState('0');
+    const [deductAmount, setDeductAmount] = useState<number>(0);
     const [reorderablePlayers, setReorderablePlayers] = useState<Player[]>([]);
 
     useEffect(() => {
@@ -223,7 +223,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                         </div>
                         <div className="form-group">
                             <label htmlFor="deduct-amount">Amount to deduct & distribute</label>
-                            <input id="deduct-amount" type="number" value={deductAmount} onChange={e => setDeductAmount(e.target.value)} min="1" placeholder="Enter amount" />
+                            <input
+                                id="deduct-amount"
+                                type="number"
+                                value={deductAmount}
+                                onChange={e => setDeductAmount(Number(e.target.value))} // Convert to number
+                                min="1"
+                                placeholder="Enter amount"
+                            />
                         </div>
                     </>
                 );
