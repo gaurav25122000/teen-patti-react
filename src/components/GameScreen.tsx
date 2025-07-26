@@ -44,12 +44,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
     const [reorderablePlayers, setReorderablePlayers] = useState<Player[]>([]);
     const [showContext, setShowContext] = useState<{ requester?: Player, target?: Player }>({});
 
-
-    // Effect to signal modal open/close to parent
-    useEffect(() => {
-        onInteractionChange(interaction !== 'idle' || showOwings);
-    }, [interaction, showOwings, onInteractionChange]);
-
     // Effect to pre-populate modal state (for non-showdown modals)
     useEffect(() => {
         if (interaction === 'idle') return;
