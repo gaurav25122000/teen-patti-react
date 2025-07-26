@@ -1,50 +1,62 @@
 // src/App.tsx
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import './App.css';
+
+// Teen Patti Imports
 import { useTeenPattiGame } from './hooks/useTeenPattiGame';
 import GameSetup from './components/GameSetup';
 import GameScreen from './components/GameScreen';
-import type { Player } from './types/gameTypes';
+
+// Poker Imports
+import { usePokerGame } from './poker/hooks/usePokerGame';
+import PokerLobby from './poker/components/PokerLobby';
+
+// General Components
+import ModeSelectionScreen from './components/ModeSelectionScreen';
 
 function App() {
-  const gameHook = useTeenPattiGame();
-  const { gameState, actions } = gameHook;
-  const [showSetup, setShowSetup] = useState(gameState.players.length < 2);
-  const [isModalOpen, setIsModalOpen] = useState(false); // State for the blur effect
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (gameState.players.length >= 2) {
-      setShowSetup(false);
-    }
-  }, [gameState.players.length]);
+  // Memoize the callback to prevent re-renders
+  const handleInteractionChange = useCallback((isOpen: boolean) => {
+    setIsModalOpen(isOpen);
+  }, []);
 
-  const handleStartNewGame = (players: Player[]) => {
-    actions.startNewGame(players);
-    setShowSetup(false);
+  // Teen Patti Hooks
+  const teenPattiHook = useTeenPattiGame();
+
+  // Poker Hooks
+  const pokerHook = usePokerGame();
+
+  // --- Teen Patti Route Component ---
+  const TeenPattiRoute = () => {
+    const showSetup = teenPattiHook.gameState.players.length < 2;
+    return showSetup ? (
+      <GameSetup
+        onStartNewGame={teenPattiHook.actions.startNewGame}
+        onLoadGame={teenPattiHook.actions.loadGame}
+      />
+    ) : (
+      <GameScreen
+        gameHook={teenPattiHook}
+        onShowSetup={() => teenPattiHook.actions.startNewGame([])}
+        onInteractionChange={handleInteractionChange}
+      />
+    );
   };
 
-  const handleLoadGame = () => {
-    if (actions.loadGame()) {
-      setShowSetup(false);
-    }
-  };
-
-  // This is the normal game view
   return (
     <div className={`app-container ${isModalOpen ? 'modal-open' : ''}`}>
-      <h1>Bets Manager</h1>
-      {showSetup ? (
-        <GameSetup
-          onStartNewGame={handleStartNewGame}
-          onLoadGame={handleLoadGame}
-        />
-      ) : (
-        <GameScreen
-          gameHook={gameHook}
-          onShowSetup={() => setShowSetup(true)}
-          onInteractionChange={setIsModalOpen} // Pass the state setter function
-        />
-      )}
+      <Link to="/" style={{ textDecoration: 'none' }}>
+        <h1>Bets Manager</h1>
+      </Link>
+      <Routes>
+        <Route path="/" element={<ModeSelectionScreen />} />
+        <Route path="/teen-patti" element={<TeenPattiRoute />} />
+        <Route path="/poker" element={<PokerLobby pokerHook={pokerHook} onInteractionChange={handleInteractionChange} />} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
     </div>
   );
 }
