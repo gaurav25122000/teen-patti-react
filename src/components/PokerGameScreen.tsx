@@ -30,7 +30,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ gameHook }) => {
     return (
         <div className="poker-game-screen">
             <div className="player-list">
-                <h2>Players</h2>
+                <h3>Players</h3>
                 {gameState.players.map((player, index) => (
                     <div key={player.id} className={`player-item ${gameState.currentPlayerIndex === index ? 'active' : ''}`}>
                         <span>{player.name}</span>
@@ -51,26 +51,28 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ gameHook }) => {
             </div>
             <div className="controls">
                 {gameState.isRoundActive && (
-                    <>
-                        <button onClick={() => handleAction('fold')}>Fold</button>
-                        <button onClick={() => handleAction('check')}>Check</button>
-                        <button onClick={() => handleAction('call')}>Call</button>
-                        <div>
+                    <div className="round-controls">
+                        <button className="btn btn-error" onClick={() => handleAction('fold')}>Fold</button>
+                        <button className="btn btn-secondary" onClick={() => handleAction('check')}>Check</button>
+                        <button className="btn btn-primary" onClick={() => handleAction('call')}>Call</button>
+                        <div className="inline-input-group">
                             <input type="number" value={betAmount} onChange={e => setBetAmount(parseInt(e.target.value))} />
-                            <button onClick={() => handleAction('bet')}>Bet</button>
-                            <button onClick={() => handleAction('raise')}>Raise</button>
+                            <button className="btn btn-success" onClick={() => handleAction('bet')}>Bet</button>
+                            <button className="btn btn-accent" onClick={() => handleAction('raise')}>Raise</button>
                         </div>
-                    </>
+                    </div>
                 )}
-                <button onClick={actions.startRound} disabled={gameState.isRoundActive}>
-                    Start Round
-                </button>
-                <button onClick={actions.nextBettingRound} disabled={!gameState.isRoundActive}>
-                    Next Betting Round
-                </button>
-                <button onClick={handleEndRound} disabled={!gameState.isRoundActive}>
-                    End Round
-                </button>
+                 <div className="game-actions">
+                    <button className="btn btn-start" onClick={actions.startRound} disabled={gameState.isRoundActive}>
+                        Start Round
+                    </button>
+                    <button className="btn btn-primary" onClick={actions.nextBettingRound} disabled={!gameState.isRoundActive}>
+                        Next Betting Round
+                    </button>
+                    <button className="btn btn-success" onClick={handleEndRound} disabled={!gameState.isRoundActive}>
+                        End Round
+                    </button>
+                </div>
             </div>
             <div className="action-log">
                 {gameState.messages.map((msg, i) => (
