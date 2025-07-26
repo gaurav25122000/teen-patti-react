@@ -138,3 +138,37 @@
     border-radius: 5px;
     box-shadow: 0 0 5px var(--color-glow-cyan);
 }
+
+/* Mobile-friendly styles */
+@media (max-width: 600px) {
+    .poker-game-screen {
+        padding: 1rem;
+    }
+
+    .player-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .round-controls, .game-actions {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .round-controls .btn, .game-actions .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+
+    .inline-input-group {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .inline-input-group input {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+}
