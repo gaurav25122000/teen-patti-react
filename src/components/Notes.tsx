@@ -2,7 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import './Notes.css';
 
-const Notes: React.FC = () => {
+interface NotesProps {
+    roundActive: boolean;
+}
+
+const Notes: React.FC<NotesProps> = ({ roundActive }) => {
     const [notes, setNotes] = useState('');
 
     useEffect(() => {
@@ -10,7 +14,7 @@ const Notes: React.FC = () => {
         if (savedNotes) {
             setNotes(savedNotes);
         }
-    }, []);
+    }, [roundActive]);
 
     const handleNotesChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
         setNotes(event.target.value);

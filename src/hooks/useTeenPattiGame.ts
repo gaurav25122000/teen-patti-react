@@ -131,6 +131,7 @@ export const useTeenPattiGame = () => {
   };
 
   const startRound = (startingPlayerIndex: number, bootAmount: number) => {
+    localStorage.setItem('poker-notes', "Game \nBUST - \nJOKER - ");
     setGameState(prev => {
       let newPot = 0;
       const newContributions = new Map<number, number>();
