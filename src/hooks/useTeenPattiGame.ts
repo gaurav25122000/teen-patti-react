@@ -65,7 +65,10 @@ export const useTeenPattiGame = () => {
         nextIndex = (nextIndex + 1) % prev.players.length;
       } while (prev.foldedPlayerIds.has(prev.players[nextIndex].id));
 
-      return { ...prev, currentPlayerIndex: nextIndex };
+      const nextPlayer = prev.players[nextIndex];
+      const newMessages = [...prev.messages, `--- Turn is now on ${toTitleCase(nextPlayer.name)} ---`];
+
+      return { ...prev, currentPlayerIndex: nextIndex, messages: newMessages };
     });
   }, []);
 
@@ -79,11 +82,11 @@ export const useTeenPattiGame = () => {
       const finalMessages = [...prev.messages];
       let finalPlayers = prev.players;
       let newLastWinnerId = prev.lastWinnerId;
-      // Capture the boot amount from the round that just ended
       const lastBootFromRound = prev.roundInitialBootAmount;
 
       if (winner) {
-        finalMessages.push(`Congratulations! ${winner.name} won the pot of ₹ ${prev.potAmount}`);
+        finalMessages.push(`--- ROUND OVER ---`);
+        finalMessages.push(`Congratulations! ${toTitleCase(winner.name)} won the pot of ₹${prev.potAmount}`);
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
         );
@@ -104,12 +107,12 @@ export const useTeenPattiGame = () => {
         blindPlayerIds: new Set<number>(),
         roundContributions: new Map<number, number>(),
         lastActorWasBlind: false,
-        // **This is the important addition**
         roundInitialBootAmount: lastBootFromRound,
         messages: finalMessages,
       };
     });
   }, []);
+
   // --- Player Actions ---
   const startNewGame = (newPlayers: Player[]) => {
     setGameState({
@@ -141,8 +144,16 @@ export const useTeenPattiGame = () => {
         return { ...p, balance: p.balance - bootAmount };
       });
       const initialBlindPlayerIds = new Set(updatedPlayers.map(p => p.id));
+      const startingPlayer = updatedPlayers[startingPlayerIndex];
 
-      addMessage(`Collecting Boot Amount: ₹ ${bootAmount} from each player. Pot: ₹ ${newPot}`);
+      const messages = [
+        ...prev.messages,
+        `--- NEW ROUND STARTED ---`,
+        `Collecting Boot Amount: ₹${bootAmount} from each player.`,
+        `Total Pot: ₹${newPot}.`,
+        `Turn starts with ${toTitleCase(startingPlayer.name)}.`
+      ];
+
       return {
         ...prev,
         players: updatedPlayers,
@@ -155,7 +166,7 @@ export const useTeenPattiGame = () => {
         roundContributions: newContributions,
         lastActorWasBlind: true,
         roundInitialBootAmount: bootAmount,
-        messages: [...prev.messages, `Round started. Stake: ₹ ${bootAmount}. Turn: ${toTitleCase(updatedPlayers[startingPlayerIndex].name)}`],
+        messages,
       };
     });
   };
@@ -169,15 +180,16 @@ export const useTeenPattiGame = () => {
       );
       const newContributions = new Map(prev.roundContributions);
       newContributions.set(currentPlayer.id, (newContributions.get(currentPlayer.id) || 0) + amount);
+      const newPotAmount = prev.potAmount + amount;
 
       const message = isRaise
-        ? `${toTitleCase(currentPlayer.name)} raises blind to ₹ ${amount}.`
-        : `${toTitleCase(currentPlayer.name)} plays blind for ₹ ${amount}.`;
+        ? `${toTitleCase(currentPlayer.name)} raises blind to ₹${amount}. Pot is now ₹${newPotAmount}.`
+        : `${toTitleCase(currentPlayer.name)} plays blind for ₹${amount}. Pot is now ₹${newPotAmount}.`;
 
       return {
         ...prev,
         players: updatedPlayers,
-        potAmount: prev.potAmount + amount,
+        potAmount: newPotAmount,
         roundContributions: newContributions,
         currentStake: isRaise ? amount : prev.currentStake,
         lastActorWasBlind: true,
@@ -195,7 +207,7 @@ export const useTeenPattiGame = () => {
       return {
         ...prev,
         blindPlayerIds: newBlindPlayerIds,
-        messages: [...prev.messages, `${toTitleCase(currentPlayer.name)} sees their cards.`],
+        messages: [...prev.messages, `${toTitleCase(currentPlayer.name)} sees their cards and is now playing Chaal.`],
       };
     });
   };
@@ -209,19 +221,20 @@ export const useTeenPattiGame = () => {
       );
       const newContributions = new Map(prev.roundContributions);
       newContributions.set(currentPlayer.id, (newContributions.get(currentPlayer.id) || 0) + amount);
+      const newPotAmount = prev.potAmount + amount;
 
       const effectiveBlindStake = Math.floor(amount / 2);
       const newCurrentStake = Math.max(prev.currentStake, effectiveBlindStake);
 
-      const messages = [...prev.messages, `${toTitleCase(currentPlayer.name)} bets ₹ ${amount}.`];
+      const messages = [...prev.messages, `${toTitleCase(currentPlayer.name)} bets Chaal of ₹${amount}. Pot is now ₹${newPotAmount}.`];
       if (newCurrentStake > prev.currentStake) {
-        messages.push(` Stake (for blind) updated to ₹ ${newCurrentStake}.`);
+        messages.push(`New stake for Blind players is now ₹${newCurrentStake}.`);
       }
 
       return {
         ...prev,
         players: newPlayers,
-        potAmount: prev.potAmount + amount,
+        potAmount: newPotAmount,
         currentStake: newCurrentStake,
         roundContributions: newContributions,
         lastActorWasBlind: false,
@@ -234,14 +247,14 @@ export const useTeenPattiGame = () => {
   const fold = () => {
     if (!currentPlayer) return;
 
-    addMessage(`${toTitleCase(currentPlayer.name)} folds.`);
+    const foldedPlayerName = toTitleCase(currentPlayer.name);
+    addMessage(`${foldedPlayerName} folds.`);
     const newFoldedIds = new Set(gameState.foldedPlayerIds).add(currentPlayer.id);
 
     const winner = checkForWinner(gameState.players, newFoldedIds);
     if (winner) {
-      addMessage(`${toTitleCase(winner.name)} is the last player remaining and wins!`);
-      // Use a temp state update to show the fold message before ending the round
-      setGameState(prev => ({ ...prev, messages: [...prev.messages, `${toTitleCase(winner.name)} wins!`] }));
+      addMessage(`${toTitleCase(winner.name)} is the last player remaining.`);
+      setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
       endRound(winner);
     } else {
       setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
@@ -262,6 +275,7 @@ export const useTeenPattiGame = () => {
         players: updatedPlayers,
         potAmount: prev.potAmount + cost,
         roundContributions: newContributions,
+        messages: [...prev.messages, `A Show is requested for ₹${cost}. Pot is now ₹${prev.potAmount + cost}.`]
       };
     });
   };
@@ -270,11 +284,12 @@ export const useTeenPattiGame = () => {
     const loser = gameState.players.find(p => p.id === loserId);
     if (!loser) return;
 
-    addMessage(`${toTitleCase(loser.name)} folds after the Show.`);
+    addMessage(`${toTitleCase(loser.name)} loses the Show and folds.`);
     const newFoldedIds = new Set(gameState.foldedPlayerIds).add(loserId);
     const winner = checkForWinner(gameState.players, newFoldedIds);
 
     if (winner) {
+      addMessage(`${toTitleCase(winner.name)} is the last player remaining.`);
       endRound(winner);
     } else {
       setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
@@ -289,7 +304,7 @@ export const useTeenPattiGame = () => {
       ...prev,
       players: [...prev.players, newPlayer]
     }));
-    addMessage(`Player ${toTitleCase(name)} added.`);
+    addMessage(`Player ${toTitleCase(name)} added with balance ₹${balance}.`);
   };
 
   const removePlayer = (playerId: number) => {
@@ -311,7 +326,7 @@ export const useTeenPattiGame = () => {
         roundContributions: newContributions,
       };
     });
-    addMessage(`Player ${toTitleCase(playerToRemove.name)} removed.`);
+    addMessage(`Player ${toTitleCase(playerToRemove.name)} removed from the game.`);
   };
 
   const reorderPlayers = (reordered: Player[]) => {
@@ -320,7 +335,7 @@ export const useTeenPattiGame = () => {
       players: reordered,
       lastWinnerId: null,
       currentPlayerIndex: -1,
-      messages: [...prev.messages, "Player order updated."],
+      messages: [...prev.messages, "Player order updated. The first player in the list will deal next."],
     }));
   };
 
@@ -346,14 +361,13 @@ export const useTeenPattiGame = () => {
         }
       });
 
-      addMessage(`Deducted ₹ ${amount} from ${toTitleCase(playerToDeduct.name)} and distributed ₹ ${amountToDistribute} to everyone else.`);
+      addMessage(`Deducted ₹${amount} from ${toTitleCase(playerToDeduct.name)} and distributed ₹${amountToDistribute} to everyone else.`);
       return { ...prev, players: updatedPlayers };
     });
   };
 
   return {
     gameState,
-    setGameState, // Exposing for direct manipulation if needed (e.g., in modals)
     addMessage,
     activePlayers,
     currentPlayer,
