@@ -11,7 +11,8 @@ const createInitialPokerState = (): PokerGameState => ({
     gameStage: 'pre-deal',
     pot: [],
     currentBet: 0,
-    lastRaiserId: null, // Still useful for determining min-raise, but not for ending rounds
+    lastRaiserId: null,
+    lastRaiseAmount: null,
     activePlayerIndex: -1,
     dealerButtonIndex: -1,
     smallBlindIndex: -1,
@@ -67,9 +68,12 @@ export const usePokerGame = () => {
     }, [gameState]);
 
     const advanceToNextStageOrShowdown = useCallback((currentState: PokerGameState): PokerGameState => {
+        const currentTotalPot = currentState.players.reduce((sum, p) => sum + p.totalPotContribution, 0);
+        addMessage(`--- End of Betting Round. Total Pot: ₹${currentTotalPot} ---`);
+
         const playersInHand = currentState.players.filter(p => p.inHand);
         if (currentState.gameStage === 'river' || playersInHand.filter(p => !p.isAllIn && p.stack > 0).length < 2) {
-            addMessage("Betting is complete. Calculating final pots for showdown.");
+            addMessage("All betting is complete. Calculating final pots for showdown.");
             const finalPots = calculatePots(currentState.players);
             return { ...currentState, gameStage: 'showdown', pot: finalPots, activePlayerIndex: -1 };
         }
@@ -79,14 +83,14 @@ export const usePokerGame = () => {
             'turn': 'river', 'river': 'showdown', 'showdown': 'pre-deal',
         };
         const newStage = nextStageMap[currentState.gameStage];
-        addMessage(`--- Moving to ${toTitleCase(newStage)} ---`);
+        addMessage(`--- Dealing the ${toTitleCase(newStage)} ---`);
 
-        // Reset round-specific data and find the first player to act
         const newPlayers = currentState.players.map(p => ({ ...p, roundBet: 0, hasActed: false }));
         let newActiveIndex = currentState.dealerButtonIndex;
         do { newActiveIndex = (newActiveIndex + 1) % newPlayers.length; } while (!newPlayers[newActiveIndex].inHand || newPlayers[newActiveIndex].isAllIn);
 
-        return { ...currentState, players: newPlayers, gameStage: newStage, currentBet: 0, lastRaiserId: null, activePlayerIndex: newActiveIndex };
+        addMessage(`Action starts with ${toTitleCase(newPlayers[newActiveIndex].name)}.`);
+        return { ...currentState, players: newPlayers, gameStage: newStage, currentBet: 0, lastRaiserId: null, lastRaiseAmount: currentState.bigBlindAmount, activePlayerIndex: newActiveIndex };
     }, [addMessage]);
 
     const getEndOfHandState = useCallback((winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameState: PokerGameState): PokerGameState => {
@@ -101,7 +105,7 @@ export const usePokerGame = () => {
         });
 
         const finalWinner = finalPlayers.find(p => p.id === winner.id)!;
-        const newMessages = [...prevGameState.messages.slice(-99), `${winner.name} wins ${totalPot}. Final Stack: ${finalWinner.stack}`];
+        const newMessages = [...prevGameState.messages.slice(-99), `--- HAND OVER ---`, `${toTitleCase(winner.name)} wins the pot of ₹${totalPot}. Their final stack is ₹${finalWinner.stack}.`];
 
         return {
             ...createInitialPokerState(),
@@ -115,23 +119,26 @@ export const usePokerGame = () => {
 
     const handlePlayerAction = useCallback((action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in', amount = 0) => {
         setGameState(prev => {
-            const players = JSON.parse(JSON.stringify(prev.players)); // Deep copy to ensure immutability
+            const players = JSON.parse(JSON.stringify(prev.players));
             const player = players[prev.activePlayerIndex];
             if (!player) return prev;
 
             let newCurrentBet = prev.currentBet;
+            let newLastRaiseAmount = prev.lastRaiseAmount;
 
             player.hasActed = true;
 
             switch (action) {
                 case 'fold':
                     player.inHand = false;
+                    addMessage(`${toTitleCase(player.name)} folds.`);
                     break;
                 case 'check':
                     if (player.roundBet < newCurrentBet) {
                         addMessage("Cannot check, there is a bet to you.");
                         return prev;
                     }
+                    addMessage(`${toTitleCase(player.name)} checks.`);
                     break;
                 case 'call': {
                     const callAmount = Math.min(newCurrentBet - player.roundBet, player.stack);
@@ -139,39 +146,61 @@ export const usePokerGame = () => {
                     player.roundBet += callAmount;
                     player.totalPotContribution += callAmount;
                     if (player.stack === 0) player.isAllIn = true;
+                    addMessage(`${toTitleCase(player.name)} calls ₹${callAmount}.`);
                     break;
                 }
                 case 'bet':
                 case 'raise': {
                     const isRaise = newCurrentBet > 0;
-                    const minAmount = isRaise ? newCurrentBet * 2 : prev.bigBlindAmount;
-                    if (amount < minAmount) {
-                        addMessage(`Invalid ${isRaise ? 'raise' : 'bet'}. Must be at least ${minAmount}.`);
-                        return prev;
-                    }
+                    const minRaise = newLastRaiseAmount || prev.bigBlindAmount;
                     const costToPlayer = amount - player.roundBet;
+
                     if (costToPlayer > player.stack) {
                         addMessage("Cannot bet more than your stack.");
                         return prev;
                     }
+
+                    if (isRaise) {
+                        const raiseAmount = amount - newCurrentBet;
+                        if (raiseAmount < minRaise) {
+                            addMessage(`Raise must be by at least ${minRaise}. Total bet must be at least ${newCurrentBet + minRaise}.`);
+                            return prev;
+                        }
+                        newLastRaiseAmount = raiseAmount;
+                        addMessage(`${toTitleCase(player.name)} raises to ₹${amount} (a raise of ₹${raiseAmount}).`);
+                    } else {
+                        if (amount < minRaise) {
+                            addMessage(`Bet must be at least ${minRaise}.`);
+                            return prev;
+                        }
+                        newLastRaiseAmount = amount;
+                        addMessage(`${toTitleCase(player.name)} bets ₹${amount}.`);
+                    }
+
                     player.stack -= costToPlayer;
                     player.totalPotContribution += costToPlayer;
                     player.roundBet = amount;
                     newCurrentBet = amount;
-                    // When a player raises, all others must act again
                     players.forEach((p: PokerPlayer) => { if (p.id !== player.id) p.hasActed = false });
                     break;
                 }
                 case 'all-in': {
                     const allInAmount = player.stack;
                     const totalBet = player.roundBet + allInAmount;
+                    addMessage(`${toTitleCase(player.name)} is ALL-IN with their last ₹${allInAmount}.`);
                     player.totalPotContribution += allInAmount;
                     player.roundBet = totalBet;
                     player.stack = 0;
                     player.isAllIn = true;
                     if (totalBet > newCurrentBet) {
+                        const raiseAmount = totalBet - newCurrentBet;
+                        const minRaise = newLastRaiseAmount || prev.bigBlindAmount;
+                        if (raiseAmount >= minRaise) {
+                            newLastRaiseAmount = raiseAmount;
+                            players.forEach((p: PokerPlayer) => { if (p.id !== player.id) p.hasActed = false });
+                            addMessage(`This is a valid raise. Action re-opened.`);
+                        }
                         newCurrentBet = totalBet;
-                        players.forEach((p: PokerPlayer) => { if (p.id !== player.id) p.hasActed = false });
                     }
                     break;
                 }
@@ -182,16 +211,14 @@ export const usePokerGame = () => {
                 return getEndOfHandState(playersLeftInHand[0], players, prev);
             }
 
-            // --- Check for End of Betting Round ---
             const activeBettors = players.filter((p: PokerPlayer) => p.inHand && !p.isAllIn);
             const allBetsMatched = activeBettors.every((p: { roundBet: number; }) => p.roundBet === newCurrentBet);
-            const allHaveActed = activeBettors.every((p: { hasActed: never; }) => p.hasActed);
+            const allHaveActed = activeBettors.every((p: { hasActed: boolean; }) => p.hasActed);
 
             if (allBetsMatched && allHaveActed) {
-                return advanceToNextStageOrShowdown({ ...prev, players, currentBet: newCurrentBet });
+                return advanceToNextStageOrShowdown({ ...prev, players, currentBet: newCurrentBet, lastRaiseAmount: newLastRaiseAmount });
             }
 
-            // --- Find Next Player ---
             let nextIndex = prev.activePlayerIndex;
             for (let i = 1; i <= players.length; i++) {
                 nextIndex = (prev.activePlayerIndex + i) % players.length;
@@ -200,13 +227,15 @@ export const usePokerGame = () => {
                 }
             }
 
-            return { ...prev, players, currentBet: newCurrentBet, activePlayerIndex: nextIndex };
+            addMessage(`Action is on ${toTitleCase(players[nextIndex].name)}.`);
+            return { ...prev, players, currentBet: newCurrentBet, lastRaiseAmount: newLastRaiseAmount, activePlayerIndex: nextIndex };
         });
     }, [addMessage, advanceToNextStageOrShowdown, getEndOfHandState]);
 
     const setupGame = useCallback((players: { name: string, stack: number }[], blinds: { sb: number, bb: number }) => {
         const initialPlayers: PokerPlayer[] = players.map((p, i) => ({
             id: i + 1, name: toTitleCase(p.name), stack: p.stack,
+            totalBuyIn: p.stack,
             inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false
         }));
 
@@ -254,16 +283,17 @@ export const usePokerGame = () => {
             let firstToActIndex = newBigBlindIndex;
             do { firstToActIndex = (firstToActIndex + 1) % prev.players.length; } while (!newPlayers[firstToActIndex].inHand);
 
-            // The big blind gets a special `hasActed` status pre-flop
-            // because they can still raise even if others just call.
-            // We handle this by not setting their `hasActed` to true initially.
-            // Small blind's action is forced, so they have "acted".
             newPlayers[newSmallBlindIndex].hasActed = true;
 
-
-            addMessage(`--- New Hand Started. Dealer: ${newPlayers[newDealerIndex].name} ---`);
-            addMessage(`${sbPlayer.name} posts small blind of ${sbAmount}.`);
-            addMessage(`${bbPlayer.name} posts big blind of ${bbAmount}.`);
+            const messages = [
+                ...prev.messages,
+                `--- NEW HAND (#${prev.dealerButtonIndex + 2}) ---`,
+                `Dealer button is on ${toTitleCase(newPlayers[newDealerIndex].name)}.`,
+                `${toTitleCase(sbPlayer.name)} posts small blind of ₹${sbAmount}.`,
+                `${toTitleCase(bbPlayer.name)} posts big blind of ₹${bbAmount}.`,
+                `Total Pot: ₹${sbAmount + bbAmount}`,
+                `Action is on ${toTitleCase(newPlayers[firstToActIndex].name)}.`,
+            ];
 
             return {
                 ...prev,
@@ -271,10 +301,12 @@ export const usePokerGame = () => {
                 gameStage: 'pre-flop',
                 pot: [],
                 currentBet: prev.bigBlindAmount,
+                lastRaiseAmount: prev.bigBlindAmount,
                 activePlayerIndex: firstToActIndex,
                 dealerButtonIndex: newDealerIndex,
                 smallBlindIndex: newSmallBlindIndex,
                 bigBlindIndex: newBigBlindIndex,
+                messages,
             };
         });
     }, [addMessage]);
@@ -284,13 +316,16 @@ export const usePokerGame = () => {
             const potToAward = prev.pot[potIndex];
             if (!potToAward) return prev;
 
+            let winnerName = '';
             const newPlayers = prev.players.map(p => {
                 if (p.id === winnerId) {
-                    addMessage(`${p.name} wins a pot of ${potToAward.amount}`);
+                    winnerName = toTitleCase(p.name);
                     return { ...p, stack: p.stack + potToAward.amount };
                 }
                 return p;
             });
+
+            addMessage(`${winnerName} wins a pot of ₹${potToAward.amount}.`);
 
             const newPots = prev.pot.filter((_, index) => index !== potIndex);
 
@@ -317,8 +352,18 @@ export const usePokerGame = () => {
                 return prev;
             }
             const newId = prev.players.length > 0 ? Math.max(...prev.players.map(p => p.id)) + 1 : 1;
-            const newPlayer: PokerPlayer = { id: newId, name: toTitleCase(name), stack, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false };
-            addMessage(`Player ${name} has been added to the game.`);
+            const newPlayer: PokerPlayer = {
+                id: newId,
+                name: toTitleCase(name),
+                stack,
+                totalBuyIn: stack,
+                inHand: false,
+                isAllIn: false,
+                roundBet: 0,
+                totalPotContribution: 0,
+                hasActed: false
+            };
+            addMessage(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
             return { ...prev, players: [...prev.players, newPlayer] };
         });
     }, [addMessage]);
@@ -331,7 +376,7 @@ export const usePokerGame = () => {
             }
             const playerToRemove = prev.players.find(p => p.id === playerId);
             if (playerToRemove) {
-                addMessage(`Player ${playerToRemove.name} has been removed.`);
+                addMessage(`Player ${toTitleCase(playerToRemove.name)} has been removed from the game.`);
             }
             return { ...prev, players: prev.players.filter(p => p.id !== playerId) };
         });
@@ -347,8 +392,12 @@ export const usePokerGame = () => {
 
             const newPlayers = prev.players.map(p => {
                 if (p.id === playerId) {
-                    addMessage(`Added ${amount} chips to ${p.name}.`);
-                    return { ...p, stack: p.stack + amount };
+                    addMessage(`Added ₹${amount} to ${toTitleCase(p.name)}'s stack. Their total buy-in is now ₹${p.totalBuyIn + amount}.`);
+                    return {
+                        ...p,
+                        stack: p.stack + amount,
+                        totalBuyIn: p.totalBuyIn + amount
+                    };
                 }
                 return p;
             });

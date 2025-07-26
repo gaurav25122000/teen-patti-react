@@ -18,9 +18,9 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th>Stack</th>
+                        <th>Stack / Buy-In</th>
                         <th>Round Bet</th>
-                        <th>Pot Contribution</th>
+                        <th>Pot Contri</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -41,7 +41,7 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                         return (
                             <tr key={p.id} className={!p.inHand && gameStage !== 'pre-deal' ? 'folded' : (isCurrent ? 'current-player' : '')}>
                                 <td data-label="Name">{toTitleCase(p.name)} {status}</td>
-                                <td data-label="Stack">₹ {p.stack}</td>
+                                <td data-label="Stack / Buy-In">₹ {p.stack} / ₹ {p.totalBuyIn}</td>
                                 <td data-label="Round Bet">₹ {p.roundBet}</td>
                                 <td data-label="Pot Contribution">₹ {p.totalPotContribution}</td>
                             </tr>
