@@ -53,7 +53,7 @@ function App() {
       </Link>
       <Routes>
         <Route path="/" element={<ModeSelectionScreen />} />
-        <Route path="/teen-patti" element={<TeenPattiRoute />} />
+        <Route path="/teen-patti" element={<TeenPattiRoute  />} />
         <Route path="/poker" element={<PokerLobby pokerHook={pokerHook} onInteractionChange={handleInteractionChange} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

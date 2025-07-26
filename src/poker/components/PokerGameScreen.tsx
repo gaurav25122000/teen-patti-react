@@ -5,6 +5,8 @@ import PokerPlayerList from './PokerPlayerList';
 import PokerRoundControls from './PokerRoundControls';
 import ActionLog from '../../components/ActionLog';
 import InteractionModal from '../../components/InteractionModal';
+import OwingsModal from '../../components/OwingsModal';
+import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
 import { toTitleCase } from '../../utils/formatters';
 
 interface PokerGameScreenProps {
@@ -12,7 +14,7 @@ interface PokerGameScreenProps {
     onInteractionChange: (isOpen: boolean) => void;
 }
 
-type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown';
+type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown' | 'owings';
 
 const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteractionChange }) => {
     const { gameState, actions } = pokerHook;
@@ -26,37 +28,30 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const [addPlayerName, setAddPlayerName] = useState('');
     const [addPlayerStack, setAddPlayerStack] = useState('1000');
     const [addChipsAmount, setAddChipsAmount] = useState('1000');
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
 
     const currentPlayer = activePlayerIndex > -1 ? players[activePlayerIndex] : null;
 
-    // This single, consolidated hook now handles all modal logic for the showdown phase.
     useEffect(() => {
         if (gameStage === 'showdown' && pot.length > 0) {
             const currentPot = pot[0];
             const eligiblePlayers = Array.from(currentPot.eligiblePlayers);
 
             if (eligiblePlayers.length === 1) {
-                // Auto-award the pot and ensure no modal is open.
                 actions.awardPot(0, eligiblePlayers[0]);
-                if (modalMode === 'showdown') {
-                    setModalMode('none');
-                }
+                if (modalMode === 'showdown') setModalMode('none');
             } else if (eligiblePlayers.length > 1) {
-                // Only open the modal if there is a decision to be made.
                 setModalMode('showdown');
             }
         } else if (gameStage !== 'showdown' && modalMode === 'showdown') {
-            // If the game is no longer in showdown, ensure the modal is closed.
             setModalMode('none');
         }
     }, [gameStage, pot, actions, modalMode]);
-
 
     useEffect(() => {
         const isModalOpen = modalMode !== 'none';
         onInteractionChange(isModalOpen);
 
-        // Pre-selection logic for modals when they open
         if (modalMode === 'showdown' && pot.length > 0 && pot[0].eligiblePlayers.size > 0) {
             setSelectedWinnerId(Array.from(pot[0].eligiblePlayers)[0]);
         }
@@ -78,7 +73,11 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         if (selectedWinnerId !== null) {
             actions.awardPot(0, selectedWinnerId);
         }
-        // The modal will close automatically via the useEffect when the pot is empty
+    };
+
+    const handleShowOwings = () => {
+        setTransactions(calculateOwings(players));
+        setModalMode('owings');
     };
 
     const handleManagePlayers = () => {
@@ -98,7 +97,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 break;
         }
         closeModal();
-    }
+    };
 
     const renderStageDisplay = () => (
         <div className="stage-display">
@@ -109,7 +108,10 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const renderModal = () => {
         if (modalMode === 'none') return null;
 
-        // Logic for management modals
+        if (modalMode === 'owings') {
+            return <OwingsModal isOpen={true} onClose={closeModal} transactions={transactions} />;
+        }
+
         if (modalMode !== 'showdown') {
             let title = '';
             let body: React.ReactNode = null;
@@ -143,7 +145,6 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             return <InteractionModal isOpen={true} onClose={closeModal} title={title} theme={theme} footerContent={footer}>{body}</InteractionModal>;
         }
 
-        // Logic for Showdown modal
         const currentPot = pot[0];
         if (!currentPot) return null;
         const eligiblePlayers = players.filter(p => currentPot.eligiblePlayers.has(p.id));
@@ -178,6 +179,9 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         <button className="btn-secondary" onClick={() => setModalMode('addChips')} disabled={gameStage !== 'pre-deal'}>Manage Rebuys</button>
                         <button className="btn-secondary" onClick={() => setModalMode('addPlayer')} disabled={gameStage !== 'pre-deal'}>Add Player</button>
                         <button className="btn-danger" onClick={() => setModalMode('removePlayer')} disabled={gameStage !== 'pre-deal' || players.length < 1}>Remove Player</button>
+                        <button className="btn-success" onClick={handleShowOwings} disabled={gameStage !== 'pre-deal'}>
+                            Final Owings
+                        </button>
                     </div>
 
                     {gameStage === 'pre-deal' && (

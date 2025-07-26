@@ -1,6 +1,6 @@
 // src/hooks/useTeenPattiGame.ts
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { GameState, Player } from '../types/gameTypes';
 import { loadStateFromLocalStorage, saveStateToLocalStorage } from '../utils/localStorage';
 import { toTitleCase } from '../utils/formatters';
@@ -38,20 +38,31 @@ export const useTeenPattiGame = () => {
     }));
   }, []);
 
-  // --- Derived State Calculation ---
-  const getActivePlayers = useCallback((): Player[] => {
-    return gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
-  }, [gameState.players, gameState.foldedPlayerIds]);
+  // --- DERIVED STATE ---
+  const { activePlayers, currentPlayer, precedingPlayer } = useMemo(() => {
+    const active = gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
+    const current = (gameState.roundActive && gameState.currentPlayerIndex >= 0) ? gameState.players[gameState.currentPlayerIndex] : null;
 
-  const getCurrentPlayer = useCallback((): Player | null => {
-    if (!gameState.roundActive || gameState.currentPlayerIndex < 0 || gameState.currentPlayerIndex >= gameState.players.length) {
-      return null;
+    let preceding: Player | null = null;
+    if (current) {
+      const numPlayers = gameState.players.length;
+      if (numPlayers >= 2) {
+        let precedingIndex = gameState.currentPlayerIndex;
+        let attempts = 0;
+        do {
+          precedingIndex = (precedingIndex - 1 + numPlayers) % numPlayers;
+          const precedingCandidate = gameState.players[precedingIndex];
+          if (precedingCandidate.id !== current.id && !gameState.foldedPlayerIds.has(precedingCandidate.id)) {
+            preceding = precedingCandidate;
+            break;
+          }
+          attempts++;
+        } while (attempts < numPlayers);
+      }
     }
-    return gameState.players[gameState.currentPlayerIndex];
-  }, [gameState.roundActive, gameState.currentPlayerIndex, gameState.players]);
+    return { activePlayers: active, currentPlayer: current, precedingPlayer: preceding };
+  }, [gameState.players, gameState.foldedPlayerIds, gameState.roundActive, gameState.currentPlayerIndex]);
 
-  const activePlayers = getActivePlayers();
-  const currentPlayer = getCurrentPlayer();
 
   // --- Core Game Logic ---
   const advanceTurn = useCallback(() => {
@@ -96,17 +107,9 @@ export const useTeenPattiGame = () => {
       }
 
       return {
-        ...prev,
+        ...createInitialGameState(),
         players: finalPlayers,
         lastWinnerId: newLastWinnerId,
-        roundActive: false,
-        currentPlayerIndex: -1,
-        potAmount: 0,
-        currentStake: 0,
-        foldedPlayerIds: new Set<number>(),
-        blindPlayerIds: new Set<number>(),
-        roundContributions: new Map<number, number>(),
-        lastActorWasBlind: false,
         roundInitialBootAmount: lastBootFromRound,
         messages: finalMessages,
       };
@@ -118,7 +121,7 @@ export const useTeenPattiGame = () => {
     setGameState({
       ...createInitialGameState(),
       players: newPlayers,
-      messages: [`New game started with ${newPlayers.length} players. Please set the boot amount.`],
+      messages: newPlayers.length > 0 ? [`New game started with ${newPlayers.length} players. Please set the boot amount.`] : ["Returning to setup..."],
     });
   };
 
@@ -254,6 +257,7 @@ export const useTeenPattiGame = () => {
     const winner = checkForWinner(gameState.players, newFoldedIds);
     if (winner) {
       addMessage(`${toTitleCase(winner.name)} is the last player remaining.`);
+      // Temporarily update state to show the fold before ending the round
       setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
       endRound(winner);
     } else {
@@ -261,6 +265,7 @@ export const useTeenPattiGame = () => {
       advanceTurn();
     }
   };
+
 
   const requestShow = (cost: number) => {
     if (!currentPlayer) return;
@@ -286,13 +291,13 @@ export const useTeenPattiGame = () => {
 
     addMessage(`${toTitleCase(loser.name)} loses the Show and folds.`);
     const newFoldedIds = new Set(gameState.foldedPlayerIds).add(loserId);
-    const winner = checkForWinner(gameState.players, newFoldedIds);
+    setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
 
+    const winner = checkForWinner(gameState.players, newFoldedIds);
     if (winner) {
       addMessage(`${toTitleCase(winner.name)} is the last player remaining.`);
       endRound(winner);
     } else {
-      setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
       advanceTurn();
     }
   };
@@ -310,20 +315,11 @@ export const useTeenPattiGame = () => {
   const removePlayer = (playerId: number) => {
     const playerToRemove = gameState.players.find(p => p.id === playerId);
     if (!playerToRemove) return;
-
     setGameState(prev => {
       const newPlayers = prev.players.filter(p => p.id !== playerId);
-      const newBlindIds = new Set(prev.blindPlayerIds); newBlindIds.delete(playerId);
-      const newFoldedIds = new Set(prev.foldedPlayerIds); newFoldedIds.delete(playerId);
-      const newContributions = new Map(prev.roundContributions); newContributions.delete(playerId);
-
       return {
         ...prev,
         players: newPlayers,
-        lastWinnerId: prev.lastWinnerId === playerId ? null : prev.lastWinnerId,
-        blindPlayerIds: newBlindIds,
-        foldedPlayerIds: newFoldedIds,
-        roundContributions: newContributions,
       };
     });
     addMessage(`Player ${toTitleCase(playerToRemove.name)} removed from the game.`);
@@ -351,7 +347,6 @@ export const useTeenPattiGame = () => {
         addMessage("Cannot distribute with less than two players.", true);
         return prev;
       }
-
       const amountToDistribute = Math.floor(amount / (players.length - 1));
       const updatedPlayers = players.map(p => {
         if (p.id === playerId) {
@@ -371,6 +366,7 @@ export const useTeenPattiGame = () => {
     addMessage,
     activePlayers,
     currentPlayer,
+    precedingPlayer,
     actions: {
       startNewGame,
       loadGame,

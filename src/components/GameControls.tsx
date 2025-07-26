@@ -1,5 +1,4 @@
 // src/components/GameControls.tsx
-
 import React from 'react';
 import type { GameState } from '../types/gameTypes';
 
@@ -11,11 +10,12 @@ interface GameControlsProps {
     onRemovePlayer: () => void;
     onReorderPlayers: () => void;
     onDeductAndDistribute: () => void;
+    onShowOwings: () => void;
     onShowSetup: () => void;
 }
 
 const GameControls: React.FC<GameControlsProps> = (props) => {
-    const { gameState, onStartRound, onChangeBoot, onAddPlayer, onRemovePlayer, onReorderPlayers, onDeductAndDistribute, onShowSetup } = props;
+    const { gameState, onStartRound, onChangeBoot, onAddPlayer, onRemovePlayer, onReorderPlayers, onDeductAndDistribute, onShowOwings, onShowSetup } = props;
     const { roundActive, players, roundInitialBootAmount: lastBootAmount, lastWinnerId } = gameState;
 
     const canStartRound = !roundActive && players.length >= 2 && (lastBootAmount || lastWinnerId === null);
@@ -40,6 +40,9 @@ const GameControls: React.FC<GameControlsProps> = (props) => {
             </button>
             <button className="btn-danger" onClick={onDeductAndDistribute} disabled={roundActive || players.length < 2}>
                 Deduct & Distribute
+            </button>
+            <button className="btn-success" onClick={onShowOwings} disabled={roundActive}>
+                Final Owings
             </button>
             <button className="btn-secondary" onClick={onShowSetup}>
                 Back to Setup

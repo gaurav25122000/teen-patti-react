@@ -1,3 +1,4 @@
+// src/components/RoundControls.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import type { GameState, Player } from '../types/gameTypes';
 import { toTitleCase } from '../utils/formatters';
@@ -5,6 +6,7 @@ import { toTitleCase } from '../utils/formatters';
 interface RoundControlsProps {
     gameState: GameState;
     currentPlayer: Player;
+    precedingPlayer: Player | null; // <-- RECEIVE AS PROP
     activePlayers: Player[];
     actions: {
         playBlind: (isRaise: boolean, amount: number) => void;
@@ -16,7 +18,7 @@ interface RoundControlsProps {
     };
 }
 
-const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer, activePlayers, actions }) => {
+const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer, precedingPlayer, activePlayers, actions }) => {
     const [betAmountInput, setBetAmountInput] = useState("");
     const [blindRaiseAmountInput, setBlindRaiseAmountInput] = useState("");
     const { currentStake, blindPlayerIds, potAmount } = gameState;
@@ -31,25 +33,6 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
             setBlindRaiseAmountInput("");
         }
     }, [currentPlayer, currentStake, blindPlayerIds]);
-
-    const findPrecedingActivePlayer = useCallback((): Player | null => {
-        const numPlayers = gameState.players.length;
-        if (numPlayers < 2) return null;
-
-        let currentIndex = gameState.currentPlayerIndex;
-        let attempts = 0;
-        do {
-            currentIndex = (currentIndex - 1 + numPlayers) % numPlayers;
-            const precedingPlayer = gameState.players[currentIndex];
-            if (precedingPlayer.id !== currentPlayer.id && !gameState.foldedPlayerIds.has(precedingPlayer.id)) {
-                return precedingPlayer;
-            }
-            attempts++;
-        } while (attempts < numPlayers);
-        return null;
-    }, [gameState.players, gameState.currentPlayerIndex, gameState.foldedPlayerIds, currentPlayer]);
-
-    const precedingPlayer = findPrecedingActivePlayer();
 
     const calculateShowCost = useCallback((): number => {
         if (!precedingPlayer) return 0;
@@ -80,6 +63,7 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
         actions.betChaal(betAmount);
     };
 
+    // This logic is now simpler as precedingPlayer is passed in
     const isShowDisabled = !precedingPlayer || activePlayers.length < 2 || (blindPlayerIds.has(precedingPlayer.id) && !blindPlayerIds.has(currentPlayer.id) && activePlayers.length !== 2);
     const showTitle = isShowDisabled ? "Cannot show (e.g., no preceding player, target is blind)." : "Show cards";
 
@@ -106,7 +90,6 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
                             value={blindRaiseAmountInput}
                             onChange={(e) => setBlindRaiseAmountInput(e.target.value)}
                             placeholder={`₹ ` + `${currentStake}`}
-                            // min={currentStake + 1}
                         />
                         <button onClick={handleConfirmBlindRaise} className="btn btn-success">Raise Blind</button>
                     </div>
