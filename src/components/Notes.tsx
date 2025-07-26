@@ -18,7 +18,6 @@ const Notes: React.FC = () => {
 
     const handleSaveNotes = () => {
         localStorage.setItem('poker-notes', notes);
-        alert('Notes saved!');
     };
 
     return (

@@ -102,10 +102,11 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
                     <div className="inline-input-group">
                         <input
                             type="number"
+                            step="10"
                             value={blindRaiseAmountInput}
                             onChange={(e) => setBlindRaiseAmountInput(e.target.value)}
                             placeholder={`₹ ` + `${currentStake}`}
-                            min={currentStake + 1}
+                            // min={currentStake + 1}
                         />
                         <button onClick={handleConfirmBlindRaise} className="btn btn-success">Raise Blind</button>
                     </div>
@@ -121,6 +122,7 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
                 <div className="inline-input-group">
                     <input
                         type="number"
+                        step="10"
                         value={betAmountInput}
                         onChange={(e) => setBetAmountInput(e.target.value)}
                         min={2 * currentStake}
