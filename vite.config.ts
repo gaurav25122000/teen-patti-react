@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist', // Ensure this is 'dist' or the directory you've configured in Netlify
+    appType: 'spa',
     // ... other build options
   },
 })
