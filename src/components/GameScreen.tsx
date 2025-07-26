@@ -7,7 +7,6 @@ import Notes from './Notes';
 import GameControls from './GameControls';
 import RoundControls from './RoundControls';
 import InteractionModal from './InteractionModal';
-import MusicPlayer from './MusicPlayer';
 import type { InteractionType, Player } from '../types/gameTypes';
 import { toTitleCase } from '../utils/formatters';
 
