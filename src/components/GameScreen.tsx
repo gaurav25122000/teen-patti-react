@@ -55,7 +55,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
     const openModal = (type: InteractionType) => {
         if (type === 'gettingBoot') setBootAmount(String(gameState.roundInitialBootAmount || 10));
         if (type === 'addingPlayer') { setAddPlayerName(''); setAddPlayerBalance('0'); }
-        if (type === 'deductAndDistribute') { setDeductAmount('0'); }
+        if (type === 'deductAndDistribute') { setDeductAmount(0); }
         if (type === 'reorderingPlayers') setReorderablePlayers([...gameState.players]);
         setInteraction(type);
     };
@@ -237,7 +237,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                 confirmText = "Confirm & Distribute";
                 primaryAction = () => {
                     const playerId = parseInt(selectedPlayerId, 10);
-                    const amount = parseInt(deductAmount, 10);
+                    const amount = Number(deductAmount);
                     if (isNaN(playerId) || isNaN(amount) || amount <= 0) return alert('Invalid player or amount.');
                     actions.deductAndDistribute(playerId, amount);
                     closeModal();
@@ -254,7 +254,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
             </>
         );
         return { title, theme, icon, body, footer };
-    }, [interaction, gameState.players, gameState.lastWinnerId, gameState.roundInitialBootAmount, bootAmount, selectedPlayerId, addPlayerName, addPlayerBalance, reorderablePlayers, activePlayers, tempData, actions]);
+    }, [interaction, gameState.players, gameState.lastWinnerId, gameState.roundInitialBootAmount, bootAmount, selectedPlayerId, addPlayerName, addPlayerBalance, reorderablePlayers, deductAmount, activePlayers, tempData, actions]);
 
     const handleStartRound = () => {
         const winnerIndex = gameState.players.findIndex(p => p.id === gameState.lastWinnerId);
@@ -318,7 +318,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
                         )}
                     </div>
                     <div className="side-panel-container">
-                        <Notes />
+                        <Notes roundActive={gameState.roundActive} />
                         <ActionLog messages={gameState.messages} />
                         {/* <MusicPlayer /> */}
                     </div>
