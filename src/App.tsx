@@ -41,7 +41,6 @@ function App() {
       <GameScreen
         gameHook={teenPattiHook}
         onShowSetup={() => teenPattiHook.actions.startNewGame([])}
-        onInteractionChange={handleInteractionChange}
       />
     );
   };

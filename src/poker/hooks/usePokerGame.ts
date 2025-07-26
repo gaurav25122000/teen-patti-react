@@ -48,7 +48,6 @@ export const usePokerGame = () => {
                 });
             }
             setGameState(parsed);
-            addMessage("Saved game loaded successfully.");
             return true;
         } catch {
             localStorage.removeItem(POKER_STORAGE_KEY);
@@ -151,8 +150,8 @@ export const usePokerGame = () => {
                 }
                 case 'bet':
                 case 'raise': {
-                    const isRaise = newCurrentBet > 0;
-                    const minRaise = newLastRaiseAmount || prev.bigBlindAmount;
+                    const isRaiseAction = newCurrentBet > 0;
+                    const minBetOrRaiseAmount = newLastRaiseAmount || prev.bigBlindAmount;
                     const costToPlayer = amount - player.roundBet;
 
                     if (costToPlayer > player.stack) {
@@ -160,17 +159,17 @@ export const usePokerGame = () => {
                         return prev;
                     }
 
-                    if (isRaise) {
+                    if (isRaiseAction) {
                         const raiseAmount = amount - newCurrentBet;
-                        if (raiseAmount < minRaise) {
-                            addMessage(`Raise must be by at least ${minRaise}. Total bet must be at least ${newCurrentBet + minRaise}.`);
+                        if (raiseAmount < minBetOrRaiseAmount) {
+                            addMessage(`Raise must be by at least ₹${minBetOrRaiseAmount}. Total bet must be at least ₹${newCurrentBet + minBetOrRaiseAmount}.`);
                             return prev;
                         }
                         newLastRaiseAmount = raiseAmount;
-                        addMessage(`${toTitleCase(player.name)} raises to ₹${amount} (a raise of ₹${raiseAmount}).`);
+                        addMessage(`${toTitleCase(player.name)} raises to ₹${amount} (a raise of ₹${costToPlayer}).`);
                     } else {
-                        if (amount < minRaise) {
-                            addMessage(`Bet must be at least ${minRaise}.`);
+                        if (amount < minBetOrRaiseAmount) {
+                            addMessage(`Bet must be at least ₹${minBetOrRaiseAmount}.`);
                             return prev;
                         }
                         newLastRaiseAmount = amount;

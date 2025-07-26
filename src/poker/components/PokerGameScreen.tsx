@@ -172,7 +172,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 </div>
                 <div className="main-content-container">
                     {renderStageDisplay()}
-                    <div className="game-controls-container">
+                    {gameStage === 'pre-deal' && (<div className="game-controls-container">
                         <button className="btn-primary" onClick={actions.startNewHand} disabled={gameStage !== 'pre-deal'}>
                             Start Next Hand
                         </button>
@@ -182,7 +182,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         <button className="btn-success" onClick={handleShowOwings} disabled={gameStage !== 'pre-deal'}>
                             Final Owings
                         </button>
-                    </div>
+                    </div>)}
 
                     {gameStage === 'pre-deal' && (
                         <div className="pre-deal-placeholder">

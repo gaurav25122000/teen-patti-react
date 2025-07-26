@@ -24,11 +24,10 @@ const IconPlay = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewB
 interface GameScreenProps {
     gameHook: ReturnType<typeof useTeenPattiGame>;
     onShowSetup: () => void;
-    onInteractionChange: (isModalOpen: boolean) => void;
 }
 
-const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onInteractionChange }) => {
-    const { gameState, activePlayers, currentPlayer, precedingPlayer, actions } = gameHook;
+const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
+    const { gameState, activePlayers, currentPlayer, precedingPlayer, addMessage, actions } = gameHook;
 
     const [interaction, setInteraction] = useState<InteractionType>('idle');
     const [showOwings, setShowOwings] = useState(false);
@@ -94,7 +93,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, onIntera
     // in one go, preventing any race conditions.
     const handleShowClick = () => {
         if (!currentPlayer || !precedingPlayer) {
-            actions.addMessage("No one to request a show with.", true);
+            addMessage("No one to request a show with.", true);
             return;
         }
         const isRequesterBlind = gameState.blindPlayerIds.has(currentPlayer.id);

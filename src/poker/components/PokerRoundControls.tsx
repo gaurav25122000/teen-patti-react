@@ -12,23 +12,28 @@ interface PokerRoundControlsProps {
 
 const PokerRoundControls: React.FC<PokerRoundControlsProps> = ({ gameState, currentPlayer, actions }) => {
     const [raiseAmount, setRaiseAmount] = useState('');
-    const { currentBet, bigBlindAmount } = gameState;
+    const { currentBet, lastRaiseAmount, bigBlindAmount } = gameState;
     const canCheck = currentPlayer.roundBet >= currentBet;
     const callAmount = Math.min(currentBet - currentPlayer.roundBet, currentPlayer.stack);
 
-    const minRaise = currentBet > 0 ? currentBet * 2 : bigBlindAmount;
+    // This is the core fix for the min-raise logic
+    const minRaiseIncrement = lastRaiseAmount || bigBlindAmount;
+    const minRaiseTotal = currentBet + minRaiseIncrement;
 
     useEffect(() => {
-        setRaiseAmount(String(minRaise));
-    }, [minRaise]);
+        // Set the default raise amount in the input box to the minimum legal raise
+        setRaiseAmount(String(minRaiseTotal));
+    }, [minRaiseTotal]);
 
     const handleRaise = () => {
         const amount = parseInt(raiseAmount);
-        if (isNaN(amount) || amount < minRaise) {
-            alert(`Raise must be at least to ${minRaise}.`);
+        if (isNaN(amount) || amount < minRaiseTotal) {
+            alert(`Raise must be at least to ${minRaiseTotal}.`);
             return;
         }
         if (amount - currentPlayer.roundBet > currentPlayer.stack) {
+            // This case should be handled as an all-in, but for simplicity we'll alert.
+            // A more advanced implementation would convert this to an all-in action.
             alert("You cannot raise more than your stack.");
             return;
         }
@@ -61,10 +66,11 @@ const PokerRoundControls: React.FC<PokerRoundControlsProps> = ({ gameState, curr
                 <div className="inline-input-group">
                     <input
                         type="number"
-                        step={bigBlindAmount}
+                        step={minRaiseIncrement}
                         value={raiseAmount}
                         onChange={(e) => setRaiseAmount(e.target.value)}
-                        min={minRaise}
+                        min={minRaiseTotal}
+                        placeholder={`Min ${minRaiseTotal}`}
                     />
                     {currentBet > 0 ?
                         <button className="btn-success" onClick={handleRaise}>Raise To</button> :
