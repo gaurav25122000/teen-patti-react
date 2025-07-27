@@ -1,0 +1,31 @@
+.entity-manager {
+    padding: 1rem;
+}
+
+.entity-item {
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    padding: 1rem;
+    border-radius: 5px;
+}
+
+.entity-item h4 {
+    margin-top: 0;
+}
+
+.entity-item h4 button {
+    margin-left: 2rem;
+}
+
+.entity-item ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.entity-item li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    color: aquamarine;
+}
