@@ -20,8 +20,7 @@ exports.handler = async function (event) {
                 headers: { 'X-MAN-API': JSONSILO_API_KEY }
             });
 
-            const siloData = getResponse.ok ? await getResponse.json() : {};
-            const allRecords = siloData.file_data || [];
+            const allRecords = getResponse.ok ? await getResponse.json() : {};
             const initialCount = allRecords.length;
 
             // Step 2: Add the new record in memory
@@ -36,9 +35,7 @@ exports.handler = async function (event) {
                 },
                 body: JSON.stringify({
                     "file_name": "bets-manager",
-                    "file_data": [
-                        allRecords
-                    ],
+                    "file_data": allRecords,
                     "region_name": "api",
                     "is_public": false
                 })
