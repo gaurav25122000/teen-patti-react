@@ -25,6 +25,8 @@ const readWinningsData = () => {
   return {};
 };
 
+import { hashPhoneNumber } from './utils/hash';
+
 const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -37,9 +39,11 @@ const handler: Handler = async (event) => {
   }
 
   const allWinnings = readWinningsData();
-  const winningsData = phoneNumbers.map(phoneNumber => {
-    return allWinnings[phoneNumber] || { poker: { totalWinnings: 0, games: [] }, teenPatti: { totalWinnings: 0, games: [] }, phoneNumber };
-  });
+  const winningsData = await Promise.all(phoneNumbers.map(async (phoneNumber) => {
+    const hashedPhoneNumber = await hashPhoneNumber(phoneNumber);
+    const encodedHashedPhoneNumber = btoa(hashedPhoneNumber);
+    return allWinnings[encodedHashedPhoneNumber] || { poker: { totalWinnings: 0, games: [] }, teenPatti: { totalWinnings: 0, games: [] }, phoneNumber };
+  }));
 
   return {
     statusCode: 200,
