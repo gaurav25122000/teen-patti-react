@@ -9,6 +9,7 @@ export const hashPhoneNumber = async (phoneNumber: string) => {
 
 export const updateLifetimeWinnings = async (playerPhoneNumber: string, gameType: 'poker' | 'teenPatti', winnings: number) => {
   const hashedPhoneNumber = await hashPhoneNumber(playerPhoneNumber);
+  const encodedHashedPhoneNumber = btoa(hashedPhoneNumber);
 
   const winningsUpdate = {
     gameType,
@@ -19,7 +20,7 @@ export const updateLifetimeWinnings = async (playerPhoneNumber: string, gameType
   await fetch('/.netlify/functions/updateWinnings', {
     method: 'POST',
     body: JSON.stringify({
-      hashedPhoneNumber,
+      hashedPhoneNumber: encodedHashedPhoneNumber,
       winningsUpdate,
     }),
   });
