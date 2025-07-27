@@ -4,21 +4,22 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { GameState, Player, Entity } from '../types/gameTypes';
 import { loadStateFromLocalStorage, saveStateToLocalStorage } from '../utils/localStorage';
 import { toTitleCase } from '../utils/formatters';
+import { updateWinnings } from '../utils/winningsService'; // IMPORT
 
 const createInitialGameState = (): GameState => ({
-    players: [],
-    entities: [],
-    lastWinnerId: null,
-    roundActive: false,
-    currentPlayerIndex: -1,
-    currentStake: 0,
-    potAmount: 0,
-    foldedPlayerIds: new Set<number>(),
-    blindPlayerIds: new Set<number>(),
-    lastActorWasBlind: false,
-    roundInitialBootAmount: null,
-    roundContributions: new Map<number, number>(),
-    messages: ["Welcome! Load a game or set up a new one."],
+  players: [],
+  entities: [],
+  lastWinnerId: null,
+  roundActive: false,
+  currentPlayerIndex: -1,
+  currentStake: 0,
+  potAmount: 0,
+  foldedPlayerIds: new Set<number>(),
+  blindPlayerIds: new Set<number>(),
+  lastActorWasBlind: false,
+  roundInitialBootAmount: null,
+  roundContributions: new Map<number, number>(),
+  messages: ["Welcome! Load a game or set up a new one."],
 });
 
 export const useTeenPattiGame = () => {
@@ -26,12 +27,10 @@ export const useTeenPattiGame = () => {
     return loadStateFromLocalStorage() || createInitialGameState();
   });
 
-  // --- Persistence ---
   useEffect(() => {
     saveStateToLocalStorage(gameState);
   }, [gameState]);
 
-  // --- Utility Functions ---
   const addMessage = useCallback((message: string, isError: boolean = false) => {
     setGameState(prev => ({
       ...prev,
@@ -39,7 +38,6 @@ export const useTeenPattiGame = () => {
     }));
   }, []);
 
-  // --- DERIVED STATE ---
   const { activePlayers, currentPlayer, precedingPlayer } = useMemo(() => {
     const active = gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
     const current = (gameState.roundActive && gameState.currentPlayerIndex >= 0) ? gameState.players[gameState.currentPlayerIndex] : null;
@@ -65,7 +63,6 @@ export const useTeenPattiGame = () => {
   }, [gameState.players, gameState.foldedPlayerIds, gameState.roundActive, gameState.currentPlayerIndex]);
 
 
-  // --- Core Game Logic ---
   const advanceTurn = useCallback(() => {
     setGameState(prev => {
       if (!prev.roundActive) return prev;
@@ -99,6 +96,18 @@ export const useTeenPattiGame = () => {
       if (winner) {
         finalMessages.push(`--- ROUND OVER ---`);
         finalMessages.push(`Congratulations! ${toTitleCase(winner.name)} won the pot of ₹${prev.potAmount}`);
+
+        // UPDATE WINNINGS
+        prev.players.forEach(player => {
+          if (player.phoneNumber) {
+            const contribution = prev.roundContributions.get(player.id) || 0;
+            const winnings = player.id === winner.id ? prev.potAmount - contribution : -contribution;
+            if (winnings !== 0) {
+              updateWinnings(player.phoneNumber, 'teen-patti', winnings);
+            }
+          }
+        });
+
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
         );
@@ -110,6 +119,7 @@ export const useTeenPattiGame = () => {
       return {
         ...createInitialGameState(),
         players: finalPlayers,
+        entities: prev.entities,
         lastWinnerId: newLastWinnerId,
         roundInitialBootAmount: lastBootFromRound,
         messages: finalMessages,
@@ -117,7 +127,6 @@ export const useTeenPattiGame = () => {
     });
   }, []);
 
-  // --- Player Actions ---
   const startNewGame = (newPlayers: Player[]) => {
     setGameState({
       ...createInitialGameState(),
@@ -258,7 +267,6 @@ export const useTeenPattiGame = () => {
     const winner = checkForWinner(gameState.players, newFoldedIds);
     if (winner) {
       addMessage(`${toTitleCase(winner.name)} is the last player remaining.`);
-      // Temporarily update state to show the fold before ending the round
       setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
       endRound(winner);
     } else {
@@ -303,9 +311,9 @@ export const useTeenPattiGame = () => {
     }
   };
 
-  const addPlayer = (name: string, balance: number) => {
+  const addPlayer = (name: string, balance: number, phoneNumber: string) => {
     const newId = gameState.players.length > 0 ? Math.max(...gameState.players.map(p => p.id)) + 1 : 1;
-    const newPlayer: Player = { id: newId, name: toTitleCase(name), balance };
+    const newPlayer: Player = { id: newId, name: toTitleCase(name), balance, phoneNumber };
     setGameState(prev => ({
       ...prev,
       players: [...prev.players, newPlayer]
@@ -370,29 +378,31 @@ export const useTeenPattiGame = () => {
     });
   };
 
+  const actions = useMemo(() => ({
+    startNewGame,
+    loadGame,
+    startRound,
+    playBlind,
+    seeCards,
+    betChaal,
+    fold,
+    requestShow,
+    resolveShow,
+    endRound,
+    addPlayer,
+    removePlayer,
+    reorderPlayers,
+    deductAndDistribute,
+    updateEntities,
+    updatePlayers,
+  }), [endRound]); // Add dependencies here
+
   return {
     gameState,
     addMessage,
     activePlayers,
     currentPlayer,
     precedingPlayer,
-    actions: {
-      startNewGame,
-      loadGame,
-      startRound,
-      playBlind,
-      seeCards,
-      betChaal,
-      fold,
-      requestShow,
-      resolveShow,
-      endRound,
-      addPlayer,
-      removePlayer,
-      reorderPlayers,
-      deductAndDistribute,
-      updateEntities,
-      updatePlayers,
-    }
+    actions
   };
 };

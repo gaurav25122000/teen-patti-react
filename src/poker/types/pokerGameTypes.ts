@@ -5,11 +5,12 @@ export interface PokerPlayer {
     id: number;
     name: string;
     stack: number;
-    totalBuyIn: number; // <-- ADDED THIS LINE
+    totalBuyIn: number;
+    phoneNumber?: string; // ADDED
     inHand: boolean;
     isAllIn: boolean;
-    roundBet: number; // Amount bet in the current betting round
-    totalPotContribution: number; // Total amount contributed to the pot for the entire hand
+    roundBet: number;
+    totalPotContribution: number;
 }
 
 export type GameStage = 'pre-deal' | 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown';

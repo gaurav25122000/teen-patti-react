@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { PokerGameState, PokerPlayer, GameStage, Pot } from '../types/pokerGameTypes';
 import { calculatePots } from '../utils/pokerLogic';
 import { toTitleCase } from '../../utils/formatters';
+import { updateWinnings } from '../../utils/winningsService'; // IMPORT
 
 const POKER_STORAGE_KEY = 'pokerGameState';
 
@@ -94,6 +95,16 @@ export const usePokerGame = () => {
 
     const getEndOfHandState = useCallback((winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameState: PokerGameState): PokerGameState => {
         const totalPot = updatedPlayers.reduce((sum, p) => sum + p.totalPotContribution, 0);
+
+        // UPDATE WINNINGS
+        updatedPlayers.forEach(p => {
+            if (p.phoneNumber) {
+                const winnings = p.id === winner.id ? totalPot - p.totalPotContribution : -p.totalPotContribution;
+                if (winnings !== 0) {
+                    updateWinnings(p.phoneNumber, 'poker', winnings);
+                }
+            }
+        });
 
         const finalPlayers = updatedPlayers.map(p => {
             const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false };
@@ -231,10 +242,10 @@ export const usePokerGame = () => {
         });
     }, [addMessage, advanceToNextStageOrShowdown, getEndOfHandState]);
 
-    const setupGame = useCallback((players: { name: string, stack: number }[], blinds: { sb: number, bb: number }) => {
+    const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }) => {
         const initialPlayers: PokerPlayer[] = players.map((p, i) => ({
             id: i + 1, name: toTitleCase(p.name), stack: p.stack,
-            totalBuyIn: p.stack,
+            totalBuyIn: p.stack, phoneNumber: p.phoneNumber,
             inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false
         }));
 
@@ -331,9 +342,20 @@ export const usePokerGame = () => {
             if (newPots.length === 0) {
                 addMessage("All pots awarded. Hand is over.");
                 const finalPlayers = newPlayers.map(p => ({ ...p, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false }));
+
+                // UPDATE WINNINGS
+                finalPlayers.forEach(p => {
+                    if (p.phoneNumber) {
+                        const winnings = p.stack - p.totalBuyIn; // Simple diff for now
+                        if (winnings !== 0) {
+                            updateWinnings(p.phoneNumber, 'poker', winnings);
+                        }
+                    }
+                });
+
                 return {
                     ...prev,
-                    players: finalPlayers,
+                    players: finalPlayers.map(p => ({ ...p, totalBuyIn: p.stack })), // Reset buy-in for next hand
                     pot: [],
                     gameStage: 'pre-deal',
                     activePlayerIndex: -1,
@@ -343,7 +365,7 @@ export const usePokerGame = () => {
         });
     }, [addMessage]);
 
-    const addPlayer = useCallback((name: string, stack: number) => {
+    const addPlayer = useCallback((name: string, stack: number, phoneNumber: string) => {
         if (!name || stack < 0) return;
         setGameState(prev => {
             if (prev.gameStage !== 'pre-deal') {
@@ -356,6 +378,7 @@ export const usePokerGame = () => {
                 name: toTitleCase(name),
                 stack,
                 totalBuyIn: stack,
+                phoneNumber,
                 inHand: false,
                 isAllIn: false,
                 roundBet: 0,
