@@ -97,26 +97,24 @@ export const usePokerGame = () => {
     const getEndOfHandState = useCallback((winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameState: PokerGameState): PokerGameState => {
         const totalPot = updatedPlayers.reduce((sum, p) => sum + p.totalPotContribution, 0);
 
-        // **BATCH UPDATE LOGIC**
-        const recordsToUpdate: WinningsRecord[] = [];
-        const timestamp = new Date().toISOString();
+        // const recordsToUpdate: WinningsRecord[] = [];
+        // const timestamp = new Date().toISOString();
 
-        updatedPlayers.forEach(p => {
-            if (p.phoneNumber) {
-                const winnings = p.id === winner.id ? totalPot - p.totalPotContribution : -p.totalPotContribution;
-                if (winnings !== 0) {
-                    recordsToUpdate.push({
-                        phoneHash: SHA256(p.phoneNumber).toString(),
-                        gameType: 'poker',
-                        winnings,
-                        timestamp
-                    });
-                }
-            }
-        });
+        // updatedPlayers.forEach(p => {
+        //     if (p.phoneNumber) {
+        //         const winnings = p.id === winner.id ? totalPot - p.totalPotContribution : -p.totalPotContribution;
+        //         if (winnings !== 0) {
+        //             recordsToUpdate.push({
+        //                 phoneHash: SHA256(p.phoneNumber).toString(),
+        //                 gameType: 'poker',
+        //                 winnings,
+        //                 timestamp
+        //             });
+        //         }
+        //     }
+        // });
 
-        // Send all records in one API call
-        bulkUpdateWinnings(recordsToUpdate);
+        // bulkUpdateWinnings(recordsToUpdate);
 
         const finalPlayers = updatedPlayers.map(p => {
             const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false };
@@ -351,8 +349,38 @@ export const usePokerGame = () => {
 
             const newPots = prev.pot.filter((_, index) => index !== potIndex);
 
+            // **FIXED: Check if this is the LAST pot being awarded**
             if (newPots.length === 0) {
                 addMessage("All pots awarded. Hand is over.");
+
+                // **BATCH UPDATE LOGIC ADDED HERE**
+                const recordsToUpdate: WinningsRecord[] = [];
+                const timestamp = new Date().toISOString();
+
+                // `newPlayers` now has the final stack totals after all pots are awarded
+                prev.players.forEach(p_initial => {
+                    if (p_initial.phoneNumber) {
+                        const p_final = newPlayers.find(p => p.id === p_initial.id);
+                        if (p_final) {
+                            // Net winnings = (Amount won from pots) - (Amount contributed to pot)
+                            const amountWon = p_final.stack - p_initial.stack;
+                            const finalWinnings = amountWon - p_initial.totalPotContribution;
+
+                            if (finalWinnings !== 0) {
+                                recordsToUpdate.push({
+                                    phoneHash: SHA256(p_initial.phoneNumber).toString(),
+                                    gameType: 'poker',
+                                    winnings: finalWinnings,
+                                    timestamp
+                                });
+                            }
+                        }
+                    }
+                });
+
+                bulkUpdateWinnings(recordsToUpdate);
+
+                // Reset players for the next hand
                 const finalPlayers = newPlayers.map(p => ({ ...p, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false }));
                 return {
                     ...prev,
@@ -362,6 +390,8 @@ export const usePokerGame = () => {
                     activePlayerIndex: -1,
                 };
             }
+
+            // If there are more pots to award, just update the player stacks and pot array
             return { ...prev, players: newPlayers, pot: newPots };
         });
     }, [addMessage]);
