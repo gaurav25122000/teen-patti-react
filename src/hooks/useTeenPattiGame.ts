@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { GameState, Player, Entity } from '../types/gameTypes';
 import { loadStateFromLocalStorage, saveStateToLocalStorage } from '../utils/localStorage';
 import { toTitleCase } from '../utils/formatters';
+import { updateLifetimeWinnings } from '../utils/lifetimeWinningsLogic';
 
 const createInitialGameState = (): GameState => ({
     players: [],
@@ -97,6 +98,9 @@ export const useTeenPattiGame = () => {
       const lastBootFromRound = prev.roundInitialBootAmount;
 
       if (winner) {
+        const winnings = prev.potAmount - (prev.roundContributions.get(winner.id) || 0);
+        updateLifetimeWinnings(winner.phoneNumber, 'teenPatti', winnings);
+
         finalMessages.push(`--- ROUND OVER ---`);
         finalMessages.push(`Congratulations! ${toTitleCase(winner.name)} won the pot of ₹${prev.potAmount}`);
         finalPlayers = prev.players.map(p =>

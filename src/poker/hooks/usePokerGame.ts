@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { PokerGameState, PokerPlayer, GameStage, Pot } from '../types/pokerGameTypes';
 import { calculatePots } from '../utils/pokerLogic';
 import { toTitleCase } from '../../utils/formatters';
+import { updateLifetimeWinnings } from '../../utils/lifetimeWinningsLogic';
 
 const POKER_STORAGE_KEY = 'pokerGameState';
 
@@ -94,6 +95,9 @@ export const usePokerGame = () => {
 
     const getEndOfHandState = useCallback((winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameState: PokerGameState): PokerGameState => {
         const totalPot = updatedPlayers.reduce((sum, p) => sum + p.totalPotContribution, 0);
+        const winnerContribution = updatedPlayers.find(p => p.id === winner.id)?.totalPotContribution || 0;
+        const winnings = totalPot - winnerContribution;
+        updateLifetimeWinnings(winner.phoneNumber, 'poker', winnings);
 
         const finalPlayers = updatedPlayers.map(p => {
             const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false };
@@ -231,9 +235,9 @@ export const usePokerGame = () => {
         });
     }, [addMessage, advanceToNextStageOrShowdown, getEndOfHandState]);
 
-    const setupGame = useCallback((players: { name: string, stack: number }[], blinds: { sb: number, bb: number }) => {
+    const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }) => {
         const initialPlayers: PokerPlayer[] = players.map((p, i) => ({
-            id: i + 1, name: toTitleCase(p.name), stack: p.stack,
+            id: i + 1, name: toTitleCase(p.name), stack: p.stack, phoneNumber: p.phoneNumber,
             totalBuyIn: p.stack,
             inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false
         }));
@@ -314,6 +318,13 @@ export const usePokerGame = () => {
         setGameState(prev => {
             const potToAward = prev.pot[potIndex];
             if (!potToAward) return prev;
+
+            const winner = prev.players.find(p => p.id === winnerId);
+            if(winner) {
+                const winnerContribution = winner.totalPotContribution;
+                const winnings = potToAward.amount - winnerContribution;
+                updateLifetimeWinnings(winner.phoneNumber, 'poker', winnings);
+            }
 
             let winnerName = '';
             const newPlayers = prev.players.map(p => {

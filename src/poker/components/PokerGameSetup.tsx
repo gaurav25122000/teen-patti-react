@@ -3,28 +3,28 @@ import React, { useState } from 'react';
 import { toTitleCase } from '../../utils/formatters';
 
 interface PokerGameSetupProps {
-    onStartGame: (players: { name: string, stack: number }[], blinds: { sb: number, bb: number }) => void;
+    onStartGame: (players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }) => void;
 }
 
 const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
-    const [players, setPlayers] = useState([{ name: '', stack: '1000' }]);
+    const [players, setPlayers] = useState([{ name: '', stack: '1000', phoneNumber: '' }]);
     const [sb, setSb] = useState('10');
     const [bb, setBb] = useState('20');
 
-    const handlePlayerChange = (index: number, field: 'name' | 'stack', value: string) => {
+    const handlePlayerChange = (index: number, field: 'name' | 'stack' | 'phoneNumber', value: string) => {
         const newPlayers = [...players];
         newPlayers[index][field] = value;
         setPlayers(newPlayers);
     };
 
     const addPlayerField = () => {
-        setPlayers([...players, { name: '', stack: '1000' }]);
+        setPlayers([...players, { name: '', stack: '1000', phoneNumber: '' }]);
     };
 
     const handleStart = () => {
         const finalPlayers = players
-            .filter(p => p.name.trim() !== '')
-            .map(p => ({ name: toTitleCase(p.name), stack: parseInt(p.stack) || 0 }));
+            .filter(p => p.name.trim() !== '' && p.phoneNumber.trim() !== '')
+            .map(p => ({ name: toTitleCase(p.name), stack: parseInt(p.stack) || 0, phoneNumber: p.phoneNumber }));
 
         if (finalPlayers.length < 2) {
             alert("Please add at least 2 players.");
@@ -63,6 +63,13 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
                         placeholder="Starting Stack"
                         value={p.stack}
                         onChange={e => handlePlayerChange(index, 'stack', e.target.value)}
+                        style={{ marginLeft: "5px" }}
+                    />
+                    <input
+                        type="text"
+                        placeholder={`Player ${index + 1} Phone Number`}
+                        value={p.phoneNumber}
+                        onChange={e => handlePlayerChange(index, 'phoneNumber', e.target.value)}
                         style={{ marginLeft: "5px" }}
                     />
                 </div>

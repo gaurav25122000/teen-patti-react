@@ -14,6 +14,7 @@ import PokerLobby from './poker/components/PokerLobby';
 
 // General Components
 import ModeSelectionScreen from './components/ModeSelectionScreen';
+import LifetimeWinnings from './components/lifetime-winnings/LifetimeWinnings';
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -54,6 +55,7 @@ function App() {
         <Route path="/" element={<ModeSelectionScreen />} />
         <Route path="/teen-patti" element={<TeenPattiRoute  />} />
         <Route path="/poker" element={<PokerLobby pokerHook={pokerHook} onInteractionChange={handleInteractionChange} />} />
+        <Route path="/lifetime-winnings" element={<LifetimeWinnings />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>
