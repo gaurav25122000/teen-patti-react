@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { getWinnings } from '../utils/winningsService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import './LifetimeWinnings.css'; // Import the CSS
+import './LifetimeWinnings.css'; // Import the updated CSS
 
 const LifetimeWinnings: React.FC = () => {
     const [phoneNumbers, setPhoneNumbers] = useState('');
@@ -30,20 +30,19 @@ const LifetimeWinnings: React.FC = () => {
 
     const COLORS = ['#00ffff', '#ff00ff', '#39ff14', '#ffd700', '#e8e8e8'];
 
-    // Memoize the processed data for the summary table
     const processedTableData = useMemo(() => {
         if (!winningsData) return null;
 
         const summary: { [key: string]: { teenPatti: number, poker: number } } = {};
 
         winningsData.teenPatti.players.forEach((p: any) => {
-            if (!summary[(p.phoneHash as string)]) summary[(p.phoneHash as string)] = { teenPatti: 0, poker: 0 };
-            summary[(p.phoneHash as string)].teenPatti = p.total;
+            if (!summary[p.phoneHash]) summary[p.phoneHash] = { teenPatti: 0, poker: 0 };
+            summary[p.phoneHash].teenPatti = p.total;
         });
 
         winningsData.poker.players.forEach((p: any) => {
-            if (!summary[(p.phoneHash as string)]) summary[(p.phoneHash as string)] = { teenPatti: 0, poker: 0 };
-            summary[(p.phoneHash as string)].poker = p.total;
+            if (!summary[p.phoneHash]) summary[p.phoneHash] = { teenPatti: 0, poker: 0 };
+            summary[p.phoneHash].poker = p.total;
         });
 
         return { summary };
@@ -69,8 +68,9 @@ const LifetimeWinnings: React.FC = () => {
             {error && <p style={{ color: 'var(--color-glow-magenta)', textAlign: 'center' }}>{error}</p>}
 
             {winningsData && processedTableData && (
-                <div className="winnings-container" style={{ flexDirection: 'column' }}>
-                    <div className="table-container" style={{ marginBottom: '2rem' }}>
+                <div className="winnings-layout">
+                    {/* Table Container is now at the top */}
+                    <div className="table-container">
                         <div className="summary-table">
                             <h3>Player Summary</h3>
                             <table>
@@ -84,7 +84,7 @@ const LifetimeWinnings: React.FC = () => {
                                 </thead>
                                 <tbody>
                                     {Object.keys(processedTableData.summary).map((hash, i) => {
-                                        const totals = processedTableData.summary[(hash as string)];
+                                        const totals = processedTableData.summary[hash];
                                         const overallTotal = totals.teenPatti + totals.poker;
                                         const totalClass = overallTotal >= 0 ? 'total-winnings' : 'total-losses';
                                         return (
@@ -99,12 +99,12 @@ const LifetimeWinnings: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
-                        {/* Transaction Log can be added here if the API provides raw data */}
                     </div>
 
+                    {/* Graph Container is below the table */}
                     <div className="graph-container">
                         <div className="stage-display" style={{ marginBottom: '2rem' }}>
-                            <h2>Teen Patti Winnings</h2>
+                            <h2>Teen Patti Winnings Trend</h2>
                         </div>
                         <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={winningsData.teenPatti.trend}>
@@ -112,15 +112,15 @@ const LifetimeWinnings: React.FC = () => {
                                 <XAxis dataKey="date" stroke="var(--color-text)" />
                                 <YAxis stroke="var(--color-text)" />
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-cyan)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-cyan)' }} />
-                                <Legend wrapperStyle={{ color: 'var(--color-text)' }}/>
+                                <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
                                 {winningsData.teenPatti.players.map((p: any, i: number) => (
-                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i+1}`} stroke={COLORS[(i % COLORS.length)]} strokeWidth={2} />
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
                                 ))}
                             </LineChart>
                         </ResponsiveContainer>
 
                         <div className="stage-display" style={{ marginTop: '3rem', marginBottom: '2rem' }}>
-                            <h2>Poker Winnings</h2>
+                            <h2>Poker Winnings Trend</h2>
                         </div>
                         <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={winningsData.poker.trend}>
@@ -130,7 +130,7 @@ const LifetimeWinnings: React.FC = () => {
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-gold)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-gold)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
                                 {winningsData.poker.players.map((p: any, i: number) => (
-                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i+1}`} stroke={COLORS[(i % COLORS.length)]} strokeWidth={2}  />
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
                                 ))}
                             </LineChart>
                         </ResponsiveContainer>
