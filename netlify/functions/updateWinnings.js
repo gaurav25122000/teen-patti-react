@@ -12,7 +12,9 @@ exports.handler = async function (event) {
 
         // Get the current array of records
         const getResponse = await fetch(JSONSILO_URL, { headers: { 'X-MAN-API': JSONSILO_API_KEY } });
+        console.log(getResponse);
         const allRecords = getResponse.ok ? await getResponse.json() : [];
+        console.log(allRecords);
 
         // Add the new record to the array
         allRecords.push(newRecord);

@@ -52,7 +52,9 @@ exports.handler = async function (event) {
         const JSONSILO_URL = `https://api.jsonsilo.com/api/v1/manage/${JSONSILO_ID}`;
 
         const response = await fetch(JSONSILO_URL, { headers: { 'X-MAN-API': JSONSILO_API_KEY } });
+        console.log(response);
         const allRecords = response.ok ? await response.json() : [];
+        console.log(allRecords);
         
         const teenPattiData = processDataForChart(allRecords, phoneHashes, 'teen-patti');
         const pokerData = processDataForChart(allRecords, phoneHashes, 'poker');
