@@ -3,12 +3,24 @@ import { Handler } from '@netlify/functions';
 import fs from 'fs';
 import path from 'path';
 
-const dataFilePath = path.resolve(process.cwd(), 'data', 'winnings.json');
+const dataDir = path.resolve(process.cwd(), 'data');
+const dataFilePath = path.resolve(dataDir, 'winnings.json');
+
+const ensureDataDirExists = () => {
+    if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
+};
 
 const readWinningsData = () => {
+  ensureDataDirExists();
   if (fs.existsSync(dataFilePath)) {
     const fileContent = fs.readFileSync(dataFilePath, 'utf-8');
-    return JSON.parse(fileContent);
+    try {
+      return JSON.parse(fileContent);
+    } catch {
+      return {}; // Return empty object if file is corrupt
+    }
   }
   return {};
 };
