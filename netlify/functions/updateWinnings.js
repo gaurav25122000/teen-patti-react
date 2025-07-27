@@ -1,5 +1,4 @@
 // netlify/functions/updateWinnings.js
-const fetch = require('node-fetch');
 
 exports.handler = async function (event) {
     if (event.httpMethod !== 'POST') {

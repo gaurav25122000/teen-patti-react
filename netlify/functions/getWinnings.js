@@ -1,5 +1,4 @@
 // netlify/functions/getWinnings.js
-const fetch = require('node-fetch');
 
 const processDataForChart = (data, phoneHashes, gameType) => {
     const trend = [];
