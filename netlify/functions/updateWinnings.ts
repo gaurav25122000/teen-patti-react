@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 
-const dataDir = path.resolve(process.cwd(), 'data');
+const dataDir = '/tmp/data';
 const dataFilePath = path.resolve(dataDir, 'winnings.json');
 
 const ensureDataDirExists = () => {
