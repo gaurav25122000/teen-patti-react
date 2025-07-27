@@ -53,8 +53,13 @@ const PokerRoundControls: React.FC<PokerRoundControlsProps> = ({ gameState, curr
         <div className="round-controls">
             <h4>Turn: <strong>{currentPlayer.name}</strong> (Stack: {currentPlayer.stack})</h4>
             <div className="round-info">
-                <div>Current Bet: ₹ {currentBet}</div>
-                <div>Your Bet: ₹ {currentPlayer.roundBet}</div>
+                <div className='turn-info' style={{ fontSize: 20 }}>
+                    <div>Current Bet</div> ₹ {currentBet}
+                </div>
+                <div className='current-stake' style={{ fontSize: 20 }}><div>Your Bet</div> ₹ {currentPlayer.roundBet}</div>
+                <div className='pot-info'>
+                    <div>Total Pot</div> ₹ {gameState.players.reduce((sum, p) => sum + p.totalPotContribution, 0)}
+                </div>
             </div>
             <div className="game-actions">
                 <button className="btn-error" onClick={() => actions.handlePlayerAction('fold')}>Fold</button>
