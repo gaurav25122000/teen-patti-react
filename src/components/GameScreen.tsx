@@ -1,6 +1,6 @@
 // src/components/GameScreen.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import type { InteractionType, Player, Entity } from '../types/gameTypes';
+import type { InteractionType, Player } from '../types/gameTypes';
 import { useTeenPattiGame } from '../hooks/useTeenPattiGame';
 import PlayerList from './PlayerList';
 import ActionLog from './ActionLog';
@@ -91,21 +91,21 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
         }
     }, [gameState, actions]);
 
-    // **DEFINITIVE FIX**: This function now sets all required state for the modal
-    // in one go, preventing any race conditions.
     const handleShowClick = () => {
-        if (!currentPlayer || !precedingPlayer) {
-            addMessage("No one to request a show with.", true);
+        const requester = currentPlayer;
+        const target = precedingPlayer;
+        if (!requester || !target) {
+            alert("Cannot Show: No valid opponent found.");
             return;
         }
-        const isRequesterBlind = gameState.blindPlayerIds.has(currentPlayer.id);
-        const cost = isRequesterBlind ? gameState.currentStake : 2 * gameState.currentStake;
-        actions.requestShow(cost);
+
+
 
         // Set all state needed for the modal at once
         setShowContext({ requester: currentPlayer, target: precedingPlayer });
         setSelectedPlayerId(String(currentPlayer.id)); // Default loser to the requester
         setInteraction('showingCards');
+
     };
 
     const renderModal = () => {
@@ -116,12 +116,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
         let icon: React.ReactNode = null;
         let body: React.ReactNode = null;
         let footer: React.ReactNode = null;
-        let primaryAction = () => {};
+        let primaryAction = () => { };
         let confirmText = "Confirm";
         const closeModal = () => setInteraction('idle');
 
         switch (interaction) {
-             case 'gettingBoot':
+            case 'gettingBoot':
                 title = 'Set Boot Amount'; theme = 'default'; icon = <IconCash />;
                 body = <div className="form-group"><label htmlFor="boot-amount">Enter amount</label><input id="boot-amount" type="number" value={bootAmount} onChange={e => setBootAmount(e.target.value)} min="1" autoFocus /></div>;
                 confirmText = "Set & Continue";
@@ -158,23 +158,30 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                 break;
 
             case 'showingCards':
-                { const { requester, target } = showContext;
-                title = "Showdown!"; theme = 'confirmation'; icon = <IconUsers />;
-                body = requester && target ? (
-                    <div className="form-group">
-                        <p><strong>{toTitleCase(requester.name)}</strong> vs <strong>{toTitleCase(target.name)}</strong></p>
-                        <label>Who folds?</label>
-                        <select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>
-                            <option value={requester.id}>{toTitleCase(requester.name)}</option>
-                            <option value={target.id}>{toTitleCase(target.name)}</option>
-                        </select>
-                    </div>
-                ) : <p>Error initializing showdown.</p>;
-                primaryAction = () => {
-                    actions.resolveShow(parseInt(selectedPlayerId, 10));
-                    closeModal();
-                };
-                break; }
+                {
+                    const { requester, target } = showContext;
+
+                    title = "Showdown!"; theme = 'confirmation'; icon = <IconUsers />;
+                    body = requester && target ? (
+                        <div className="form-group">
+                            <p><strong>{toTitleCase(requester.name)}</strong> vs <strong>{toTitleCase(target.name)}</strong></p>
+                            <label>Who folds?</label>
+                            <select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>
+                                <option value={requester.id}>{toTitleCase(requester.name)}</option>
+                                <option value={target.id}>{toTitleCase(target.name)}</option>
+                            </select>
+                        </div>
+                    ) : <p>Error initializing showdown.</p>;
+                    const cost = gameState.blindPlayerIds.has(requester.id) ? gameState.currentStake : gameState.currentStake * 2;
+                    primaryAction = () => {
+                        actions.resolveShow(parseInt(selectedPlayerId, 10));
+
+                        actions.requestShow(cost);
+                        addMessage(`${toTitleCase(requester.name)} pays ₹ ${cost} for Show with ${toTitleCase(target.name)}.`);
+                        closeModal();
+                    };
+                    break;
+                }
 
             case 'addingPlayer':
                 title = "Add Player"; theme = 'success'; icon = <IconUserPlus />;
@@ -194,21 +201,23 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                     closeModal();
                 };
                 break;
-            
+
             case 'reorderingPlayers':
-                 { const movePlayer = (index: number, direction: 'up' | 'down') => {
-                    const newPlayers = [...reorderablePlayers];
-                    const [playerToMove] = newPlayers.splice(index, 1);
-                    newPlayers.splice(direction === 'up' ? index - 1 : index + 1, 0, playerToMove);
-                    setReorderablePlayers(newPlayers);
-                };
-                title = "Reorder Players"; theme = 'default'; icon = <IconList />;
-                body = <ul className="reorder-list">{reorderablePlayers.map((p, i) => <li key={p.id}><span>{toTitleCase(p.name)}</span><div className="reorder-buttons"><button onClick={() => movePlayer(i, 'up')} disabled={i === 0}>▲</button><button onClick={() => movePlayer(i, 'down')} disabled={i === reorderablePlayers.length - 1}>▼</button></div></li>)}</ul>;
-                primaryAction = () => {
-                    actions.reorderPlayers(reorderablePlayers);
-                    closeModal();
-                };
-                break; }
+                {
+                    const movePlayer = (index: number, direction: 'up' | 'down') => {
+                        const newPlayers = [...reorderablePlayers];
+                        const [playerToMove] = newPlayers.splice(index, 1);
+                        newPlayers.splice(direction === 'up' ? index - 1 : index + 1, 0, playerToMove);
+                        setReorderablePlayers(newPlayers);
+                    };
+                    title = "Reorder Players"; theme = 'default'; icon = <IconList />;
+                    body = <ul className="reorder-list">{reorderablePlayers.map((p, i) => <li key={p.id}><span>{toTitleCase(p.name)}</span><div className="reorder-buttons"><button onClick={() => movePlayer(i, 'up')} disabled={i === 0}>▲</button><button onClick={() => movePlayer(i, 'down')} disabled={i === reorderablePlayers.length - 1}>▼</button></div></li>)}</ul>;
+                    primaryAction = () => {
+                        actions.reorderPlayers(reorderablePlayers);
+                        closeModal();
+                    };
+                    break;
+                }
 
             case 'deductAndDistribute':
                 title = "Deduct & Distribute"; theme = 'danger'; icon = <IconCash />;
@@ -252,7 +261,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                                 currentPlayer={currentPlayer}
                                 precedingPlayer={precedingPlayer}
                                 activePlayers={activePlayers}
-                                actions={{ ...actions, onShowClick: handleShowClick, onEndBettingClick: () => setInteraction('selectingWinner')}}
+                                actions={{ ...actions, onShowClick: handleShowClick, onEndBettingClick: () => setInteraction('selectingWinner') }}
                             />
                         )}
                     </div>

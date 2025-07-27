@@ -1,6 +1,6 @@
 // src/components/GameModalManager.tsx
 import React, { useState, useEffect } from 'react';
-import type { InteractionType, Player, GameState } from '../types/gameTypes';
+import type { InteractionType, Player } from '../types/gameTypes';
 import { useTeenPattiGame } from '../hooks/useTeenPattiGame';
 import InteractionModal from './InteractionModal';
 import { toTitleCase } from '../utils/formatters';
