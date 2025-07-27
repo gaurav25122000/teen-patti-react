@@ -2,7 +2,6 @@
 import { Handler } from '@netlify/functions';
 import fs from 'fs';
 import path from 'path';
-import bcrypt from 'bcryptjs';
 
 const dataDir = '/tmp/data';
 const dataFilePath = path.resolve(dataDir, 'winnings.json');
