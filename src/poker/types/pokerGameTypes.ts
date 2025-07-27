@@ -4,6 +4,7 @@ export interface PokerPlayer {
     hasActed: boolean;
     id: number;
     name: string;
+    phoneNumber: string;
     stack: number;
     totalBuyIn: number; // <-- ADDED THIS LINE
     inHand: boolean;

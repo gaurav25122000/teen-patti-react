@@ -11,15 +11,15 @@ interface GameSetupProps {
 
 const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => {
     const [numPlayersInput, setNumPlayersInput] = useState("2");
-    const [playerInputs, setPlayerInputs] = useState<{ name: string; balance: string }[]>([]);
+    const [playerInputs, setPlayerInputs] = useState<{ name: string; balance: string; phoneNumber: string }[]>([]);
 
     const handleConfirmNumPlayers = () => {
         const num = parseInt(numPlayersInput);
         if (isNaN(num) || num < 2) return alert("Please enter at least 2 players.");
-        setPlayerInputs(Array(num).fill({ name: "", balance: "0" }));
+        setPlayerInputs(Array(num).fill({ name: "", balance: "0", phoneNumber: "" }));
     };
 
-    const handlePlayerInputChange = (index: number, field: 'name' | 'balance', value: string) => {
+    const handlePlayerInputChange = (index: number, field: 'name' | 'balance' | 'phoneNumber', value: string) => {
         setPlayerInputs(prev => {
             const updated = [...prev];
             updated[index] = { ...updated[index], [field]: value };
@@ -31,10 +31,10 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
         const newPlayers: Player[] = [];
         for (const [index, input] of playerInputs.entries()) {
             const balance = parseInt(input.balance, 10);
-            if (!input.name.trim() || isNaN(balance)) {
-                return alert(`Invalid name or balance for Player ${index + 1}.`);
+            if (!input.name.trim() || isNaN(balance) || !input.phoneNumber.trim()) {
+                return alert(`Invalid name, balance, or phone number for Player ${index + 1}.`);
             }
-            newPlayers.push({ id: index + 1, name: toTitleCase(input.name), balance });
+            newPlayers.push({ id: index + 1, name: toTitleCase(input.name), balance, phoneNumber: input.phoneNumber });
         }
         if (newPlayers.length < 2) return alert("Need at least 2 players.");
         onStartNewGame(newPlayers);
@@ -75,6 +75,13 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
                                 placeholder="Balance"
                                 value={input.balance}
                                 onChange={(e) => handlePlayerInputChange(index, 'balance', e.target.value)}
+                                style={{ marginLeft: "5px" }}
+                            />
+                            <input
+                                type="text"
+                                placeholder={`Player ${index + 1} Phone Number`}
+                                value={input.phoneNumber}
+                                onChange={(e) => handlePlayerInputChange(index, 'phoneNumber', e.target.value)}
                                 style={{ marginLeft: "5px" }}
                             />
                         </div>
