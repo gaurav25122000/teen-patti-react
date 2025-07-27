@@ -102,7 +102,6 @@ export const useTeenPattiGame = () => {
         finalMessages.push(`--- ROUND OVER ---`);
         finalMessages.push(`Congratulations! ${toTitleCase(winner.name)} won the pot of ₹${prev.potAmount}`);
 
-        // **BATCH UPDATE LOGIC**
         const recordsToUpdate: WinningsRecord[] = [];
         const timestamp = new Date().toISOString();
 
@@ -122,7 +121,6 @@ export const useTeenPattiGame = () => {
           }
         });
 
-        // Send all records in one API call
         bulkUpdateWinnings(recordsToUpdate);
 
         finalPlayers = prev.players.map(p =>
@@ -285,7 +283,6 @@ export const useTeenPattiGame = () => {
     const winner = checkForWinner(gameState.players, newFoldedIds);
     if (winner) {
       addMessage(`${toTitleCase(winner.name)} is the last player remaining.`);
-      // Temporarily update state to show the fold before ending the round
       setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
       endRound(winner);
     } else {
@@ -293,7 +290,6 @@ export const useTeenPattiGame = () => {
       advanceTurn();
     }
   };
-
 
   const requestShow = (cost: number) => {
     if (!currentPlayer) return;

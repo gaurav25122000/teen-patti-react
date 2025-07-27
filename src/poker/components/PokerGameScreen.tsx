@@ -27,6 +27,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const [managePlayerId, setManagePlayerId] = useState<string>('');
     const [addPlayerName, setAddPlayerName] = useState('');
     const [addPlayerStack, setAddPlayerStack] = useState('1000');
+    const [addPlayerPhone, setAddPlayerPhone] = useState('');
     const [addChipsAmount, setAddChipsAmount] = useState('1000');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
@@ -59,14 +60,14 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             setManagePlayerId(String(players[0].id));
         } else if (modalMode === 'addPlayer') {
             setManagePlayerId('');
+            setAddPlayerName('');
+            setAddPlayerStack('1000');
+            setAddPlayerPhone('');
         }
     }, [modalMode, onInteractionChange, pot, players, managePlayerId]);
 
     const closeModal = () => {
         setModalMode('none');
-        setAddPlayerName('');
-        setAddPlayerStack('1000');
-        setAddChipsAmount('1000');
     };
 
     const handleAwardPot = () => {
@@ -84,7 +85,10 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         switch (modalMode) {
             case 'addPlayer':
                 if (!addPlayerName || !addPlayerStack) return alert("Please enter name and stack.");
-                actions.addPlayer(addPlayerName, parseInt(addPlayerStack, 10));
+                if (!/^\d{10}$/.test(addPlayerPhone)) {
+                    return alert('Please enter a valid 10-digit phone number.');
+                }
+                actions.addPlayer(addPlayerName, parseInt(addPlayerStack, 10), addPlayerPhone);
                 break;
             case 'removePlayer':
                 if (!managePlayerId) return alert("Please select a player to remove.");
@@ -124,6 +128,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                     body = <>
                         <div className="form-group"><label>Player Name</label><input type="text" value={addPlayerName} onChange={e => setAddPlayerName(e.target.value)} /></div>
                         <div className="form-group"><label>Starting Stack</label><input type="number" value={addPlayerStack} onChange={e => setAddPlayerStack(e.target.value)} /></div>
+                        <div className="form-group"><label>Phone Number</label><input type="tel" value={addPlayerPhone} onChange={e => setAddPlayerPhone(e.target.value)} placeholder="10 digits" /></div>
                     </>;
                     break;
                 case 'removePlayer':

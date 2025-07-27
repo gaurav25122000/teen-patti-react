@@ -35,17 +35,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
     const [showEntityManager, setShowEntityManager] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-    // State for modals
     const [bootAmount, setBootAmount] = useState('10');
     const [startPlayerId, setStartPlayerId] = useState('');
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
     const [addPlayerName, setAddPlayerName] = useState('');
     const [addPlayerBalance, setAddPlayerBalance] = useState('0');
+    const [addPlayerPhone, setAddPlayerPhone] = useState('');
     const [deductAmount, setDeductAmount] = useState(0);
     const [reorderablePlayers, setReorderablePlayers] = useState<Player[]>([]);
     const [showContext, setShowContext] = useState<{ requester?: Player, target?: Player }>({});
 
-    // Effect to pre-populate modal state (for non-showdown modals)
     useEffect(() => {
         if (interaction === 'idle') return;
 
@@ -56,6 +55,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
             case 'addingPlayer':
                 setAddPlayerName('');
                 setAddPlayerBalance('0');
+                setAddPlayerPhone('');
                 break;
             case 'removingPlayer':
             case 'deductAndDistribute':
@@ -99,13 +99,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
             return;
         }
 
-
-
-        // Set all state needed for the modal at once
         setShowContext({ requester: currentPlayer, target: precedingPlayer });
-        setSelectedPlayerId(String(currentPlayer.id)); // Default loser to the requester
+        setSelectedPlayerId(String(currentPlayer.id));
         setInteraction('showingCards');
-
     };
 
     const renderModal = () => {
@@ -160,7 +156,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
             case 'showingCards':
                 {
                     const { requester, target } = showContext;
-
                     title = "Showdown!"; theme = 'confirmation'; icon = <IconUsers />;
                     body = requester && target ? (
                         <div className="form-group">
@@ -175,7 +170,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                     const cost = gameState.blindPlayerIds.has(requester.id) ? gameState.currentStake : gameState.currentStake * 2;
                     primaryAction = () => {
                         actions.resolveShow(parseInt(selectedPlayerId, 10));
-
                         actions.requestShow(cost);
                         addMessage(`${toTitleCase(requester.name)} pays ₹ ${cost} for Show with ${toTitleCase(target.name)}.`);
                         closeModal();
@@ -185,9 +179,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
 
             case 'addingPlayer':
                 title = "Add Player"; theme = 'success'; icon = <IconUserPlus />;
-                body = <><div className="form-group"><label>Name</label><input type="text" value={addPlayerName} onChange={e => setAddPlayerName(e.target.value)} /></div><div className="form-group"><label>Balance</label><input type="number" value={addPlayerBalance} onChange={e => setAddPlayerBalance(e.target.value)} /></div></>;
+                body = (
+                    <>
+                        <div className="form-group"><label>Name</label><input type="text" value={addPlayerName} onChange={e => setAddPlayerName(e.target.value)} /></div>
+                        <div className="form-group"><label>Balance</label><input type="number" value={addPlayerBalance} onChange={e => setAddPlayerBalance(e.target.value)} /></div>
+                        <div className="form-group"><label>Phone Number</label><input type="tel" value={addPlayerPhone} onChange={e => setAddPlayerPhone(e.target.value)} placeholder="10 digits" /></div>
+                    </>
+                );
                 primaryAction = () => {
-                    if (addPlayerName) actions.addPlayer(addPlayerName, parseInt(addPlayerBalance, 10) || 0);
+                    if (!addPlayerName.trim()) return alert('Player name cannot be empty.');
+                    if (!/^\d{10}$/.test(addPlayerPhone)) {
+                        return alert('Please enter a valid 10-digit phone number.');
+                    }
+                    actions.addPlayer(addPlayerName, parseInt(addPlayerBalance, 10) || 0, addPlayerPhone);
                     closeModal();
                 };
                 break;

@@ -349,20 +349,16 @@ export const usePokerGame = () => {
 
             const newPots = prev.pot.filter((_, index) => index !== potIndex);
 
-            // **FIXED: Check if this is the LAST pot being awarded**
             if (newPots.length === 0) {
                 addMessage("All pots awarded. Hand is over.");
 
-                // **BATCH UPDATE LOGIC ADDED HERE**
                 const recordsToUpdate: WinningsRecord[] = [];
                 const timestamp = new Date().toISOString();
 
-                // `newPlayers` now has the final stack totals after all pots are awarded
                 prev.players.forEach(p_initial => {
                     if (p_initial.phoneNumber) {
                         const p_final = newPlayers.find(p => p.id === p_initial.id);
                         if (p_final) {
-                            // Net winnings = (Amount won from pots) - (Amount contributed to pot)
                             const amountWon = p_final.stack - p_initial.stack;
                             const finalWinnings = amountWon - p_initial.totalPotContribution;
 
@@ -380,7 +376,6 @@ export const usePokerGame = () => {
 
                 bulkUpdateWinnings(recordsToUpdate);
 
-                // Reset players for the next hand
                 const finalPlayers = newPlayers.map(p => ({ ...p, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false }));
                 return {
                     ...prev,
@@ -391,7 +386,6 @@ export const usePokerGame = () => {
                 };
             }
 
-            // If there are more pots to award, just update the player stacks and pot array
             return { ...prev, players: newPlayers, pot: newPots };
         });
     }, [addMessage]);
