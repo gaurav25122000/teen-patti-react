@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import type { Player, Entity } from '../types/gameTypes';
 import InteractionModal from './InteractionModal';
+import './EntityManager.css';
 
 interface EntityManagerProps {
     isOpen: boolean;
