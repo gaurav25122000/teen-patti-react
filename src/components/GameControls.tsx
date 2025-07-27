@@ -24,32 +24,48 @@ const GameControls: React.FC<GameControlsProps> = (props) => {
 
     return (
         <div className="game-actions">
-            <button className="btn-primary" onClick={onStartRound} disabled={!canStartRound} title={startRoundTitle}>
-                Start Round
-            </button>
-            <button className="btn-secondary" onClick={onChangeBoot} disabled={roundActive || players.length < 2}>
-                Change Boot
-            </button>
-            <button className="btn-primary" onClick={onAddPlayer} disabled={roundActive}>
-                Add Player
-            </button>
-            <button className="btn-secondary" onClick={onRemovePlayer} disabled={roundActive || players.length <= 2}>
-                Remove Player
-            </button>
-            <button className="btn-primary" onClick={onReorderPlayers} disabled={roundActive || players.length < 2}>
-                Reorder Players
-            </button>
-            <button className="btn-danger" onClick={onDeductAndDistribute} disabled={roundActive || players.length < 2}>
-                Deduct & Distribute
-            </button>
-            <button className="btn-primary" onClick={onManageEntities} disabled={roundActive}>
-                Manage Entities
-            </button>
-            <button className="btn-success" onClick={onShowOwings} disabled={roundActive}>
-                Final Owings
-            </button>
+            {canStartRound && (
+                <button className="btn-primary" onClick={onStartRound} title={startRoundTitle}>
+                    Start Round
+                </button>
+            )}
+            {!roundActive && players.length >= 2 && (
+                <button className="btn-secondary" onClick={onChangeBoot}>
+                    Change Boot
+                </button>
+            )}
+            {!roundActive && (
+                <button className="btn-primary" onClick={onAddPlayer}>
+                    Add Player
+                </button>
+            )}
+            {!roundActive && players.length > 2 && (
+                <button className="btn-secondary" onClick={onRemovePlayer}>
+                    Remove Player
+                </button>
+            )}
+            {!roundActive && players.length >= 2 && (
+                <button className="btn-primary" onClick={onReorderPlayers}>
+                    Reorder Players
+                </button>
+            )}
+            {!roundActive && players.length >= 2 && (
+                <button className="btn-danger" onClick={onDeductAndDistribute}>
+                    Deduct & Distribute
+                </button>
+            )}
+            {!roundActive && (
+                <button className="btn-primary" onClick={onManageEntities}>
+                    Manage Entities
+                </button>
+            )}
+            {!roundActive && (
+                <button className="btn-success" onClick={onShowOwings}>
+                    Final Owings
+                </button>
+            )}
             <button className="btn-secondary" onClick={onShowSetup}>
-                Back to Setup
+                Setup New Game
             </button>
         </div>
     );
