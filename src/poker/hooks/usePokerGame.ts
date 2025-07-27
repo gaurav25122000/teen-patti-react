@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { PokerGameState, PokerPlayer, GameStage, Pot } from '../types/pokerGameTypes';
 import { calculatePots } from '../utils/pokerLogic';
 import { toTitleCase } from '../../utils/formatters';
-import { updateWinnings } from '../../utils/winningsService'; // IMPORT
+import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsService';
+import { SHA256 } from 'crypto-js';
 
 const POKER_STORAGE_KEY = 'pokerGameState';
 
@@ -96,15 +97,26 @@ export const usePokerGame = () => {
     const getEndOfHandState = useCallback((winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameState: PokerGameState): PokerGameState => {
         const totalPot = updatedPlayers.reduce((sum, p) => sum + p.totalPotContribution, 0);
 
-        // UPDATE WINNINGS
+        // **BATCH UPDATE LOGIC**
+        const recordsToUpdate: WinningsRecord[] = [];
+        const timestamp = new Date().toISOString();
+
         updatedPlayers.forEach(p => {
             if (p.phoneNumber) {
                 const winnings = p.id === winner.id ? totalPot - p.totalPotContribution : -p.totalPotContribution;
                 if (winnings !== 0) {
-                    updateWinnings(p.phoneNumber, 'poker', winnings);
+                    recordsToUpdate.push({
+                        phoneHash: SHA256(p.phoneNumber).toString(),
+                        gameType: 'poker',
+                        winnings,
+                        timestamp
+                    });
                 }
             }
         });
+
+        // Send all records in one API call
+        bulkUpdateWinnings(recordsToUpdate);
 
         const finalPlayers = updatedPlayers.map(p => {
             const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false };
@@ -342,17 +354,6 @@ export const usePokerGame = () => {
             if (newPots.length === 0) {
                 addMessage("All pots awarded. Hand is over.");
                 const finalPlayers = newPlayers.map(p => ({ ...p, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false }));
-
-                // UPDATE WINNINGS
-                finalPlayers.forEach(p => {
-                    if (p.phoneNumber) {
-                        const winnings = p.stack - p.totalBuyIn; // Simple diff for now
-                        if (winnings !== 0) {
-                            updateWinnings(p.phoneNumber, 'poker', winnings);
-                        }
-                    }
-                });
-
                 return {
                     ...prev,
                     players: finalPlayers.map(p => ({ ...p, totalBuyIn: p.stack })), // Reset buy-in for next hand

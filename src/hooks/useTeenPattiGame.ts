@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { GameState, Player, Entity } from '../types/gameTypes';
 import { loadStateFromLocalStorage, saveStateToLocalStorage } from '../utils/localStorage';
 import { toTitleCase } from '../utils/formatters';
-import { updateWinnings } from '../utils/winningsService'; // IMPORT
+import { bulkUpdateWinnings, type WinningsRecord } from '../utils/winningsService';
+import { SHA256 } from 'crypto-js';
 
 const createInitialGameState = (): GameState => ({
   players: [],
@@ -27,10 +28,12 @@ export const useTeenPattiGame = () => {
     return loadStateFromLocalStorage() || createInitialGameState();
   });
 
+  // --- Persistence ---
   useEffect(() => {
     saveStateToLocalStorage(gameState);
   }, [gameState]);
 
+  // --- Utility Functions ---
   const addMessage = useCallback((message: string, isError: boolean = false) => {
     setGameState(prev => ({
       ...prev,
@@ -38,6 +41,7 @@ export const useTeenPattiGame = () => {
     }));
   }, []);
 
+  // --- DERIVED STATE ---
   const { activePlayers, currentPlayer, precedingPlayer } = useMemo(() => {
     const active = gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
     const current = (gameState.roundActive && gameState.currentPlayerIndex >= 0) ? gameState.players[gameState.currentPlayerIndex] : null;
@@ -63,6 +67,7 @@ export const useTeenPattiGame = () => {
   }, [gameState.players, gameState.foldedPlayerIds, gameState.roundActive, gameState.currentPlayerIndex]);
 
 
+  // --- Core Game Logic ---
   const advanceTurn = useCallback(() => {
     setGameState(prev => {
       if (!prev.roundActive) return prev;
@@ -97,21 +102,34 @@ export const useTeenPattiGame = () => {
         finalMessages.push(`--- ROUND OVER ---`);
         finalMessages.push(`Congratulations! ${toTitleCase(winner.name)} won the pot of ₹${prev.potAmount}`);
 
-        // UPDATE WINNINGS
+        // **BATCH UPDATE LOGIC**
+        const recordsToUpdate: WinningsRecord[] = [];
+        const timestamp = new Date().toISOString();
+
         prev.players.forEach(player => {
           if (player.phoneNumber) {
             const contribution = prev.roundContributions.get(player.id) || 0;
             const winnings = player.id === winner.id ? prev.potAmount - contribution : -contribution;
+
             if (winnings !== 0) {
-              updateWinnings(player.phoneNumber, 'teen-patti', winnings);
+              recordsToUpdate.push({
+                phoneHash: SHA256(player.phoneNumber).toString(),
+                gameType: 'teen-patti',
+                winnings,
+                timestamp
+              });
             }
           }
         });
+
+        // Send all records in one API call
+        bulkUpdateWinnings(recordsToUpdate);
 
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
         );
         newLastWinnerId = winner.id;
+
       } else {
         finalMessages.push("Round ended with no winner determined.");
       }
@@ -126,6 +144,7 @@ export const useTeenPattiGame = () => {
     });
   }, []);
 
+  // --- Player Actions ---
   const startNewGame = (newPlayers: Player[]) => {
     setGameState({
       ...createInitialGameState(),
@@ -266,6 +285,7 @@ export const useTeenPattiGame = () => {
     const winner = checkForWinner(gameState.players, newFoldedIds);
     if (winner) {
       addMessage(`${toTitleCase(winner.name)} is the last player remaining.`);
+      // Temporarily update state to show the fold before ending the round
       setGameState(prev => ({ ...prev, foldedPlayerIds: newFoldedIds }));
       endRound(winner);
     } else {

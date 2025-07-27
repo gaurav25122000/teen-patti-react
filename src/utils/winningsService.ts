@@ -1,32 +1,38 @@
 // src/utils/winningsService.ts
 import { SHA256 } from 'crypto-js';
 
-// The base URL for your Netlify functions, which proxies requests securely.
 const FUNCTIONS_URL = '/.netlify/functions';
 
-// Hashes the phone number on the client-side before sending it.
+// Hashes the phone number on the client-side
 const hashPhoneNumber = (phoneNumber: string): string => {
     return SHA256(phoneNumber).toString();
 };
 
-export const updateWinnings = async (phoneNumber: string, gameType: 'teen-patti' | 'poker', amount: number): Promise<void> => {
-    const hashedPhone = hashPhoneNumber(phoneNumber);
+// Defines the structure for a single transaction record
+export interface WinningsRecord {
+    phoneHash: string;
+    gameType: 'teen-patti' | 'poker';
+    winnings: number;
+    timestamp: string;
+}
+
+// Sends a batch of winnings records to the serverless function
+export const bulkUpdateWinnings = async (records: WinningsRecord[]): Promise<void> => {
+    if (records.length === 0) {
+        return; // Don't make an API call if there's nothing to update
+    }
     try {
-        await fetch(`${FUNCTIONS_URL}/updateWinnings`, {
+        await fetch(`${FUNCTIONS_URL}/bulkUpdateWinnings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                phoneHash: hashedPhone,
-                gameType,
-                winnings: amount,
-                timestamp: new Date().toISOString(),
-            }),
+            body: JSON.stringify({ records }), // Send the array inside a 'records' property
         });
     } catch (error) {
-        console.error("Failed to update winnings via Netlify Function:", error);
+        console.error("Failed to bulk update winnings via Netlify Function:", error);
     }
 };
 
+// The getWinnings function remains unchanged
 export const getWinnings = async (phoneNumbers: string[]): Promise<any | null> => {
     const hashedPhones = phoneNumbers.map(hashPhoneNumber);
     try {
