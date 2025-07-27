@@ -8,9 +8,10 @@ exports.handler = async function (event) {
     try {
         const { phoneHash, gameType, winnings, timestamp } = JSON.parse(event.body);
         const { JSONSILO_API_KEY, JSONSILO_ID } = process.env;
-        const JSONSILO_URL = `https://jsonsilo.com/api/v1/silo/${JSONSILO_ID}`;
+        const JSONSILO_URL = `https://api.jsonsilo.com/${JSONSILO_ID}`;
 
         const getResponse = await fetch(JSONSILO_URL, { headers: { 'X-API-KEY': JSONSILO_API_KEY } });
+        console.log(getResponse);
         const record = getResponse.ok ? await getResponse.json() : {};
 
         if (!record[phoneHash]) {

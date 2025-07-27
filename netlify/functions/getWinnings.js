@@ -43,11 +43,12 @@ exports.handler = async function (event) {
     try {
         const { phoneHashes } = JSON.parse(event.body);
         const { JSONSILO_API_KEY, JSONSILO_ID } = process.env;
-        const JSONSILO_URL = `https://jsonsilo.com/api/v1/silo/${JSONSILO_ID}`;
+        const JSONSILO_URL = `https://api.jsonsilo.com/${JSONSILO_ID}`;
 
         const response = await fetch(JSONSILO_URL, {
             headers: { 'X-API-KEY': JSONSILO_API_KEY }
         });
+        console.log(response);
         if (!response.ok) throw new Error('Failed to fetch from JSONSilo.');
 
         const record = await response.json();
