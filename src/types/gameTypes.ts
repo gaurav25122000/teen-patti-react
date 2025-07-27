@@ -5,6 +5,7 @@ export interface Player {
   name: string;
   balance: number;
   entityId?: number;
+  phoneNumber?: string; // ADDED
 }
 
 export interface Entity {

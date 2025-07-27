@@ -1,0 +1,131 @@
+/* src/components/LifetimeWinnings.css */
+
+.winnings-container {
+    display: flex;
+    flex-direction: row;
+    gap: 2rem;
+    width: 100%;
+    margin-top: 2rem;
+}
+
+.graph-container {
+    flex: 3; /* Takes up 3/5 of the space */
+    min-width: 0; /* Important for flexbox shrinking */
+}
+
+.table-container {
+    flex: 2; /* Takes up 2/5 of the space */
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.summary-table, .transaction-log {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-glow-gold);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.15);
+}
+
+.summary-table h3, .transaction-log h3 {
+    font-family: var(--font-display);
+    color: var(--color-glow-gold);
+    text-shadow: 0 0 5px var(--color-glow-gold);
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+}
+
+.summary-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.summary-table th, .summary-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.summary-table th {
+    color: var(--color-glow-cyan);
+    font-family: var(--font-display);
+    font-size: 1.1em;
+}
+
+.summary-table td {
+    font-size: 1.2em;
+    font-family: var(--font-display);
+}
+
+.summary-table .total-winnings {
+    font-weight: bold;
+    color: var(--color-glow-lime);
+}
+
+.summary-table .total-losses {
+    font-weight: bold;
+    color: var(--color-glow-magenta);
+}
+
+.transaction-log .log-entries {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px; /* Space for scrollbar */
+}
+
+/* Custom Scrollbar for Transaction Log */
+.transaction-log .log-entries::-webkit-scrollbar {
+  width: 8px;
+}
+.transaction-log .log-entries::-webkit-scrollbar-track {
+  background: var(--color-bg);
+  border-radius: 4px;
+}
+.transaction-log .log-entries::-webkit-scrollbar-thumb {
+  background: var(--color-glow-gold);
+  border-radius: 4px;
+}
+.transaction-log .log-entries::-webkit-scrollbar-thumb:hover {
+  background: #ffd700;
+}
+
+
+.transaction-log table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.transaction-log th, .transaction-log td {
+    padding: 0.5rem;
+    text-align: left;
+    border-bottom: 1px dashed var(--color-border);
+    font-size: 0.9em;
+}
+.transaction-log th {
+    color: var(--color-text-muted);
+}
+.transaction-log td {
+     font-family: var(--font-display);
+}
+
+
+.win-amount {
+    color: var(--color-glow-lime);
+}
+
+.loss-amount {
+    color: var(--color-glow-magenta);
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 1024px) {
+    .winnings-container {
+        flex-direction: column;
+    }
+    .graph-container, .table-container {
+        flex: 1;
+        width: 100%;
+    }
+}

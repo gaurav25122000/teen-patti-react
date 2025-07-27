@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { PokerGameState, PokerPlayer, GameStage, Pot } from '../types/pokerGameTypes';
 import { calculatePots } from '../utils/pokerLogic';
 import { toTitleCase } from '../../utils/formatters';
+import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsService';
+import { SHA256 } from 'crypto-js';
 
 const POKER_STORAGE_KEY = 'pokerGameState';
 
@@ -94,6 +96,25 @@ export const usePokerGame = () => {
 
     const getEndOfHandState = useCallback((winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameState: PokerGameState): PokerGameState => {
         const totalPot = updatedPlayers.reduce((sum, p) => sum + p.totalPotContribution, 0);
+
+        const recordsToUpdate: WinningsRecord[] = [];
+        const timestamp = new Date().toISOString();
+
+        updatedPlayers.forEach(p => {
+            if (p.phoneNumber) {
+                const winnings = p.id === winner.id ? totalPot - p.totalPotContribution : -p.totalPotContribution;
+                if (winnings !== 0) {
+                    recordsToUpdate.push({
+                        phoneHash: SHA256(p.phoneNumber).toString(),
+                        gameType: 'poker',
+                        winnings,
+                        timestamp
+                    });
+                }
+            }
+        });
+
+        bulkUpdateWinnings(recordsToUpdate);
 
         const finalPlayers = updatedPlayers.map(p => {
             const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false };
@@ -231,10 +252,10 @@ export const usePokerGame = () => {
         });
     }, [addMessage, advanceToNextStageOrShowdown, getEndOfHandState]);
 
-    const setupGame = useCallback((players: { name: string, stack: number }[], blinds: { sb: number, bb: number }) => {
+    const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }) => {
         const initialPlayers: PokerPlayer[] = players.map((p, i) => ({
             id: i + 1, name: toTitleCase(p.name), stack: p.stack,
-            totalBuyIn: p.stack,
+            totalBuyIn: p.stack, phoneNumber: p.phoneNumber,
             inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false
         }));
 
@@ -328,22 +349,54 @@ export const usePokerGame = () => {
 
             const newPots = prev.pot.filter((_, index) => index !== potIndex);
 
+            // **FIXED: Check if this is the LAST pot being awarded**
             if (newPots.length === 0) {
                 addMessage("All pots awarded. Hand is over.");
+
+                // **BATCH UPDATE LOGIC ADDED HERE**
+                const recordsToUpdate: WinningsRecord[] = [];
+                const timestamp = new Date().toISOString();
+
+                // `newPlayers` now has the final stack totals after all pots are awarded
+                prev.players.forEach(p_initial => {
+                    if (p_initial.phoneNumber) {
+                        const p_final = newPlayers.find(p => p.id === p_initial.id);
+                        if (p_final) {
+                            // Net winnings = (Amount won from pots) - (Amount contributed to pot)
+                            const amountWon = p_final.stack - p_initial.stack;
+                            const finalWinnings = amountWon - p_initial.totalPotContribution;
+
+                            if (finalWinnings !== 0) {
+                                recordsToUpdate.push({
+                                    phoneHash: SHA256(p_initial.phoneNumber).toString(),
+                                    gameType: 'poker',
+                                    winnings: finalWinnings,
+                                    timestamp
+                                });
+                            }
+                        }
+                    }
+                });
+
+                bulkUpdateWinnings(recordsToUpdate);
+
+                // Reset players for the next hand
                 const finalPlayers = newPlayers.map(p => ({ ...p, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false }));
                 return {
                     ...prev,
-                    players: finalPlayers,
+                    players: finalPlayers.map(p => ({ ...p, totalBuyIn: p.stack })), // Reset buy-in for next hand
                     pot: [],
                     gameStage: 'pre-deal',
                     activePlayerIndex: -1,
                 };
             }
+
+            // If there are more pots to award, just update the player stacks and pot array
             return { ...prev, players: newPlayers, pot: newPots };
         });
     }, [addMessage]);
 
-    const addPlayer = useCallback((name: string, stack: number) => {
+    const addPlayer = useCallback((name: string, stack: number, phoneNumber: string) => {
         if (!name || stack < 0) return;
         setGameState(prev => {
             if (prev.gameStage !== 'pre-deal') {
@@ -356,6 +409,7 @@ export const usePokerGame = () => {
                 name: toTitleCase(name),
                 stack,
                 totalBuyIn: stack,
+                phoneNumber,
                 inHand: false,
                 isAllIn: false,
                 roundBet: 0,

@@ -4,21 +4,23 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { GameState, Player, Entity } from '../types/gameTypes';
 import { loadStateFromLocalStorage, saveStateToLocalStorage } from '../utils/localStorage';
 import { toTitleCase } from '../utils/formatters';
+import { bulkUpdateWinnings, type WinningsRecord } from '../utils/winningsService';
+import { SHA256 } from 'crypto-js';
 
 const createInitialGameState = (): GameState => ({
-    players: [],
-    entities: [],
-    lastWinnerId: null,
-    roundActive: false,
-    currentPlayerIndex: -1,
-    currentStake: 0,
-    potAmount: 0,
-    foldedPlayerIds: new Set<number>(),
-    blindPlayerIds: new Set<number>(),
-    lastActorWasBlind: false,
-    roundInitialBootAmount: null,
-    roundContributions: new Map<number, number>(),
-    messages: ["Welcome! Load a game or set up a new one."],
+  players: [],
+  entities: [],
+  lastWinnerId: null,
+  roundActive: false,
+  currentPlayerIndex: -1,
+  currentStake: 0,
+  potAmount: 0,
+  foldedPlayerIds: new Set<number>(),
+  blindPlayerIds: new Set<number>(),
+  lastActorWasBlind: false,
+  roundInitialBootAmount: null,
+  roundContributions: new Map<number, number>(),
+  messages: ["Welcome! Load a game or set up a new one."],
 });
 
 export const useTeenPattiGame = () => {
@@ -99,10 +101,35 @@ export const useTeenPattiGame = () => {
       if (winner) {
         finalMessages.push(`--- ROUND OVER ---`);
         finalMessages.push(`Congratulations! ${toTitleCase(winner.name)} won the pot of ₹${prev.potAmount}`);
+
+        // **BATCH UPDATE LOGIC**
+        const recordsToUpdate: WinningsRecord[] = [];
+        const timestamp = new Date().toISOString();
+
+        prev.players.forEach(player => {
+          if (player.phoneNumber) {
+            const contribution = prev.roundContributions.get(player.id) || 0;
+            const winnings = player.id === winner.id ? prev.potAmount - contribution : -contribution;
+
+            if (winnings !== 0) {
+              recordsToUpdate.push({
+                phoneHash: SHA256(player.phoneNumber).toString(),
+                gameType: 'teen-patti',
+                winnings,
+                timestamp
+              });
+            }
+          }
+        });
+
+        // Send all records in one API call
+        bulkUpdateWinnings(recordsToUpdate);
+
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
         );
         newLastWinnerId = winner.id;
+
       } else {
         finalMessages.push("Round ended with no winner determined.");
       }
@@ -303,9 +330,9 @@ export const useTeenPattiGame = () => {
     }
   };
 
-  const addPlayer = (name: string, balance: number) => {
+  const addPlayer = (name: string, balance: number, phoneNumber: string) => {
     const newId = gameState.players.length > 0 ? Math.max(...gameState.players.map(p => p.id)) + 1 : 1;
-    const newPlayer: Player = { id: newId, name: toTitleCase(name), balance };
+    const newPlayer: Player = { id: newId, name: toTitleCase(name), balance, phoneNumber };
     setGameState(prev => ({
       ...prev,
       players: [...prev.players, newPlayer]
