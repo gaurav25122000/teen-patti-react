@@ -49,6 +49,8 @@ exports.handler = async function (event) {
     try {
         const { phoneHashes } = JSON.parse(event.body);
         const { JSONSILO_API_KEY, JSONSILO_ID } = process.env;
+        console.log(JSONSILO_ID);
+        console.log(JSONSILO_API_KEY);
         const JSONSILO_URL = `https://api.jsonsilo.com/api/v1/manage/${JSONSILO_ID}`;
 
         const response = await fetch(JSONSILO_URL, { headers: { 'X-MAN-API': JSONSILO_API_KEY } });
