@@ -119,7 +119,6 @@ export const useTeenPattiGame = () => {
       return {
         ...createInitialGameState(),
         players: finalPlayers,
-        entities: prev.entities,
         lastWinnerId: newLastWinnerId,
         roundInitialBootAmount: lastBootFromRound,
         messages: finalMessages,
@@ -378,31 +377,29 @@ export const useTeenPattiGame = () => {
     });
   };
 
-  const actions = useMemo(() => ({
-    startNewGame,
-    loadGame,
-    startRound,
-    playBlind,
-    seeCards,
-    betChaal,
-    fold,
-    requestShow,
-    resolveShow,
-    endRound,
-    addPlayer,
-    removePlayer,
-    reorderPlayers,
-    deductAndDistribute,
-    updateEntities,
-    updatePlayers,
-  }), [endRound]); // Add dependencies here
-
   return {
     gameState,
     addMessage,
     activePlayers,
     currentPlayer,
     precedingPlayer,
-    actions
+    actions: {
+      startNewGame,
+      loadGame,
+      startRound,
+      playBlind,
+      seeCards,
+      betChaal,
+      fold,
+      requestShow,
+      resolveShow,
+      endRound,
+      addPlayer,
+      removePlayer,
+      reorderPlayers,
+      deductAndDistribute,
+      updateEntities,
+      updatePlayers,
+    }
   };
 };
