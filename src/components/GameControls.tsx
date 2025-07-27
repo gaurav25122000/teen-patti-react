@@ -12,10 +12,11 @@ interface GameControlsProps {
     onDeductAndDistribute: () => void;
     onShowOwings: () => void;
     onShowSetup: () => void;
+    onManageEntities: () => void;
 }
 
 const GameControls: React.FC<GameControlsProps> = (props) => {
-    const { gameState, onStartRound, onChangeBoot, onAddPlayer, onRemovePlayer, onReorderPlayers, onDeductAndDistribute, onShowOwings, onShowSetup } = props;
+    const { gameState, onStartRound, onChangeBoot, onAddPlayer, onRemovePlayer, onReorderPlayers, onDeductAndDistribute, onShowOwings, onShowSetup, onManageEntities } = props;
     const { roundActive, players, roundInitialBootAmount: lastBootAmount, lastWinnerId } = gameState;
 
     const canStartRound = !roundActive && players.length >= 2 && (lastBootAmount || lastWinnerId === null);
@@ -40,6 +41,9 @@ const GameControls: React.FC<GameControlsProps> = (props) => {
             </button>
             <button className="btn-danger" onClick={onDeductAndDistribute} disabled={roundActive || players.length < 2}>
                 Deduct & Distribute
+            </button>
+            <button className="btn-primary" onClick={onManageEntities} disabled={roundActive}>
+                Manage Entities
             </button>
             <button className="btn-success" onClick={onShowOwings} disabled={roundActive}>
                 Final Owings
