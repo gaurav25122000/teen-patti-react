@@ -32,10 +32,13 @@ const writeWinningsData = (data: any) => {
 };
 
 const handler: Handler = async (event) => {
+  console.log('updateWinnings function called');
   if (event.httpMethod !== 'POST') {
+    console.log('Invalid HTTP method:', event.httpMethod);
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
+  console.log('Request body:', event.body);
   const { hashedPhoneNumber, winningsUpdate } = JSON.parse(event.body || '{}');
 
   if (!hashedPhoneNumber || !winningsUpdate) {
