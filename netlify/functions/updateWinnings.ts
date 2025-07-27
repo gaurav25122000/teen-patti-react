@@ -2,7 +2,7 @@
 import { Handler } from '@netlify/functions';
 import fs from 'fs';
 import path from 'path';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const dataFilePath = path.resolve(process.cwd(), 'data', 'winnings.json');
 
