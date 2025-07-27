@@ -1,23 +1,24 @@
 // src/hooks/useTeenPattiGame.ts
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { GameState, Player } from '../types/gameTypes';
+import type { GameState, Player, Entity } from '../types/gameTypes';
 import { loadStateFromLocalStorage, saveStateToLocalStorage } from '../utils/localStorage';
 import { toTitleCase } from '../utils/formatters';
 
 const createInitialGameState = (): GameState => ({
-  players: [],
-  lastWinnerId: null,
-  roundActive: false,
-  currentPlayerIndex: -1,
-  currentStake: 0,
-  potAmount: 0,
-  foldedPlayerIds: new Set<number>(),
-  blindPlayerIds: new Set<number>(),
-  lastActorWasBlind: false,
-  roundInitialBootAmount: null,
-  roundContributions: new Map<number, number>(),
-  messages: ["Welcome! Load a game or set up a new one."],
+    players: [],
+    entities: [],
+    lastWinnerId: null,
+    roundActive: false,
+    currentPlayerIndex: -1,
+    currentStake: 0,
+    potAmount: 0,
+    foldedPlayerIds: new Set<number>(),
+    blindPlayerIds: new Set<number>(),
+    lastActorWasBlind: false,
+    roundInitialBootAmount: null,
+    roundContributions: new Map<number, number>(),
+    messages: ["Welcome! Load a game or set up a new one."],
 });
 
 export const useTeenPattiGame = () => {
@@ -335,6 +336,14 @@ export const useTeenPattiGame = () => {
     }));
   };
 
+  const updateEntities = (entities: Entity[]) => {
+    setGameState(prev => ({ ...prev, entities }));
+  };
+
+  const updatePlayers = (players: Player[]) => {
+    setGameState(prev => ({ ...prev, players }));
+  };
+
   const deductAndDistribute = (playerId: number, amount: number) => {
     setGameState(prev => {
       const { players } = prev;
@@ -382,6 +391,8 @@ export const useTeenPattiGame = () => {
       removePlayer,
       reorderPlayers,
       deductAndDistribute,
+      updateEntities,
+      updatePlayers,
     }
   };
 };
