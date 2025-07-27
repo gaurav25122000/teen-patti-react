@@ -6,34 +6,36 @@ exports.handler = async function (event) {
     }
 
     try {
-        const { phoneHash, gameType, winnings, timestamp } = JSON.parse(event.body);
+        const newRecord = JSON.parse(event.body);
         const { JSONSILO_API_KEY, JSONSILO_ID } = process.env;
-        const JSONSILO_URL = `https://api.jsonsilo.com/${JSONSILO_ID}`;
+        const JSONSILO_URL = `https://api.jsonsilo.com/api/v1/manage/${JSONSILO_ID}`;
 
-        const getResponse = await fetch(JSONSILO_URL, { headers: { 'X-API-KEY': JSONSILO_API_KEY } });
-        console.log(getResponse);
-        const record = getResponse.ok ? await getResponse.json() : {};
+        // Get the current array of records
+        const getResponse = await fetch(JSONSILO_URL, { headers: { 'X-MAN-API': JSONSILO_API_KEY } });
+        const allRecords = getResponse.ok ? await getResponse.json() : [];
 
-        if (!record[phoneHash]) {
-            record[phoneHash] = { teenPatti: [], poker: [] };
-        }
-        if (!record[phoneHash][gameType]) {
-            record[phoneHone][gameType] = [];
-        }
-        record[phoneHash][gameType].push({ amount: winnings, timestamp });
+        // Add the new record to the array
+        allRecords.push(newRecord);
 
+        // Write the updated array back
         await fetch(JSONSILO_URL, {
-            method: 'PUT',
+            method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
-                'X-API-KEY': JSONSILO_API_KEY
+                'X-MAN-API': JSONSILO_API_KEY
             },
-            body: JSON.stringify(record)
+            body: JSON.stringify({
+                "file_name": "bets-manager",
+                "file_data": allRecords,
+                "region_name": "api",
+                "is_public": false
+            })
         });
 
         return { statusCode: 200, body: JSON.stringify({ message: "Winnings updated." }) };
 
     } catch (error) {
+        console.error("Error in updateWinnings function:", error);
         return { statusCode: 500, body: JSON.stringify({ error: 'Failed to update winnings.' }) };
     }
 };
