@@ -97,24 +97,24 @@ export const usePokerGame = () => {
     const getEndOfHandState = useCallback((winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameState: PokerGameState): PokerGameState => {
         const totalPot = updatedPlayers.reduce((sum, p) => sum + p.totalPotContribution, 0);
 
-        // const recordsToUpdate: WinningsRecord[] = [];
-        // const timestamp = new Date().toISOString();
+        const recordsToUpdate: WinningsRecord[] = [];
+        const timestamp = new Date().toISOString();
 
-        // updatedPlayers.forEach(p => {
-        //     if (p.phoneNumber) {
-        //         const winnings = p.id === winner.id ? totalPot - p.totalPotContribution : -p.totalPotContribution;
-        //         if (winnings !== 0) {
-        //             recordsToUpdate.push({
-        //                 phoneHash: SHA256(p.phoneNumber).toString(),
-        //                 gameType: 'poker',
-        //                 winnings,
-        //                 timestamp
-        //             });
-        //         }
-        //     }
-        // });
+        updatedPlayers.forEach(p => {
+            if (p.phoneNumber) {
+                const winnings = p.id === winner.id ? totalPot - p.totalPotContribution : -p.totalPotContribution;
+                if (winnings !== 0) {
+                    recordsToUpdate.push({
+                        phoneHash: SHA256(p.phoneNumber).toString(),
+                        gameType: 'poker',
+                        winnings,
+                        timestamp
+                    });
+                }
+            }
+        });
 
-        // bulkUpdateWinnings(recordsToUpdate);
+        bulkUpdateWinnings(recordsToUpdate);
 
         const finalPlayers = updatedPlayers.map(p => {
             const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false };
