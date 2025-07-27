@@ -37,7 +37,7 @@ exports.handler = async function (event) {
                 body: JSON.stringify({
                     "file_name": "bets-manager",
                     "file_data": [
-                        record
+                        allRecords
                     ],
                     "region_name": "api",
                     "is_public": false
@@ -55,7 +55,7 @@ exports.handler = async function (event) {
                 headers: { 'X-MAN-API': JSONSILO_API_KEY }
             });
             const finalSiloData = verifyResponse.ok ? await verifyResponse.json() : {};
-            const finalRecords = finalSiloData.file_data || [];
+            const finalRecords = finalSiloData || [];
 
             // Step 5: Check if our write was successful
             if (finalRecords.length >= initialCount + 1) {
