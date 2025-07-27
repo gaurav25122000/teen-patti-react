@@ -1,14 +1,9 @@
 // src/utils/lifetimeWinningsLogic.ts
 import bcrypt from 'bcryptjs';
 
-const saltRounds = 10;
-
-export const hashPhoneNumber = async (phoneNumber: string) => {
-  return await bcrypt.hash(phoneNumber, saltRounds);
-};
-
 export const updateLifetimeWinnings = async (playerPhoneNumber: string, gameType: 'poker' | 'teenPatti', winnings: number) => {
-  const hashedPhoneNumber = await hashPhoneNumber(playerPhoneNumber);
+  const salt = await bcrypt.genSalt(10);
+  const hashedPhoneNumber = await bcrypt.hash(playerPhoneNumber, salt);
   const encodedHashedPhoneNumber = btoa(hashedPhoneNumber);
 
   const winningsUpdate = {

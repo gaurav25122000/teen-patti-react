@@ -25,7 +25,7 @@ const readWinningsData = () => {
   return {};
 };
 
-import { hashPhoneNumber } from '../../src/utils/lifetimeWinningsLogic';
+import { hashPhoneNumber } from './utils/hash';
 
 const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
