@@ -51,16 +51,16 @@ const EntityManager: React.FC<EntityManagerProps> = ({ isOpen, onClose, players,
                         onChange={(e) => setNewEntityName(e.target.value)}
                         placeholder="Entity Name"
                     />
-                    <button onClick={handleCreateEntity}>Create</button>
+                    <button className="btn-modal btn-primary" onClick={handleCreateEntity}>Create</button>
                 </div>
                 <hr />
                 <h3>Existing Entities</h3>
                 {entities.map(entity => (
                     <div key={entity.id} className="entity-item">
-                        <h4>{entity.name} <button onClick={() => handleDeleteEntity(entity.id)}>Delete</button></h4>
+                        <h4>{entity.name} <button className="btn-modal btn-danger" onClick={() => handleDeleteEntity(entity.id)}>Delete</button></h4>
                         <ul>
                             {players.filter(p => p.entityId === entity.id).map(p => (
-                                <li key={p.id}>{p.name} <button onClick={() => handleAddPlayerToEntity(p.id, null)}>Remove</button></li>
+                                <li key={p.id}>{p.name} <button className="btn-modal btn-error" onClick={() => handleAddPlayerToEntity(p.id, null)}>Remove</button></li>
                             ))}
                         </ul>
                         <div className="form-group">
