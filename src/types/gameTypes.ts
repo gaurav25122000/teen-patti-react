@@ -4,10 +4,17 @@ export interface Player {
   id: number;
   name: string;
   balance: number;
+  entityId?: number;
+}
+
+export interface Entity {
+    id: number;
+    name:string;
 }
 
 export interface GameState {
   players: Player[];
+  entities: Entity[];
   lastWinnerId: number | null;
   roundActive: boolean;
   currentPlayerIndex: number;

@@ -1,6 +1,6 @@
 // src/components/GameScreen.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import type { InteractionType, Player } from '../types/gameTypes';
+import type { InteractionType, Player, Entity } from '../types/gameTypes';
 import { useTeenPattiGame } from '../hooks/useTeenPattiGame';
 import PlayerList from './PlayerList';
 import ActionLog from './ActionLog';
@@ -9,6 +9,7 @@ import GameControls from './GameControls';
 import RoundControls from './RoundControls';
 import OwingsModal from './OwingsModal';
 import InteractionModal from './InteractionModal';
+import EntityManager from './EntityManager';
 import { calculateOwings, type Transaction } from '../utils/owingsLogic';
 import { toTitleCase } from '../utils/formatters';
 
@@ -31,6 +32,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
 
     const [interaction, setInteraction] = useState<InteractionType>('idle');
     const [showOwings, setShowOwings] = useState(false);
+    const [showEntityManager, setShowEntityManager] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
     // State for modals
@@ -74,7 +76,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
 
     const handleShowOwings = () => {
         const playersWithInitialBalance = gameState.players.map(p => ({ ...p, totalBuyIn: 0 }));
-        setTransactions(calculateOwings(playersWithInitialBalance));
+        setTransactions(calculateOwings(playersWithInitialBalance, gameState.entities));
         setShowOwings(true);
     };
 
@@ -242,6 +244,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                             onDeductAndDistribute={() => setInteraction('deductAndDistribute')}
                             onShowOwings={handleShowOwings}
                             onShowSetup={onShowSetup}
+                            onManageEntities={() => setShowEntityManager(true)}
                         />
                         {gameState.roundActive && currentPlayer && (
                             <RoundControls
@@ -267,6 +270,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                 onClose={() => setShowOwings(false)}
                 transactions={transactions}
             />
+
+            {showEntityManager && (
+                <EntityManager
+                    isOpen={showEntityManager}
+                    onClose={() => setShowEntityManager(false)}
+                    players={gameState.players}
+                    entities={gameState.entities}
+                    onUpdateEntities={actions.updateEntities}
+                    onUpdatePlayers={actions.updatePlayers}
+                />
+            )}
         </>
     );
 };

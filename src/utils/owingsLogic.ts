@@ -1,5 +1,6 @@
 // src/utils/owingsLogic.ts
 import { toTitleCase } from './formatters';
+import type { Entity } from '../types/gameTypes';
 
 interface PlayerBalance {
     name: string;
@@ -12,20 +13,61 @@ export interface Transaction {
     amount: number;
 }
 
-export const calculateOwings = (players: { name: string; stack?: number; balance?: number; totalBuyIn?: number }[]): Transaction[] => {
+export const calculateOwings = (
+    players: { name: string; stack?: number; balance?: number; totalBuyIn?: number; entityId?: number }[],
+    entities: Entity[] = []
+): Transaction[] => {
     // 1. Calculate Net Balance for each player
-    const balances: PlayerBalance[] = players.map(p => {
+    const playerBalances: PlayerBalance[] = players.map(p => {
         const currentAmount = p.stack ?? p.balance ?? 0;
-        const investedAmount = p.totalBuyIn ?? (p.stack !== undefined ? p.totalBuyIn : 0); // Handle Teen Patti case where buy-in isn't tracked
+        const investedAmount = p.totalBuyIn ?? (p.stack !== undefined ? p.totalBuyIn : 0);
         return {
             name: toTitleCase(p.name),
             net: currentAmount - investedAmount,
         };
     });
 
+    // Group players by entity
+    const entityBalances: { [key: number]: PlayerBalance[] } = {};
+    players.forEach(p => {
+        if (p.entityId) {
+            if (!entityBalances[p.entityId]) {
+                entityBalances[p.entityId] = [];
+            }
+            entityBalances[p.entityId].push({
+                name: toTitleCase(p.name),
+                net: (p.stack ?? p.balance ?? 0) - (p.totalBuyIn ?? (p.stack !== undefined ? p.totalBuyIn : 0)),
+            });
+        }
+    });
+
+    const aggregatedBalances: PlayerBalance[] = [];
+
+    // Add individual players (not in any entity)
+    players.forEach(p => {
+        if (!p.entityId) {
+            aggregatedBalances.push({
+                name: toTitleCase(p.name),
+                net: (p.stack ?? p.balance ?? 0) - (p.totalBuyIn ?? (p.stack !== undefined ? p.totalBuyIn : 0)),
+            });
+        }
+    });
+
+    // Add aggregated entity balances
+    for (const entityId in entityBalances) {
+        const entity = entities.find(e => e.id === Number(entityId));
+        if (entity) {
+            const totalNet = entityBalances[entityId].reduce((sum, p) => sum + p.net, 0);
+            aggregatedBalances.push({
+                name: toTitleCase(entity.name),
+                net: totalNet,
+            });
+        }
+    }
+
     // 2. Separate into Debtors and Creditors
-    const debtors = balances.filter(p => p.net < 0).map(p => ({ ...p, net: -p.net })); // Owed amounts are positive
-    const creditors = balances.filter(p => p.net > 0);
+    const debtors = aggregatedBalances.filter(p => p.net < 0).map(p => ({ ...p, net: -p.net })); // Owed amounts are positive
+    const creditors = aggregatedBalances.filter(p => p.net > 0);
 
     const transactions: Transaction[] = [];
 
