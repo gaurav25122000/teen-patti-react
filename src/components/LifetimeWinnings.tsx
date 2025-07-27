@@ -1,7 +1,8 @@
 // src/components/LifetimeWinnings.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { getWinnings } from '../utils/winningsService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import './LifetimeWinnings.css'; // Import the new CSS
 
 const LifetimeWinnings: React.FC = () => {
     const [phoneNumbers, setPhoneNumbers] = useState('');
@@ -29,6 +30,30 @@ const LifetimeWinnings: React.FC = () => {
 
     const COLORS = ['#00ffff', '#ff00ff', '#39ff14', '#ffd700', '#e8e8e8'];
 
+    // Memoize the processed data to avoid recalculating on every render
+    const processedTableData = useMemo(() => {
+        if (!winningsData) return null;
+
+        const summary: { [key: string]: { teenPatti: number, poker: number } } = {};
+        const allTransactions: any[] = [];
+
+        winningsData.teenPatti.players.forEach((p: any) => {
+            if (!summary[p.phoneHash]) summary[p.phoneHash] = { teenPatti: 0, poker: 0 };
+            summary[p.phoneHash].teenPatti = p.total;
+        });
+
+        winningsData.poker.players.forEach((p: any) => {
+            if (!summary[p.phoneHash]) summary[p.phoneHash] = { teenPatti: 0, poker: 0 };
+            summary[p.phoneHash].poker = p.total;
+        });
+
+        // This part needs the raw transaction data which is not currently returned by the function.
+        // For now, we will leave this empty and can be built out if the getWinnings function is updated.
+
+        return { summary, allTransactions };
+
+    }, [winningsData]);
+
     return (
         <div className="setup-screen">
             <h2>Lifetime Winnings</h2>
@@ -46,53 +71,75 @@ const LifetimeWinnings: React.FC = () => {
                 </button>
             </div>
             {error && <p style={{ color: 'var(--color-glow-magenta)', textAlign: 'center' }}>{error}</p>}
-            {winningsData && (
-                <div style={{ width: '100%', marginTop: '2rem' }}>
-                    <div className="stage-display" style={{ marginBottom: '2rem' }}>
-                        <h2>Teen Patti Winnings</h2>
-                    </div>
-                    <ResponsiveContainer width="100%" height={400}>
-                        <LineChart data={winningsData.teenPatti.trend}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-text-muted)" />
-                            <XAxis dataKey="date" stroke="var(--color-text)" />
-                            <YAxis stroke="var(--color-text)" />
-                            <Tooltip
-                                contentStyle={{
-                                    backgroundColor: 'var(--color-surface)',
-                                    border: '1px solid var(--color-glow-cyan)',
-                                    color: 'var(--color-text)'
-                                }}
-                                labelStyle={{ color: 'var(--color-glow-cyan)' }}
-                            />
-                            <Legend wrapperStyle={{ color: 'var(--color-text)' }}/>
-                            {winningsData.teenPatti.players.map((player: any, index: number) => (
-                                <Line key={player.phoneHash} type="monotone" dataKey={player.phoneHash} name={`Player ${index + 1}`} stroke={COLORS[index % COLORS.length]} strokeWidth={2} />
-                            ))}
-                        </LineChart>
-                    </ResponsiveContainer>
 
-                    <div className="stage-display" style={{ marginTop: '3rem', marginBottom: '2rem' }}>
-                        <h2>Poker Winnings</h2>
-                     </div>
-                     <ResponsiveContainer width="100%" height={400}>
-                        <LineChart data={winningsData.poker.trend}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-text-muted)" />
-                            <XAxis dataKey="date" stroke="var(--color-text)" />
-                            <YAxis stroke="var(--color-text)" />
-                            <Tooltip
-                                contentStyle={{
-                                    backgroundColor: 'var(--color-surface)',
-                                    border: '1px solid var(--color-glow-gold)',
-                                     color: 'var(--color-text)'
-                                }}
-                                labelStyle={{ color: 'var(--color-glow-gold)' }}
-                            />
-                            <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
-                            {winningsData.poker.players.map((player: any, index: number) => (
-                                <Line key={player.phoneHash} type="monotone" dataKey={player.phoneHash} name={`Player ${index + 1}`} stroke={COLORS[index % COLORS.length]} strokeWidth={2} />
-                            ))}
-                        </LineChart>
-                    </ResponsiveContainer>
+            {winningsData && processedTableData && (
+                <div className="winnings-container">
+
+                    <div className="graph-container">
+                        <div className="stage-display" style={{ marginBottom: '2rem' }}>
+                            <h2>Teen Patti Winnings</h2>
+                        </div>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={winningsData.teenPatti.trend}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-text-muted)" />
+                                <XAxis dataKey="date" stroke="var(--color-text)" />
+                                <YAxis stroke="var(--color-text)" />
+                                <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-cyan)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-cyan)' }} />
+                                <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
+                                {winningsData.teenPatti.players.map((p: any, i: number) => (
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
+                                ))}
+                            </LineChart>
+                        </ResponsiveContainer>
+
+                        <div className="stage-display" style={{ marginTop: '3rem', marginBottom: '2rem' }}>
+                            <h2>Poker Winnings</h2>
+                        </div>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={winningsData.poker.trend}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-text-muted)" />
+                                <XAxis dataKey="date" stroke="var(--color-text)" />
+                                <YAxis stroke="var(--color-text)" />
+                                <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-gold)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-gold)' }} />
+                                <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
+                                {winningsData.poker.players.map((p: any, i: number) => (
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
+                                ))}
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="table-container">
+                        <div className="summary-table">
+                            <h3>Player Summary</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Player</th>
+                                        <th>Teen Patti</th>
+                                        <th>Poker</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {Object.keys(processedTableData.summary).map((hash, i) => {
+                                        const totals = processedTableData.summary[hash];
+                                        const overallTotal = totals.teenPatti + totals.poker;
+                                        const totalClass = overallTotal >= 0 ? 'total-winnings' : 'total-losses';
+                                        return (
+                                            <tr key={hash}>
+                                                <td>Player {i + 1}</td>
+                                                <td className={totals.teenPatti >= 0 ? 'win-amount' : 'loss-amount'}>₹{totals.teenPatti.toFixed(2)}</td>
+                                                <td className={totals.poker >= 0 ? 'win-amount' : 'loss-amount'}>₹{totals.poker.toFixed(2)}</td>
+                                                <td className={totalClass}>₹{overallTotal.toFixed(2)}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        {/* The transaction log can be built out here if the raw data is passed from the API */}
+                    </div>
                 </div>
             )}
         </div>
