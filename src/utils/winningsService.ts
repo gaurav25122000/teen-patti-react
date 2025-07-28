@@ -11,6 +11,7 @@ const hashPhoneNumber = (phoneNumber: string): string => {
 // Defines the structure for a single transaction record
 export interface WinningsRecord {
     phoneHash: string;
+    playerName: string; // Add playerName
     gameType: 'teen-patti' | 'poker';
     winnings: number;
     timestamp: string;

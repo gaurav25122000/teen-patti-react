@@ -106,6 +106,7 @@ export const usePokerGame = () => {
                 if (winnings !== 0) {
                     recordsToUpdate.push({
                         phoneHash: SHA256(p.phoneNumber).toString(),
+                        playerName: p.name,
                         gameType: 'poker',
                         winnings,
                         timestamp
@@ -365,6 +366,7 @@ export const usePokerGame = () => {
                             if (finalWinnings !== 0) {
                                 recordsToUpdate.push({
                                     phoneHash: SHA256(p_initial.phoneNumber).toString(),
+                                    playerName: p_initial.name,
                                     gameType: 'poker',
                                     winnings: finalWinnings,
                                     timestamp

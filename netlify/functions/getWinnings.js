@@ -21,6 +21,7 @@ const processDataForChart = (allRecords, requestedHashes, gameType) => {
 
     const trend = [];
     const cumulativeTotals = {}; // e.g., { phoneHash1: 100, phoneHash2: -50 }
+    const playerNames = {}; // to store player names
     requestedHashes.forEach(hash => {
         cumulativeTotals[hash] = 0;
     });
@@ -46,10 +47,18 @@ const processDataForChart = (allRecords, requestedHashes, gameType) => {
         trend.push(trendPoint);
     });
 
+    // Capture player names
+    allRecords.forEach(rec => {
+        if(requestedHashes.includes(rec.phone_hash) && rec.player_name) {
+            playerNames[rec.phone_hash] = rec.player_name;
+        }
+    });
+
     // 5. Get the final total winnings for each player
     const players = requestedHashes
         .map(hash => ({
             phoneHash: hash,
+            playerName: playerNames[hash] || 'Unknown',
             total: cumulativeTotals[hash] || 0
         }));
 
@@ -66,7 +75,7 @@ export default async (req) => {
         const sql = neon();
 
         const allRecords = await sql`
-            SELECT phone_hash, game_type, winnings, timestamp FROM winnings
+            SELECT phone_hash, player_name, game_type, winnings, timestamp FROM winnings
             WHERE phone_hash = ANY(${phoneHashes})
         `;
 

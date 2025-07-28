@@ -113,6 +113,7 @@ export const useTeenPattiGame = () => {
             if (winnings !== 0) {
               recordsToUpdate.push({
                 phoneHash: SHA256(player.phoneNumber).toString(),
+                playerName: player.name,
                 gameType: 'teen-patti',
                 winnings,
                 timestamp

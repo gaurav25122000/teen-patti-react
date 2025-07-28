@@ -19,8 +19,8 @@ export default async (req) => {
         await sql.transaction(
             newRecords.map(record =>
                 sql`
-                    INSERT INTO winnings (phone_hash, game_type, winnings, "timestamp")
-                    VALUES (${record.phoneHash}, ${record.gameType}, ${record.winnings}, ${record.timestamp})
+                    INSERT INTO winnings (phone_hash, player_name, game_type, winnings, "timestamp")
+                    VALUES (${record.phoneHash}, ${record.playerName}, ${record.gameType}, ${record.winnings}, ${record.timestamp})
                 `
             )
         );
