@@ -1,59 +1,40 @@
 // netlify/functions/bulkUpdateWinnings.js
 
-exports.handler = async function (event) {
-    if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: 'Method Not Allowed' };
+import { neon } from '@netlify/neon';
+
+export default async (req) => {
+    if (req.method !== 'POST') {
+        return new Response('Method Not Allowed', { status: 405 });
     }
 
     try {
-        const { records: newRecords } = JSON.parse(event.body);
+        const { records: newRecords } = await req.json();
 
         if (!newRecords || !Array.isArray(newRecords) || newRecords.length === 0) {
-            return { statusCode: 400, body: 'Bad Request: No records provided to update.' };
+            return new Response('Bad Request: No records provided to update.', { status: 400 });
         }
 
-        const { JSONSILO_API_KEY, JSONSILO_ID } = process.env;
-        const MANAGE_URL = `https://api.jsonsilo.com/api/v1/manage/${JSONSILO_ID}`;
+        const sql = neon(process.env.DATABASE_URL);
 
-        // Get the current array of records from the silo
-        const getResponse = await fetch(MANAGE_URL, {
-            headers: { 'X-MAN-API': JSONSILO_API_KEY }
+        await sql.transaction(
+            newRecords.map(record =>
+                sql`
+                    INSERT INTO winnings (phone_hash, game_type, winnings, "timestamp")
+                    VALUES (${record.phoneHash}, ${record.gameType}, ${record.winnings}, ${record.timestamp})
+                `
+            )
+        );
+
+
+        return new Response(JSON.stringify({ message: "Bulk update successful." }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
         });
-
-        const existingRecords = getResponse.ok ? await getResponse.json() : {};
-
-        // Combine the existing records with the new batch of records
-        const combinedRecords = existingRecords.concat(newRecords);
-
-        // Write the complete, updated array back to the silo in a single PATCH operation
-        const patchResponse = await fetch(MANAGE_URL, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-MAN-API': JSONSILO_API_KEY
-            },
-            body: JSON.stringify({
-                "file_name": "bets-manager",
-                "file_data": combinedRecords,
-                "region_name": "api",
-                "is_public": false
-            })
-        });
-
-        if (!patchResponse.ok) {
-            throw new Error(`PATCH request to JsonSilo failed with status: ${patchResponse.status}`);
-        }
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ message: "Bulk update successful." })
-        };
 
     } catch (error) {
         console.error("Error in bulkUpdateWinnings function:", error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: 'Failed to bulk update winnings.' })
-        };
+        return new Response(JSON.stringify({ error: 'Failed to bulk update winnings.' }), {
+            status: 500
+        });
     }
 };

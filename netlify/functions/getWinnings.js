@@ -1,10 +1,12 @@
 // netlify/functions/getWinnings.js
 
+import { neon } from '@netlify/neon';
+
 // This function processes the array of raw transactions for charting
 const processDataForChart = (allRecords, requestedHashes, gameType) => {
     // 1. Filter records for the relevant game type and players, then sort by date
     const relevantRecords = allRecords
-        .filter(rec => rec.gameType === gameType && requestedHashes.includes(rec.phoneHash))
+        .filter(rec => rec.game_type === gameType && requestedHashes.includes(rec.phone_hash))
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
     const trend = [];
@@ -17,8 +19,8 @@ const processDataForChart = (allRecords, requestedHashes, gameType) => {
 
     // 2. Create a trend point for each transaction
     relevantRecords.forEach(rec => {
-        cumulativeTotals[rec.phoneHash] += rec.winnings;
-        
+        cumulativeTotals[rec.phone_hash] += parseFloat(rec.winnings);
+
         const trendPoint = {
             date: new Date(rec.timestamp).toLocaleDateString()
         };
@@ -27,7 +29,7 @@ const processDataForChart = (allRecords, requestedHashes, gameType) => {
         for (const hash in cumulativeTotals) {
             trendPoint[hash] = cumulativeTotals[hash];
         }
-        
+
         trend.push(trendPoint);
     });
 
@@ -41,33 +43,30 @@ const processDataForChart = (allRecords, requestedHashes, gameType) => {
     return { trend, players };
 };
 
-exports.handler = async function (event) {
-    if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req) => {
+    if (req.method !== 'POST') {
+        return new Response('Method Not Allowed', { status: 405 });
     }
 
     try {
-        const { phoneHashes } = JSON.parse(event.body);
-        const { JSONSILO_API_KEY, JSONSILO_ID } = process.env;
-        console.log(JSONSILO_ID);
-        console.log(JSONSILO_API_KEY);
-        const JSONSILO_URL = `https://api.jsonsilo.com/api/v1/manage/${JSONSILO_ID}`;
+        const { phoneHashes } = await req.json();
+        const sql = neon(process.env.DATABASE_URL);
 
-        const response = await fetch(JSONSILO_URL, { headers: { 'X-MAN-API': JSONSILO_API_KEY } });
-        console.log(response);
-        const allRecords = response.ok ? await response.json() : [];
-        console.log(allRecords);
-        
+        const allRecords = await sql`
+            SELECT phone_hash, game_type, winnings, timestamp FROM winnings
+            WHERE phone_hash IN ${sql(phoneHashes)}
+        `;
+
         const teenPattiData = processDataForChart(allRecords, phoneHashes, 'teen-patti');
         const pokerData = processDataForChart(allRecords, phoneHashes, 'poker');
 
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ teenPatti: teenPattiData, poker: pokerData })
-        };
+        return new Response(JSON.stringify({ teenPatti: teenPattiData, poker: pokerData }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
 
     } catch (error) {
-         console.error("Error in getWinnings function:", error);
-        return { statusCode: 500, body: JSON.stringify({ error: 'Failed to get winnings.' }) };
+        console.error("Error in getWinnings function:", error);
+        return new Response(JSON.stringify({ error: 'Failed to get winnings.' }), { status: 500 });
     }
 };
