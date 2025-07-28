@@ -1,4 +1,3 @@
-// src/components/LifetimeWinnings.tsx
 import React, { useState, useMemo } from 'react';
 import { getWinnings } from '../utils/winningsService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -50,9 +49,37 @@ const LifetimeWinnings: React.FC = () => {
             summary[p.phoneHash].poker = p.total;
         });
 
-        const allRecords = winningsData.allRecords.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        const allRecords = winningsData.allRecords.sort((a: any, b: any) => {
+            const nameA = a.player_name.toUpperCase();
+            const nameB = b.player_name.toUpperCase();
+            if (nameA < nameB) {
+                return -1;
+            }
+            if (nameA > nameB) {
+                return 1;
+            }
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+        });
 
-        return { summary, allRecords };
+        const summaryArray = Object.keys(summary)
+            .map(hash => ({
+                hash,
+                ...summary[hash]
+            }))
+            .sort((a, b) => {
+                const nameA = a.playerName.toUpperCase();
+                const nameB = b.playerName.toUpperCase();
+                if (nameA < nameB) {
+                    return -1;
+                }
+                if (nameA > nameB) {
+                    return 1;
+                }
+                return 0;
+            });
+
+
+        return { summary, allRecords, summaryArray };
 
     }, [winningsData]);
 
@@ -90,15 +117,14 @@ const LifetimeWinnings: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {Object.keys(processedTableData.summary).map((hash) => {
-                                        const totals = processedTableData.summary[hash];
-                                        const overallTotal = totals.teenPatti + totals.poker;
+                                    {processedTableData.summaryArray.map((playerSummary) => {
+                                        const overallTotal = playerSummary.teenPatti + playerSummary.poker;
                                         const totalClass = overallTotal >= 0 ? 'total-winnings' : 'total-losses';
                                         return (
-                                            <tr key={hash}>
-                                                <td>{toTitleCase(totals.playerName)}</td>
-                                                <td className={totals.teenPatti >= 0 ? 'win-amount' : 'loss-amount'}>₹{totals.teenPatti.toFixed(2)}</td>
-                                                <td className={totals.poker >= 0 ? 'win-amount' : 'loss-amount'}>₹{totals.poker.toFixed(2)}</td>
+                                            <tr key={playerSummary.hash}>
+                                                <td>{toTitleCase(playerSummary.playerName)}</td>
+                                                <td className={playerSummary.teenPatti >= 0 ? 'win-amount' : 'loss-amount'}>₹{playerSummary.teenPatti.toFixed(2)}</td>
+                                                <td className={playerSummary.poker >= 0 ? 'win-amount' : 'loss-amount'}>₹{playerSummary.poker.toFixed(2)}</td>
                                                 <td className={totalClass}>₹{overallTotal.toFixed(2)}</td>
                                             </tr>
                                         );
@@ -149,8 +175,8 @@ const LifetimeWinnings: React.FC = () => {
                                 <YAxis stroke="var(--color-text)" />
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-cyan)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-cyan)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
-                                {winningsData.teenPatti.players.map((p: any) => (
-                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={toTitleCase(p.playerName)} stroke={COLORS[Object.keys(processedTableData.summary).indexOf(p.phoneHash) % COLORS.length]} strokeWidth={2} />
+                                {winningsData.teenPatti.players.map((p: any, i: number) => (
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={toTitleCase(p.playerName)} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>
                         </ResponsiveContainer>
@@ -165,8 +191,8 @@ const LifetimeWinnings: React.FC = () => {
                                 <YAxis stroke="var(--color-text)" />
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-gold)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-gold)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
-                                {winningsData.poker.players.map((p: any) => (
-                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={toTitleCase(p.playerName)} stroke={COLORS[Object.keys(processedTableData.summary).indexOf(p.phoneHash) % COLORS.length]} strokeWidth={2} />
+                                {winningsData.poker.players.map((p: any, i: number) => (
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={toTitleCase(p.playerName)} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>
                         </ResponsiveContainer>
