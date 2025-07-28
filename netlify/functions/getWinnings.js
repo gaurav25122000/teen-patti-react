@@ -50,7 +50,7 @@ export default async (req) => {
 
     try {
         const { phoneHashes } = await req.json();
-        const sql = neon(process.env.DATABASE_URL);
+        const sql = neon();
 
         const allRecords = await sql`
             SELECT phone_hash, game_type, winnings, timestamp FROM winnings

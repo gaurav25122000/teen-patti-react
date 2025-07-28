@@ -14,7 +14,7 @@ export default async (req) => {
             return new Response('Bad Request: No records provided to update.', { status: 400 });
         }
 
-        const sql = neon(process.env.DATABASE_URL);
+        const sql = neon();
 
         await sql.transaction(
             newRecords.map(record =>
