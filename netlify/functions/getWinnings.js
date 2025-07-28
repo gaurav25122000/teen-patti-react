@@ -52,7 +52,10 @@ export default async (req) => {
         const { phoneHashes } = await req.json();
         const sql = neon({arrayMode: true});
 
-        const allRecords = await sql("SELECT phone_hash, game_type, winnings, timestamp FROM winnings WHERE phone_hash IN $1", phoneHashes)
+        const allRecords = await sql`
+            SELECT phone_hash, game_type, winnings, timestamp FROM winnings
+            WHERE phone_hash = ANY(${phoneHashes})
+        `;
         console.log(allRecords);
 
 
