@@ -2,7 +2,8 @@
 
 .winnings-layout {
     display: flex;
-    flex-direction: column; /* Changed to column for top-down layout */
+    flex-direction: column;
+    /* Changed to column for top-down layout */
     gap: 2rem;
     width: 100%;
     margin-top: 2rem;
@@ -22,7 +23,8 @@
     border-radius: 8px;
     padding: 1.5rem;
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.15);
-    overflow-x: auto; /* Allow horizontal scrolling on very small screens */
+    overflow-x: auto;
+    /* Allow horizontal scrolling on very small screens */
 }
 
 .summary-table h3 {
@@ -39,11 +41,13 @@
     border-collapse: collapse;
 }
 
-.summary-table th, .summary-table td {
+.summary-table th,
+.summary-table td {
     padding: 0.75rem;
     text-align: left;
     border-bottom: 1px solid var(--color-border);
-    white-space: nowrap; /* Prevent text wrapping in table cells */
+    white-space: nowrap;
+    /* Prevent text wrapping in table cells */
 }
 
 .summary-table th {
@@ -80,17 +84,21 @@
     .summary-table {
         padding: 1rem;
     }
+
     .summary-table h3 {
         font-size: 1.2em;
     }
+
     .summary-table th {
         font-size: 0.9em;
         padding: 0.5rem;
     }
+
     .summary-table td {
         font-size: 1em;
         padding: 0.5rem;
     }
+
     .graph-container .stage-display h2 {
         font-size: 1.5rem;
     }

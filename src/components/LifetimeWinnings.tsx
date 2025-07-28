@@ -1,8 +1,8 @@
-// src/components/LifetimeWinnings.tsx
 import React, { useState, useMemo } from 'react';
 import { getWinnings } from '../utils/winningsService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './LifetimeWinnings.css'; // Import the updated CSS
+import { toTitleCase } from '../utils/formatters';
 
 const LifetimeWinnings: React.FC = () => {
     const [phoneNumbers, setPhoneNumbers] = useState('');
@@ -34,18 +34,35 @@ const LifetimeWinnings: React.FC = () => {
         if (!winningsData) return null;
 
         const summary: { [key: string]: { teenPatti: number, poker: number } } = {};
+        const playerHashMap: { [key: string]: string } = {};
+        let playerCounter = 1;
 
         winningsData.teenPatti.players.forEach((p: any) => {
-            if (!summary[p.phoneHash]) summary[p.phoneHash] = { teenPatti: 0, poker: 0 };
+            if (!summary[p.phoneHash]) {
+                summary[p.phoneHash] = { teenPatti: 0, poker: 0 };
+                playerHashMap[p.phoneHash] = `Player ${playerCounter++}`;
+            }
             summary[p.phoneHash].teenPatti = p.total;
         });
 
         winningsData.poker.players.forEach((p: any) => {
-            if (!summary[p.phoneHash]) summary[p.phoneHash] = { teenPatti: 0, poker: 0 };
+            if (!summary[p.phoneHash]) {
+                summary[p.phoneHash] = { teenPatti: 0, poker: 0 };
+                if (!playerHashMap[p.phoneHash]) {
+                    playerHashMap[p.phoneHash] = `Player ${playerCounter++}`;
+                }
+            }
             summary[p.phoneHash].poker = p.total;
         });
 
-        return { summary };
+        const allRecords = winningsData.allRecords
+            .map((rec: any) => ({
+                ...rec,
+                playerName: playerHashMap[rec.phone_hash] || 'Unknown Player',
+            }))
+            .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        return { summary, allRecords, playerHashMap };
 
     }, [winningsData]);
 
@@ -83,13 +100,13 @@ const LifetimeWinnings: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {Object.keys(processedTableData.summary).map((hash, i) => {
+                                    {Object.keys(processedTableData.summary).map((hash) => {
                                         const totals = processedTableData.summary[hash];
                                         const overallTotal = totals.teenPatti + totals.poker;
                                         const totalClass = overallTotal >= 0 ? 'total-winnings' : 'total-losses';
                                         return (
                                             <tr key={hash}>
-                                                <td>Player {i + 1}</td>
+                                                <td>{processedTableData.playerHashMap[hash]}</td>
                                                 <td className={totals.teenPatti >= 0 ? 'win-amount' : 'loss-amount'}>₹{totals.teenPatti.toFixed(2)}</td>
                                                 <td className={totals.poker >= 0 ? 'win-amount' : 'loss-amount'}>₹{totals.poker.toFixed(2)}</td>
                                                 <td className={totalClass}>₹{overallTotal.toFixed(2)}</td>
@@ -101,7 +118,36 @@ const LifetimeWinnings: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Graph Container is below the table */}
+                    {/* New Detailed Winnings Table */}
+                    <div className="table-container">
+                        <div className="summary-table">
+                            <h3>Per Game Winnings</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Player</th>
+                                        <th>Game</th>
+                                        <th>Winnings</th>
+                                        <th>Timestamp</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {processedTableData.allRecords.map((record: any, index: number) => (
+                                        <tr key={index}>
+                                            <td>{record.playerName}</td>
+                                            <td>{toTitleCase(record.game_type)}</td>
+                                            <td className={record.winnings >= 0 ? 'win-amount' : 'loss-amount'}>
+                                                ₹{parseFloat(record.winnings).toFixed(2)}
+                                            </td>
+                                            <td>{new Date(record.timestamp).toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Graph Container is below the tables */}
                     <div className="graph-container">
                         <div className="stage-display" style={{ marginBottom: '2rem' }}>
                             <h2>Teen Patti Winnings Trend</h2>
@@ -114,7 +160,7 @@ const LifetimeWinnings: React.FC = () => {
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-cyan)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-cyan)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
                                 {winningsData.teenPatti.players.map((p: any, i: number) => (
-                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={processedTableData.playerHashMap[p.phoneHash]} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>
                         </ResponsiveContainer>
@@ -130,7 +176,7 @@ const LifetimeWinnings: React.FC = () => {
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-gold)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-gold)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
                                 {winningsData.poker.players.map((p: any, i: number) => (
-                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={processedTableData.playerHashMap[p.phoneHash]} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>
                         </ResponsiveContainer>
