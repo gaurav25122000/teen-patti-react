@@ -56,7 +56,9 @@ export default async (req) => {
             SELECT phone_hash, game_type, winnings, timestamp FROM winnings
             WHERE phone_hash IN (${sql(phoneHashes)})
         `;
-
+        console.log(allRecords);
+        console.log(`SELECT phone_hash, game_type, winnings, timestamp FROM winnings
+            WHERE phone_hash IN (${sql(phoneHashes)})`)
         const teenPattiData = processDataForChart(allRecords, phoneHashes, 'teen-patti');
         const pokerData = processDataForChart(allRecords, phoneHashes, 'poker');
 
