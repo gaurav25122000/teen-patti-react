@@ -1,31 +1,44 @@
-// netlify/functions/getWinnings.js
-
 import { neon } from '@netlify/neon';
 
 // This function processes the array of raw transactions for charting
 const processDataForChart = (allRecords, requestedHashes, gameType) => {
-    // 1. Filter records for the relevant game type and players, then sort by date
+    // 1. Filter for relevant records and sort chronologically. This is crucial.
     const relevantRecords = allRecords
         .filter(rec => rec.game_type === gameType && requestedHashes.includes(rec.phone_hash))
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
+    // 2. Aggregate all winnings by date to handle multiple transactions in a single day.
+    const dailyAggregations = {}; // e.g., { '2025-07-28': { hash1: 150, hash2: -50 } }
+    relevantRecords.forEach(rec => {
+        const date = new Date(rec.timestamp).toISOString().split('T')[0];
+        if (!dailyAggregations[date]) {
+            dailyAggregations[date] = {};
+        }
+        // Sum up winnings for the same player on the same day
+        const winnings = parseFloat(rec.winnings);
+        dailyAggregations[date][rec.phone_hash] = (dailyAggregations[date][rec.phone_hash] || 0) + winnings;
+    });
+
     const trend = [];
     const cumulativeTotals = {}; // e.g., { phoneHash1: 100, phoneHash2: -50 }
-
-    // Initialize totals for all requested players
     requestedHashes.forEach(hash => {
         cumulativeTotals[hash] = 0;
     });
 
-    // 2. Create a trend point for each transaction
-    relevantRecords.forEach(rec => {
-        cumulativeTotals[rec.phone_hash] += parseFloat(rec.winnings);
+    // 3. Get sorted dates to process in chronological order
+    const sortedDates = Object.keys(dailyAggregations).sort();
 
-        const trendPoint = {
-            date: new Date(rec.timestamp).toLocaleDateString()
-        };
+    // 4. Create a single, cumulative trend point for each date
+    sortedDates.forEach(date => {
+        const dailyChanges = dailyAggregations[date];
 
-        // Add the current cumulative total for each player at this point in time
+        // Update cumulative totals with the aggregated changes for this day
+        for (const hash in dailyChanges) {
+            cumulativeTotals[hash] += dailyChanges[hash];
+        }
+
+        // Create the trend point for this date with the new cumulative totals
+        const trendPoint = { date };
         for (const hash in cumulativeTotals) {
             trendPoint[hash] = cumulativeTotals[hash];
         }
@@ -33,7 +46,7 @@ const processDataForChart = (allRecords, requestedHashes, gameType) => {
         trend.push(trendPoint);
     });
 
-    // 3. Get the final total winnings for each player
+    // 5. Get the final total winnings for each player
     const players = requestedHashes
         .map(hash => ({
             phoneHash: hash,
@@ -56,8 +69,6 @@ export default async (req) => {
             SELECT phone_hash, game_type, winnings, timestamp FROM winnings
             WHERE phone_hash = ANY(${phoneHashes})
         `;
-        console.log(allRecords);
-
 
         const teenPattiData = processDataForChart(allRecords, phoneHashes, 'teen-patti');
         const pokerData = processDataForChart(allRecords, phoneHashes, 'poker');

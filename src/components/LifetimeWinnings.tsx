@@ -114,7 +114,7 @@ const LifetimeWinnings: React.FC = () => {
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-cyan)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-cyan)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
                                 {winningsData.teenPatti.players.map((p: any, i: number) => (
-                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>
                         </ResponsiveContainer>
@@ -130,7 +130,7 @@ const LifetimeWinnings: React.FC = () => {
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-gold)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-gold)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
                                 {winningsData.poker.players.map((p: any, i: number) => (
-                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={`Player ${i + 1}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>
                         </ResponsiveContainer>
