@@ -51,12 +51,10 @@ export default async (req) => {
     try {
         const { phoneHashes } = await req.json();
         const sql = neon();
-        console.log(phoneHashes);
-        console.log(phoneHashes.join(','));
 
         const allRecords = await sql`
             SELECT phone_hash, game_type, winnings, timestamp FROM winnings
-            WHERE phone_hash IN (${phoneHashes.join(',')})
+            WHERE phone_hash IN (${phoneHashes.map(item => `'${item}'`).join(',')})
         `;
         const teenPattiData = processDataForChart(allRecords, phoneHashes, 'teen-patti');
         const pokerData = processDataForChart(allRecords, phoneHashes, 'poker');
