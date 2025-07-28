@@ -54,7 +54,7 @@ export default async (req) => {
 
         const allRecords = await sql`
             SELECT phone_hash, game_type, winnings, timestamp FROM winnings
-            WHERE phone_hash IN ${sql.valueList(phoneHashes)}
+            WHERE phone_hash IN (${sql(phoneHashes)})
         `;
 
         const teenPattiData = processDataForChart(allRecords, phoneHashes, 'teen-patti');
