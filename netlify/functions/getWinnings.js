@@ -56,6 +56,8 @@ export default async (req) => {
             SELECT phone_hash, game_type, winnings, timestamp FROM winnings
             WHERE phone_hash IN (${phoneHashes.map(item => `'${item}'`).join(',')})
         `;
+        console.log(`(${phoneHashes.map(item => `'${item}'`).join(',')})`);
+
         const teenPattiData = processDataForChart(allRecords, phoneHashes, 'teen-patti');
         const pokerData = processDataForChart(allRecords, phoneHashes, 'poker');
 
