@@ -381,7 +381,7 @@ export const usePokerGame = () => {
                 const finalPlayers = newPlayers.map(p => ({ ...p, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false }));
                 return {
                     ...prev,
-                    players: finalPlayers.map(p => ({ ...p, totalBuyIn: p.stack })), // Reset buy-in for next hand
+                    players: finalPlayers.map(p => ({ ...p, totalBuyIn: p.totalBuyIn })), 
                     pot: [],
                     gameStage: 'pre-deal',
                     activePlayerIndex: -1,
