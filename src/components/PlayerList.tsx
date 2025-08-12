@@ -11,6 +11,8 @@ interface PlayerListProps {
 }
 
 const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlayer }) => {
+    const netBalance = players.reduce((acc, player) => acc + player.balance, 0);
+
     return (
         <div className="player-list">
             <h3>Players ({players.length})</h3>
@@ -54,6 +56,13 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
                         );
                     })}
                 </tbody>
+                 <tfoot>
+                    <tr>
+                        <td colSpan={2}>Net Balance</td>
+                        <td>₹ {netBalance}</td>
+                        <td colSpan={2}></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     );
