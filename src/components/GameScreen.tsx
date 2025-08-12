@@ -167,10 +167,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                             </select>
                         </div>
                     ) : <p>Error initializing showdown.</p>;
-                    const cost = gameState.blindPlayerIds.has(requester.id) ? gameState.currentStake : gameState.currentStake * 2;
+                    
                     primaryAction = () => {
-                        actions.resolveShow(parseInt(selectedPlayerId, 10));
+                        const cost = gameState.blindPlayerIds.has(requester.id) ? gameState.currentStake : gameState.currentStake * 2;
                         actions.requestShow(cost);
+                        actions.resolveShow(parseInt(selectedPlayerId, 10));
                         addMessage(`${toTitleCase(requester.name)} pays ₹ ${cost} for Show with ${toTitleCase(target.name)}.`);
                         closeModal();
                     };
