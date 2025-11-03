@@ -47,6 +47,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
 
     useEffect(() => {
         if (interaction === 'idle') return;
+        const activeGamePlayers = gameState.players.filter(p => !p.isTakingBreak);
 
         switch (interaction) {
             case 'gettingBoot':
@@ -59,10 +60,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                 break;
             case 'removingPlayer':
             case 'deductAndDistribute':
+            case 'toggleBreak': // ADDED
                 if (gameState.players.length > 0) setSelectedPlayerId(String(gameState.players[0].id));
                 break;
             case 'gettingStartPlayer':
-                if (gameState.players.length > 0) setStartPlayerId(String(gameState.players[0].id));
+                // MODIFIED: Default to first active player
+                if (activeGamePlayers.length > 0) {
+                    setStartPlayerId(String(activeGamePlayers[0].id));
+                } else if (gameState.players.length > 0) {
+                    setStartPlayerId(String(gameState.players[0].id))
+                }
                 break;
             case 'selectingWinner':
                 if (activePlayers.length > 0) setSelectedPlayerId(String(activePlayers[0].id));
@@ -82,14 +89,32 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
 
     const handleStartRound = useCallback(() => {
         const { lastWinnerId, roundInitialBootAmount, players } = gameState;
-        const winnerIndex = players.findIndex(p => p.id === lastWinnerId);
+        
+        // Find active players
+        const activeGamePlayers = players.filter(p => !p.isTakingBreak);
+        if (activeGamePlayers.length < 2) {
+          addMessage("Not enough active players to start a round.", true);
+          return;
+        }
+
+        const winner = players.find(p => p.id === lastWinnerId);
+        
+        // Find the index of the winner in the *full* players array
+        const winnerIndex = winner ? players.indexOf(winner) : -1;
 
         if (lastWinnerId !== null && roundInitialBootAmount && winnerIndex !== -1) {
-            actions.startRound((winnerIndex + 1) % players.length, roundInitialBootAmount);
+            // Start with the player *after* the last winner
+            let nextPlayerIndex = (winnerIndex + 1) % players.length;
+            
+            // Find the next *active* player to start
+            while (players[nextPlayerIndex].isTakingBreak) {
+                nextPlayerIndex = (nextPlayerIndex + 1) % players.length;
+            }
+            actions.startRound(nextPlayerIndex, roundInitialBootAmount);
         } else {
             setInteraction('gettingBoot');
         }
-    }, [gameState, actions]);
+    }, [gameState, actions, addMessage]);
 
     const handleShowClick = () => {
         const requester = currentPlayer;
@@ -131,8 +156,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                 break;
 
             case 'gettingStartPlayer':
-                title = "Select Starting Player"; theme = 'confirmation'; icon = <IconPlay />;
-                body = <div className="form-group"><label htmlFor="start-player-select">Who starts?</label><select id="start-player-select" value={startPlayerId} onChange={e => setStartPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div>;
+                { title = "Select Starting Player"; theme = 'confirmation'; icon = <IconPlay />;
+                // MODIFIED: Filter out players on break
+                const activeGamePlayers = gameState.players.filter(p => !p.isTakingBreak);
+                body = <div className="form-group"><label htmlFor="start-player-select">Who starts?</label><select id="start-player-select" value={startPlayerId} onChange={e => setStartPlayerId(e.target.value)}>{
+                  activeGamePlayers.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)
+                }</select></div>;
                 primaryAction = () => {
                     const playerIndex = gameState.players.findIndex(p => p.id === parseInt(startPlayerId, 10));
                     if (playerIndex > -1) {
@@ -140,7 +169,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                         closeModal();
                     }
                 };
-                break;
+                break; }
 
             case 'selectingWinner':
                 title = "Select Round Winner"; theme = 'success'; icon = <IconTrophy />;
@@ -207,6 +236,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                 };
                 break;
 
+            // ADDED CASE
+            case 'toggleBreak':
+                title = "Toggle Player Break"; 
+                theme = 'default'; 
+                icon = <IconUsers />; // Re-using icon
+                body = <div className="form-group"><label>Select player to toggle break status</label><select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)} ({p.isTakingBreak ? "On Break" : "Active"})</option>)}</select></div>;
+                confirmText = "Confirm";
+                primaryAction = () => {
+                    actions.togglePlayerBreak(parseInt(selectedPlayerId, 10));
+                    closeModal();
+                };
+                break;
+
             case 'reorderingPlayers':
                 {
                     const movePlayer = (index: number, direction: 'up' | 'down') => {
@@ -259,6 +301,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                             onShowOwings={handleShowOwings}
                             onShowSetup={onShowSetup}
                             onManageEntities={() => setShowEntityManager(true)}
+                            onTogglePlayerBreak={() => setInteraction('toggleBreak')} // ADDED
                         />
                         {gameState.roundActive && currentPlayer && (
                             <RoundControls

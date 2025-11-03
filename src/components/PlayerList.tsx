@@ -33,7 +33,10 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
                         const contribution = gameState.roundContributions.get(p.id) || 0;
                         let status = "Waiting";
 
-                        if (gameState.roundActive) {
+                        // MODIFIED LOGIC
+                        if (p.isTakingBreak) {
+                            status = "On Break";
+                        } else if (gameState.roundActive) {
                             if (isFolded) {
                                 status = "Folded";
                             } else {
@@ -42,7 +45,8 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
                             }
                         }
 
-                        const className = `${isFolded ? 'folded' : ''} ${isCurrent ? 'current-player' : ''}`;
+                        // MODIFIED CLASSNAME
+                        const className = `${isFolded ? 'folded' : ''} ${isCurrent ? 'current-player' : ''} ${p.isTakingBreak ? 'on-break' : ''}`;
 
                         return (
                             <tr key={p.id} className={className}>

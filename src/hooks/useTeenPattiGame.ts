@@ -133,9 +133,17 @@ export const useTeenPattiGame = () => {
         finalMessages.push("Round ended with no winner determined.");
       }
 
+      // Preserve 'isTakingBreak' status when resetting game state
+      const playerBreakStatus = new Map(prev.players.map(p => [p.id, p.isTakingBreak]));
+      const finalPlayersWithBreakStatus = finalPlayers.map(p => ({
+        ...p,
+        isTakingBreak: playerBreakStatus.get(p.id) || false
+      }));
+
+
       return {
         ...createInitialGameState(),
-        players: finalPlayers,
+        players: finalPlayersWithBreakStatus, // Use players with break status
         lastWinnerId: newLastWinnerId,
         roundInitialBootAmount: lastBootFromRound,
         messages: finalMessages,
@@ -147,7 +155,7 @@ export const useTeenPattiGame = () => {
   const startNewGame = (newPlayers: Player[]) => {
     setGameState({
       ...createInitialGameState(),
-      players: newPlayers,
+      players: newPlayers.map(p => ({ ...p, isTakingBreak: false })), // Ensure break status is reset
       messages: newPlayers.length > 0 ? [`New game started with ${newPlayers.length} players. Please set the boot amount.`] : ["Returning to setup..."],
     });
   };
@@ -155,6 +163,8 @@ export const useTeenPattiGame = () => {
   const loadGame = () => {
     const loadedState = loadStateFromLocalStorage();
     if (loadedState) {
+      // Ensure new properties are initialized if loading old state
+      loadedState.players = loadedState.players.map(p => ({ ...p, isTakingBreak: p.isTakingBreak || false }));
       setGameState(loadedState);
       addMessage("Saved game loaded.");
       return true;
@@ -166,20 +176,47 @@ export const useTeenPattiGame = () => {
   const startRound = (startingPlayerIndex: number, bootAmount: number) => {
     localStorage.setItem('poker-notes', "Game \nBUST - \nJOKER - ");
     setGameState(prev => {
+      // MODIFIED: Filter out players on break
+      const activePlayersForRound = prev.players.filter(p => !p.isTakingBreak);
+      if (activePlayersForRound.length < 2) {
+        addMessage("Not enough active players to start a round.", true);
+        return prev;
+      }
+      const activePlayerIds = new Set(activePlayersForRound.map(p => p.id));
+      
+      // MODIFIED: Find the next *active* starting player
+      let finalStartingPlayerIndex = startingPlayerIndex;
+      if (!activePlayerIds.has(prev.players[finalStartingPlayerIndex].id)) {
+        addMessage("Selected start player is on break. Finding next active player...");
+        do {
+          finalStartingPlayerIndex = (finalStartingPlayerIndex + 1) % prev.players.length;
+        } while (!activePlayerIds.has(prev.players[finalStartingPlayerIndex].id));
+      }
+      
       let newPot = 0;
       const newContributions = new Map<number, number>();
+      
+      // MODIFIED: Collect boot only from active players
       const updatedPlayers = prev.players.map(p => {
-        newPot += bootAmount;
-        newContributions.set(p.id, bootAmount);
-        return { ...p, balance: p.balance - bootAmount };
+        if (activePlayerIds.has(p.id)) {
+          newPot += bootAmount;
+          newContributions.set(p.id, bootAmount);
+          return { ...p, balance: p.balance - bootAmount };
+        }
+        return p; // No change for players on break
       });
-      const initialBlindPlayerIds = new Set(updatedPlayers.map(p => p.id));
-      const startingPlayer = updatedPlayers[startingPlayerIndex];
+
+      // MODIFIED: Blind players are only active players
+      const initialBlindPlayerIds = new Set(activePlayersForRound.map(p => p.id));
+      // MODIFIED: Folded players are those on break
+      const initialFoldedPlayerIds = new Set(prev.players.filter(p => p.isTakingBreak).map(p => p.id));
+
+      const startingPlayer = updatedPlayers[finalStartingPlayerIndex];
 
       const messages = [
         ...prev.messages,
         `--- NEW ROUND STARTED ---`,
-        `Collecting Boot Amount: ₹${bootAmount} from each player.`,
+        `Collecting Boot Amount: ₹${bootAmount} from ${activePlayersForRound.length} active players.`,
         `Total Pot: ₹${newPot}.`,
         `Turn starts with ${toTitleCase(startingPlayer.name)}.`
       ];
@@ -189,10 +226,10 @@ export const useTeenPattiGame = () => {
         players: updatedPlayers,
         roundActive: true,
         blindPlayerIds: initialBlindPlayerIds,
-        currentPlayerIndex: startingPlayerIndex,
+        currentPlayerIndex: finalStartingPlayerIndex,
         currentStake: bootAmount,
         potAmount: newPot,
-        foldedPlayerIds: new Set<number>(),
+        foldedPlayerIds: initialFoldedPlayerIds,
         roundContributions: newContributions,
         lastActorWasBlind: true,
         roundInitialBootAmount: bootAmount,
@@ -329,7 +366,13 @@ export const useTeenPattiGame = () => {
 
   const addPlayer = (name: string, balance: number, phoneNumber: string) => {
     const newId = gameState.players.length > 0 ? Math.max(...gameState.players.map(p => p.id)) + 1 : 1;
-    const newPlayer: Player = { id: newId, name: toTitleCase(name), balance, phoneNumber };
+    const newPlayer: Player = { 
+      id: newId, 
+      name: toTitleCase(name), 
+      balance, 
+      phoneNumber,
+      isTakingBreak: false // ADDED
+    };
     setGameState(prev => ({
       ...prev,
       players: [...prev.players, newPlayer]
@@ -394,6 +437,24 @@ export const useTeenPattiGame = () => {
     });
   };
 
+  // ADDED
+  const togglePlayerBreak = useCallback((playerId: number) => {
+    setGameState(prev => {
+        if (prev.roundActive) {
+            addMessage("Can only take a break between hands.", true);
+            return prev;
+        }
+        const newPlayers = prev.players.map(p =>
+            p.id === playerId ? { ...p, isTakingBreak: !p.isTakingBreak } : p
+        );
+        const player = prev.players.find(p => p.id === playerId);
+        if (player) {
+            addMessage(`${toTitleCase(player.name)} is now ${!player.isTakingBreak ? 'on a break' : 'back'}.`);
+        }
+        return { ...prev, players: newPlayers };
+    });
+  }, [addMessage]);
+
   return {
     gameState,
     addMessage,
@@ -417,6 +478,7 @@ export const useTeenPattiGame = () => {
       deductAndDistribute,
       updateEntities,
       updatePlayers,
+      togglePlayerBreak, // ADDED
     }
   };
 };

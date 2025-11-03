@@ -5,7 +5,8 @@ export interface Player {
   name: string;
   balance: number;
   entityId?: number;
-  phoneNumber?: string; // ADDED
+  phoneNumber?: string; 
+  isTakingBreak: boolean; // ADDED
 }
 
 export interface Entity {
@@ -38,4 +39,5 @@ export type InteractionType =
   | 'selectingWinner'
   | 'showingCards'
   | 'reorderingPlayers'
-  | 'deductAndDistribute';
+  | 'deductAndDistribute'
+  | 'toggleBreak'; // ADDED
