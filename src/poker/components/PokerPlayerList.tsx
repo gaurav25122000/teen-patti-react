@@ -31,15 +31,19 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                         const isCurrent = index === activePlayerIndex && gameStage !== 'pre-deal';
 
                         let status = '';
-                        if (isDealer) status += ' (D)';
-                        if (isSB) status += ' (SB)';
-                        if (isBB) status += ' (BB)';
-                        if (!p.inHand && gameStage !== 'pre-deal') status = 'Folded';
-                        if (p.isAllIn) status = 'All-In';
+                        if (p.isTakingBreak) {
+                            status = ' (On Break)';
+                        } else if (gameStage !== 'pre-deal') {
+                            if (isDealer) status += ' (D)';
+                            if (isSB) status += ' (SB)';
+                            if (isBB) status += ' (BB)';
+                            if (!p.inHand) status = 'Folded';
+                            if (p.isAllIn) status = 'All-In';
+                        }
 
 
                         return (
-                            <tr key={p.id} className={!p.inHand && gameStage !== 'pre-deal' ? 'folded' : (isCurrent ? 'current-player' : '')}>
+                            <tr key={p.id} className={!p.inHand && gameStage !== 'pre-deal' ? 'folded' : (isCurrent ? 'current-player' : (p.isTakingBreak ? 'on-break' : ''))}>
                                 <td data-label="Name">{toTitleCase(p.name)} {status}</td>
                                 <td data-label="Stack / Buy-In">₹ {p.stack} / ₹ {p.totalBuyIn}</td>
                                 <td data-label="Round Bet">₹ {p.roundBet}</td>

@@ -11,6 +11,8 @@ export interface PokerPlayer {
     isAllIn: boolean;
     roundBet: number;
     totalPotContribution: number;
+    isTakingBreak: boolean; // ADDED
+    canOnlyCall: boolean; // ADDED
 }
 
 export type GameStage = 'pre-deal' | 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown';

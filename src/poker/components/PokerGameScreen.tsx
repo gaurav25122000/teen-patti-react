@@ -14,7 +14,7 @@ interface PokerGameScreenProps {
     onInteractionChange: (isOpen: boolean) => void;
 }
 
-type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown' | 'owings';
+type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown' | 'owings' | 'toggleBreak';
 
 const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteractionChange }) => {
     const { gameState, actions } = pokerHook;
@@ -56,7 +56,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         if (modalMode === 'showdown' && pot.length > 0 && pot[0].eligiblePlayers.size > 0) {
             setSelectedWinnerId(Array.from(pot[0].eligiblePlayers)[0]);
         }
-        if ((modalMode === 'removePlayer' || modalMode === 'addChips') && players.length > 0 && !managePlayerId) {
+        if ((modalMode === 'removePlayer' || modalMode === 'addChips' || modalMode === 'toggleBreak') && players.length > 0 && !managePlayerId) {
             setManagePlayerId(String(players[0].id));
         } else if (modalMode === 'addPlayer') {
             setManagePlayerId('');
@@ -98,6 +98,10 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             case 'addChips':
                 if (!managePlayerId) return alert("Please select a player.");
                 actions.addChipsToPlayer(parseInt(managePlayerId, 10), parseInt(addChipsAmount, 10));
+                break;
+            case 'toggleBreak':
+                if (!managePlayerId) return alert("Please select a player.");
+                actions.togglePlayerBreak(parseInt(managePlayerId, 10));
                 break;
         }
         closeModal();
@@ -143,6 +147,10 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         <div className="form-group"><label>Amount to Add</label><input type="number" value={addChipsAmount} onChange={e => setAddChipsAmount(e.target.value)} /></div>
                     </>;
                     break;
+                case 'toggleBreak':
+                    title = "Toggle Player Break";
+                    body = <div className="form-group"><label>Select Player</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>;
+                    break;
             }
 
             footer = <><button className="btn-modal btn-modal-secondary" onClick={closeModal}>Cancel</button><button className={`btn-modal btn-modal-primary theme-${theme}`} onClick={handleManagePlayers}>Confirm</button></>;
@@ -184,6 +192,9 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         <button className="btn-secondary" onClick={() => setModalMode('addChips')} disabled={gameStage !== 'pre-deal'}>Manage Rebuys</button>
                         <button className="btn-secondary" onClick={() => setModalMode('addPlayer')} disabled={gameStage !== 'pre-deal'}>Add Player</button>
                         <button className="btn-danger" onClick={() => setModalMode('removePlayer')} disabled={gameStage !== 'pre-deal' || players.length < 1}>Remove Player</button>
+                        <button className="btn-secondary" onClick={() => setModalMode('toggleBreak')} disabled={gameStage !== 'pre-deal'}>
+                            Toggle Player Break
+                        </button>
                         <button className="btn-success" onClick={handleShowOwings} disabled={gameStage !== 'pre-deal'}>
                             Final Owings
                         </button>

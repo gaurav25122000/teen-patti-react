@@ -15,10 +15,14 @@ const PokerRoundControls: React.FC<PokerRoundControlsProps> = ({ gameState, curr
     const { currentBet, lastRaiseAmount, bigBlindAmount } = gameState;
     const canCheck = currentPlayer.roundBet >= currentBet;
     const callAmount = Math.min(currentBet - currentPlayer.roundBet, currentPlayer.stack);
+    const isFacingAllInCall = !canCheck && callAmount === currentPlayer.stack;
 
     // This is the core fix for the min-raise logic
     const minRaiseIncrement = lastRaiseAmount || bigBlindAmount;
     const minRaiseTotal = currentBet + minRaiseIncrement;
+
+    // Check if player is allowed to raise
+    const canRaise = !currentPlayer.canOnlyCall && currentPlayer.stack > callAmount && !isFacingAllInCall;
 
     useEffect(() => {
         // Set the default raise amount in the input box to the minimum legal raise
@@ -62,27 +66,42 @@ const PokerRoundControls: React.FC<PokerRoundControlsProps> = ({ gameState, curr
                 </div>
             </div>
             <div className="game-actions">
-                <button className="btn-error" onClick={() => actions.handlePlayerAction('fold')}>Fold</button>
-                {canCheck ? (
-                    <button className="btn-secondary" onClick={() => actions.handlePlayerAction('check')}>Check</button>
+                <button className="btn-error btn-action-lg" onClick={() => actions.handlePlayerAction('fold')}>Fold</button>
+                
+                {isFacingAllInCall ? (
+                    <button className="btn-primary btn-action-lg" onClick={() => actions.handlePlayerAction('call')}>
+                        All-in (Call ₹ {callAmount})
+                    </button>
+                ) : canCheck ? (
+                    <button className="btn-secondary btn-action-lg" onClick={() => actions.handlePlayerAction('check')}>Check</button>
                 ) : (
-                    <button className="btn-primary" onClick={() => actions.handlePlayerAction('call')}>Call (₹ {callAmount})</button>
+                    <button className="btn-primary btn-action-lg" onClick={() => actions.handlePlayerAction('call')}>
+                        Call (₹ {callAmount})
+                    </button>
                 )}
-                <div className="inline-input-group">
-                    <input
-                        type="number"
-                        step={minRaiseIncrement}
-                        value={raiseAmount}
-                        onChange={(e) => setRaiseAmount(e.target.value)}
-                        min={minRaiseTotal}
-                        placeholder={`Min ${minRaiseTotal}`}
-                    />
-                    {currentBet > 0 ?
-                        <button className="btn-success" onClick={handleRaise}>Raise To</button> :
-                        <button className="btn-success" onClick={handleBet}>Bet</button>
-                    }
-                </div>
-                <button className="btn-accent rainbow-outline" onClick={() => actions.handlePlayerAction('all-in')}>All-In (₹ {currentPlayer.stack})</button>
+                
+                {canRaise && (
+                    <div className="inline-input-group">
+                        <input
+                            type="number"
+                            step={minRaiseIncrement}
+                            value={raiseAmount}
+                            onChange={(e) => setRaiseAmount(e.target.value)}
+                            min={minRaiseTotal}
+                            placeholder={`Min ${minRaiseTotal}`}
+                        />
+                        {currentBet > 0 ?
+                            <button className="btn-success btn-action-lg" onClick={handleRaise}>Raise To</button> :
+                            <button className="btn-success btn-action-lg" onClick={handleBet}>Bet</button>
+                        }
+                    </div>
+                )}
+                
+                {!isFacingAllInCall && (
+                    <button className="btn-accent rainbow-outline btn-action-lg" onClick={() => actions.handlePlayerAction('all-in')}>
+                        All-In (₹ {currentPlayer.stack})
+                    </button>
+                )}
             </div>
         </div>
     );

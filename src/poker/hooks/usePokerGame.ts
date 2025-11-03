@@ -86,7 +86,7 @@ export const usePokerGame = () => {
         const newStage = nextStageMap[currentState.gameStage];
         addMessage(`--- Dealing the ${toTitleCase(newStage)} ---`);
 
-        const newPlayers = currentState.players.map(p => ({ ...p, roundBet: 0, hasActed: false }));
+        const newPlayers = currentState.players.map(p => ({ ...p, roundBet: 0, hasActed: false, canOnlyCall: false }));
         let newActiveIndex = currentState.dealerButtonIndex;
         do { newActiveIndex = (newActiveIndex + 1) % newPlayers.length; } while (!newPlayers[newActiveIndex].inHand || newPlayers[newActiveIndex].isAllIn);
 
@@ -118,7 +118,7 @@ export const usePokerGame = () => {
         bulkUpdateWinnings(recordsToUpdate);
 
         const finalPlayers = updatedPlayers.map(p => {
-            const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false };
+            const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false, canOnlyCall: false };
             if (p.id === winner.id) {
                 return { ...playerWithReset, stack: p.stack + totalPot };
             }
@@ -148,6 +148,7 @@ export const usePokerGame = () => {
             let newLastRaiseAmount = prev.lastRaiseAmount;
 
             player.hasActed = true;
+            player.canOnlyCall = false; // Any action resets this flag for the current player
 
             switch (action) {
                 case 'fold':
@@ -202,7 +203,12 @@ export const usePokerGame = () => {
                     player.totalPotContribution += costToPlayer;
                     player.roundBet = amount;
                     newCurrentBet = amount;
-                    players.forEach((p: PokerPlayer) => { if (p.id !== player.id) p.hasActed = false });
+                    players.forEach((p: PokerPlayer) => {
+                        if (p.id !== player.id) {
+                            p.hasActed = false;
+                            p.canOnlyCall = false;
+                        }
+                    });
                     break;
                 }
                 case 'all-in': {
@@ -214,14 +220,38 @@ export const usePokerGame = () => {
                     player.stack = 0;
                     player.isAllIn = true;
                     if (totalBet > newCurrentBet) {
+                        // This all-in is a raise.
                         const raiseAmount = totalBet - newCurrentBet;
                         const minRaise = newLastRaiseAmount || prev.bigBlindAmount;
                         if (raiseAmount >= minRaise) {
+                            // This is a "full" or "valid" raise. Action is re-opened for everyone.
                             newLastRaiseAmount = raiseAmount;
-                            players.forEach((p: PokerPlayer) => { if (p.id !== player.id) p.hasActed = false });
+                            players.forEach((p: PokerPlayer) => {
+                                if (p.id !== player.id) {
+                                    p.hasActed = false;
+                                    p.canOnlyCall = false; // Everyone can act freely
+                                }
+                            });
                             addMessage(`This is a valid raise. Action re-opened.`);
+                        } else {
+                            // This is an "incomplete" raise.
+                            players.forEach((p: PokerPlayer) => {
+                                if (p.id !== player.id && p.inHand && !p.isAllIn) {
+                                    if (p.roundBet < totalBet) {
+                                        // They must act again (call or fold).
+                                        p.hasActed = false;
+                                        // If they already matched the *previous* bet, they can only call.
+                                        if (p.roundBet === newCurrentBet) {
+                                            p.canOnlyCall = true;
+                                        } else {
+                                            p.canOnlyCall = false; // They haven't even called the prev bet, they can raise.
+                                        }
+                                    }
+                                }
+                            });
+                            addMessage(`This all-in is not a full raise. Players may only call or fold.`);
                         }
-                        newCurrentBet = totalBet;
+                        newCurrentBet = totalBet; // The new bet to match is the all-in amount
                     }
                     break;
                 }
@@ -257,7 +287,8 @@ export const usePokerGame = () => {
         const initialPlayers: PokerPlayer[] = players.map((p, i) => ({
             id: i + 1, name: toTitleCase(p.name), stack: p.stack,
             totalBuyIn: p.stack, phoneNumber: p.phoneNumber,
-            inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false
+            inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false,
+            isTakingBreak: false, canOnlyCall: false
         }));
 
         setGameState({
@@ -272,23 +303,32 @@ export const usePokerGame = () => {
 
     const startNewHand = useCallback(() => {
         setGameState(prev => {
-            const playersWithChips = prev.players.filter(p => p.stack > 0);
+            // UPDATED LOGIC: Filter out players on break or with no chips
+            const playersWithChips = prev.players.filter(p => p.stack > 0 && !p.isTakingBreak);
             if (playersWithChips.length < 2) {
-                addMessage("Not enough players with stacks to start a hand.");
+                addMessage("Not enough active players with stacks to start a hand.");
                 return prev;
             }
+            
+            const activePlayerIds = new Set(playersWithChips.map(p => p.id));
 
             let newDealerIndex = prev.dealerButtonIndex;
-            do { newDealerIndex = (newDealerIndex + 1) % prev.players.length; } while (prev.players[newDealerIndex].stack === 0);
+            do { newDealerIndex = (newDealerIndex + 1) % prev.players.length; } while (!activePlayerIds.has(prev.players[newDealerIndex].id));
 
             let newSmallBlindIndex = newDealerIndex;
-            do { newSmallBlindIndex = (newSmallBlindIndex + 1) % prev.players.length; } while (prev.players[newSmallBlindIndex].stack === 0);
+            do { newSmallBlindIndex = (newSmallBlindIndex + 1) % prev.players.length; } while (!activePlayerIds.has(prev.players[newSmallBlindIndex].id));
 
             let newBigBlindIndex = newSmallBlindIndex;
-            do { newBigBlindIndex = (newBigBlindIndex + 1) % prev.players.length; } while (prev.players[newBigBlindIndex].stack === 0);
+            do { newBigBlindIndex = (newBigBlindIndex + 1) % prev.players.length; } while (!activePlayerIds.has(prev.players[newBigBlindIndex].id));
 
             const newPlayers = prev.players.map(p => ({
-                ...p, inHand: p.stack > 0, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false,
+                ...p, 
+                inHand: activePlayerIds.has(p.id), // This line now correctly deals out players on break
+                isAllIn: false, 
+                roundBet: 0, 
+                totalPotContribution: 0, 
+                hasActed: false,
+                canOnlyCall: false
             }));
 
             const sbPlayer = newPlayers[newSmallBlindIndex];
@@ -378,7 +418,7 @@ export const usePokerGame = () => {
 
                 bulkUpdateWinnings(recordsToUpdate);
 
-                const finalPlayers = newPlayers.map(p => ({ ...p, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false }));
+                const finalPlayers = newPlayers.map(p => ({ ...p, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false, canOnlyCall: false }));
                 return {
                     ...prev,
                     players: finalPlayers.map(p => ({ ...p, totalBuyIn: p.totalBuyIn })), 
@@ -410,7 +450,9 @@ export const usePokerGame = () => {
                 isAllIn: false,
                 roundBet: 0,
                 totalPotContribution: 0,
-                hasActed: false
+                hasActed: false,
+                isTakingBreak: false, 
+                canOnlyCall: false 
             };
             addMessage(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
             return { ...prev, players: [...prev.players, newPlayer] };
@@ -454,9 +496,27 @@ export const usePokerGame = () => {
         });
     }, [addMessage]);
 
+    const togglePlayerBreak = useCallback((playerId: number) => {
+        setGameState(prev => {
+            if (prev.gameStage !== 'pre-deal') {
+                addMessage("Can only take a break between hands.");
+                return prev;
+            }
+            const newPlayers = prev.players.map(p =>
+                p.id === playerId ? { ...p, isTakingBreak: !p.isTakingBreak } : p
+            );
+            const player = prev.players.find(p => p.id === playerId);
+            if (player) {
+                addMessage(`${toTitleCase(player.name)} is now ${!player.isTakingBreak ? 'on a break' : 'back'}.`);
+            }
+            return { ...prev, players: newPlayers };
+        });
+    }, [addMessage]);
+
+
     const actions = useMemo(() => ({
-        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer
-    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer]);
+        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak
+    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak]);
 
     return { gameState, actions };
 };
