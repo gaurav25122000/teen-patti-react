@@ -438,6 +438,7 @@ export const useBlackjackGame = () => {
         });
     };
     
+    // This function is defined *inside* the hook, so it has access to `endRoundAndPay_internal`
     const setHandStatus = (playerId: number, handId: string, status: HandStatus, dealerScore: number = 0) => {
          setGameState(prev => {
             let playerWonAmount: number | null = null;
@@ -509,7 +510,8 @@ export const useBlackjackGame = () => {
             if (areAllHandsSettled(newPlayers)) {
                 // All hands are done, end the round
                 addMessage("All hands settled.");
-                return endRoundAndPay({ ...prev, players: newPlayers, dealerNet: prev.dealerNet + dealerNetChange });
+                // We call the *internal* endRoundAndPay with the new state
+                return endRoundAndPay_internal({ ...prev, players: newPlayers, dealerNet: prev.dealerNet + dealerNetChange });
             }
             // --- END AUTO-SETTLE ---
 
@@ -517,70 +519,67 @@ export const useBlackjackGame = () => {
          });
     };
 
-    const endRoundAndPay = (state: BlackjackGameState) => {
+    // --- UPDATED: Renamed to internal ---
+    const endRoundAndPay_internal = (state: BlackjackGameState): BlackjackGameState => {
         // This function is now private and only called by auto-settle
         const endState = state || gameState;
 
-        setGameState(prev => {
-            const recordsToUpdate: WinningsRecord[] = [];
-            const timestamp = new Date().toISOString();
+        const recordsToUpdate: WinningsRecord[] = [];
+        const timestamp = new Date().toISOString();
+        
+        const finalPlayers = endState.players.map(p => {
+            let roundNet = 0;
+            let lastBet = p.lastBet; // Keep old lastBet if no new bet
             
-            const finalPlayers = endState.players.map(p => {
-                let roundNet = 0;
-                let lastBet = p.lastBet; // Keep old lastBet if no new bet
-                
-                p.hands.forEach(h => {
-                    let betForCalc = h.bet;
-                    if (h.status === 'surrendered') {
-                        betForCalc = h.bet * 2; // Bet was halved, restore to full for net calc
-                    }
-                    
-                    if (lastBet === 0 && betForCalc > 0) {
-                         lastBet = betForCalc; // Save the first bet as lastBet
-                    } else if (h.bet > 0) {
-                        lastBet = h.bet; // Save the last placed bet
-                    }
-                    
-                    if (h.status === 'win') roundNet += betForCalc;
-                    else if (h.status === 'blackjack') roundNet += (endState.blackjackPayout === '3to2' ? betForCalc * 1.5 : betForCalc * 1.2);
-                    else if (h.status === 'lose') roundNet -= betForCalc;
-                    else if (h.status === 'busted') roundNet -= betForCalc;
-                    else if (h.status === 'surrendered') roundNet -= betForCalc / 2; // Loss is half
-                    // Push is net 0
-                });
-
-                if (p.phoneNumber && roundNet !== 0) {
-                    recordsToUpdate.push({
-                        phoneHash: SHA256(p.phoneNumber).toString(),
-                        playerName: p.name,
-                        gameType: 'blackjack',
-                        winnings: roundNet,
-                        timestamp
-                    });
+            p.hands.forEach(h => {
+                let betForCalc = h.bet;
+                if (h.status === 'surrendered') {
+                    betForCalc = h.bet * 2; // Bet was halved, restore to full for net calc
                 }
                 
-                // Reset hands for next round
-                return { ...p, hands: [], lastBet: lastBet > 0 ? lastBet : endState.minBet };
+                if (lastBet === 0 && betForCalc > 0) {
+                     lastBet = betForCalc; // Save the first bet as lastBet
+                } else if (h.bet > 0 && !endState.isBettingLocked) { // <-- THIS IS THE FIX
+                    // Only update lastBet if bets were *not* locked
+                    lastBet = betForCalc; 
+                }
+                
+                if (h.status === 'win') roundNet += betForCalc;
+                else if (h.status === 'blackjack') roundNet += (endState.blackjackPayout === '3to2' ? betForCalc * 1.5 : betForCalc * 1.2);
+                else if (h.status === 'lose') roundNet -= betForCalc;
+                else if (h.status === 'busted') roundNet -= betForCalc;
+                else if (h.status === 'surrendered') roundNet -= betForCalc / 2; // Loss is half
+                // Push is net 0
             });
 
-            if(recordsToUpdate.length > 0) {
-                bulkUpdateWinnings(recordsToUpdate);
+            if (p.phoneNumber && roundNet !== 0) {
+                recordsToUpdate.push({
+                    phoneHash: SHA256(p.phoneNumber).toString(),
+                    playerName: p.name,
+                    gameType: 'blackjack',
+                    winnings: roundNet,
+                    timestamp
+                });
             }
             
-            addMessage("--- ROUND OVER ---");
-            addMessage(`Bets locked to last amount. Click 'Change Bets' to unlock.`);
-
-            return {
-                ...endState, // Use the state passed in
-                players: finalPlayers,
-                gameStage: 'betting',
-                currentPlayerId: null,
-                currentHandId: null,
-                dealerHand: { cards: [], status: 'playing', score: 0 },
-                isBettingLocked: true, // Lock betting for next round
-                messages: [...endState.messages, "--- ROUND OVER ---", `Bets locked to last amount. Click 'Change Bets' to unlock.`]
-            };
+            // Reset hands for next round
+            return { ...p, hands: [], lastBet: lastBet > 0 ? lastBet : endState.minBet };
         });
+
+        if(recordsToUpdate.length > 0) {
+            bulkUpdateWinnings(recordsToUpdate);
+        }
+
+        return {
+            ...endState, // Use the state passed in
+            players: finalPlayers,
+            gameStage: 'betting',
+            currentPlayerId: null,
+            currentHandId: null,
+            dealerHand: { cards: [], status: 'playing', score: 0 },
+            isBettingLocked: true, // Lock betting for next round
+            messages: [...endState.messages, "--- ROUND OVER ---", `Bets locked to last amount. Click 'Change Bets' to unlock.`]
+        };
     };
     
     // --- PLAYER MANAGEMENT ACTIONS ---
