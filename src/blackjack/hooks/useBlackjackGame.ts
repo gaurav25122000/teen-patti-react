@@ -22,9 +22,7 @@ const createInitialBlackjackState = (): BlackjackGameState => ({
     isBettingLocked: true, 
 });
 
-// --- NEW HELPER FUNCTION ---
-// This function safely loads and parses state from local storage
-// It does NOT call any React hooks, so it's safe to use for initialization.
+// --- HELPER FUNCTION ---
 const loadStateFromStorage = (): BlackjackGameState | null => {
     try {
         const savedState = localStorage.getItem(BLACKJACK_STORAGE_KEY);
@@ -37,7 +35,6 @@ const loadStateFromStorage = (): BlackjackGameState | null => {
             return null;
         }
 
-        // Re-hydrate the state with defaults for any missing properties
         const initialState = createInitialBlackjackState();
         return {
             ...initialState,
@@ -55,8 +52,6 @@ const loadStateFromStorage = (): BlackjackGameState | null => {
         return null;
     }
 };
-// --- END NEW HELPER FUNCTION ---
-
 
 // Simplified card logic for manager (no deck, just scoring)
 const getHandScore = (cards: string[]): number => {
@@ -93,24 +88,17 @@ const areAllHandsSettled = (players: BlackjackPlayer[]): boolean => {
 };
 
 export const useBlackjackGame = () => {
-    // --- UPDATED useState ---
-    // This now lazy-initializes by calling our safe loader function.
-    // gameState will ALWAYS be a valid state object.
     const [gameState, setGameState] = useState<BlackjackGameState>(() => {
         return loadStateFromStorage() || createInitialBlackjackState();
     });
-    // --- END UPDATED useState ---
 
     const addMessage = useCallback((message: string) => {
-        // This is now safe, `prev` will never be undefined
         setGameState(prev => ({
             ...prev,
             messages: [...prev.messages.slice(-100), message]
         }));
     }, []);
 
-    // --- UPDATED loadGame ---
-    // This is now just an action that re-runs the safe loader
     const loadGame = useCallback(() => {
         const loadedState = loadStateFromStorage();
         if (loadedState) {
@@ -122,7 +110,6 @@ export const useBlackjackGame = () => {
             return false;
         }
     }, [addMessage]);
-    // --- END UPDATED loadGame ---
 
     useEffect(() => {
         if (gameState.players.length > 0) {
@@ -140,7 +127,7 @@ export const useBlackjackGame = () => {
             initialHandsCount: p.numHands,
             hands: [],
             isTakingBreak: false,
-            lastBet: createInitialBlackjackState().minBet, // ADDED
+            lastBet: createInitialBlackjackState().minBet,
         }));
         setGameState({
             ...createInitialBlackjackState(),
@@ -341,6 +328,67 @@ export const useBlackjackGame = () => {
         return { nextPlayerId: null, nextHandId: null };
     };
 
+    // This function must be defined *before* it is used in setHandStatus
+    const endRoundAndPay_internal = (state: BlackjackGameState): BlackjackGameState => {
+        const endState = state || gameState;
+
+        const recordsToUpdate: WinningsRecord[] = [];
+        const timestamp = new Date().toISOString();
+        
+        const finalPlayers = endState.players.map(p => {
+            let roundNet = 0;
+            let lastBet = p.lastBet; // Keep old lastBet if no new bet
+            
+            p.hands.forEach(h => {
+                let betForCalc = h.bet;
+                if (h.status === 'surrendered') {
+                    betForCalc = h.bet * 2; // Bet was halved, restore to full for net calc
+                }
+                
+                // --- FIXED: Bet saving logic ---
+                if (betForCalc > 0) {
+                    lastBet = betForCalc; 
+                }
+                // --- END FIX ---
+                
+                if (h.status === 'win') roundNet += betForCalc;
+                else if (h.status === 'blackjack') roundNet += (endState.blackjackPayout === '3to2' ? betForCalc * 1.5 : betForCalc * 1.2);
+                else if (h.status === 'lose') roundNet -= betForCalc;
+                else if (h.status === 'busted') roundNet -= betForCalc;
+                else if (h.status === 'surrendered') roundNet -= betForCalc / 2; // Loss is half
+                // Push is net 0
+            });
+
+            if (p.phoneNumber && roundNet !== 0) {
+                recordsToUpdate.push({
+                    phoneHash: SHA256(p.phoneNumber).toString(),
+                    playerName: p.name,
+                    gameType: 'blackjack',
+                    winnings: roundNet,
+                    timestamp
+                });
+            }
+            
+            // Reset hands for next round
+            return { ...p, hands: [], lastBet: lastBet > 0 ? lastBet : endState.minBet };
+        });
+
+        if(recordsToUpdate.length > 0) {
+            bulkUpdateWinnings(recordsToUpdate);
+        }
+
+        return {
+            ...endState, // Use the state passed in
+            players: finalPlayers,
+            gameStage: 'betting',
+            currentPlayerId: null,
+            currentHandId: null,
+            dealerHand: { cards: [], status: 'playing', score: 0 },
+            isBettingLocked: true, // Lock betting for next round
+            messages: [...endState.messages, "--- ROUND OVER ---", `Bets locked to last amount. Click 'Change Bets' to unlock.`]
+        };
+    };
+
     const handlePlayerAction = (action: 'hit' | 'stand' | 'double' | 'split' | 'surrender' | 'insurance') => {
         setGameState(prev => {
             if (prev.gameStage !== 'player-turn' || !prev.currentPlayerId || !prev.currentHandId) return prev;
@@ -431,6 +479,14 @@ export const useBlackjackGame = () => {
                     nextPlayerId = null;
                     nextHandId = null;
                     addMessage("All players have acted. Dealer's turn. Settle all hands.");
+                    
+                    // --- FIX: CHECK FOR AUTO-SETTLE ---
+                    // If all hands are now settled (e.g. all surrendered), end the round
+                    if (areAllHandsSettled(newPlayers)) {
+                        addMessage("All hands settled.");
+                        return endRoundAndPay_internal({ ...prev, players: newPlayers, dealerNet: newDealerNet, gameStage: 'dealer-turn' });
+                    }
+                    // --- END FIX ---
                  }
             }
 
@@ -438,7 +494,6 @@ export const useBlackjackGame = () => {
         });
     };
     
-    // This function is defined *inside* the hook, so it has access to `endRoundAndPay_internal`
     const setHandStatus = (playerId: number, handId: string, status: HandStatus, dealerScore: number = 0) => {
          setGameState(prev => {
             let playerWonAmount: number | null = null;
@@ -510,76 +565,12 @@ export const useBlackjackGame = () => {
             if (areAllHandsSettled(newPlayers)) {
                 // All hands are done, end the round
                 addMessage("All hands settled.");
-                // We call the *internal* endRoundAndPay with the new state
                 return endRoundAndPay_internal({ ...prev, players: newPlayers, dealerNet: prev.dealerNet + dealerNetChange });
             }
             // --- END AUTO-SETTLE ---
 
             return { ...prev, players: newPlayers, dealerNet: prev.dealerNet + dealerNetChange };
          });
-    };
-
-    // --- UPDATED: Renamed to internal ---
-    const endRoundAndPay_internal = (state: BlackjackGameState): BlackjackGameState => {
-        // This function is now private and only called by auto-settle
-        const endState = state || gameState;
-
-        const recordsToUpdate: WinningsRecord[] = [];
-        const timestamp = new Date().toISOString();
-        
-        const finalPlayers = endState.players.map(p => {
-            let roundNet = 0;
-            let lastBet = p.lastBet; // Keep old lastBet if no new bet
-            
-            p.hands.forEach(h => {
-                let betForCalc = h.bet;
-                if (h.status === 'surrendered') {
-                    betForCalc = h.bet * 2; // Bet was halved, restore to full for net calc
-                }
-                
-                if (lastBet === 0 && betForCalc > 0) {
-                     lastBet = betForCalc; // Save the first bet as lastBet
-                } else if (h.bet > 0 && !endState.isBettingLocked) { // <-- THIS IS THE FIX
-                    // Only update lastBet if bets were *not* locked
-                    lastBet = betForCalc; 
-                }
-                
-                if (h.status === 'win') roundNet += betForCalc;
-                else if (h.status === 'blackjack') roundNet += (endState.blackjackPayout === '3to2' ? betForCalc * 1.5 : betForCalc * 1.2);
-                else if (h.status === 'lose') roundNet -= betForCalc;
-                else if (h.status === 'busted') roundNet -= betForCalc;
-                else if (h.status === 'surrendered') roundNet -= betForCalc / 2; // Loss is half
-                // Push is net 0
-            });
-
-            if (p.phoneNumber && roundNet !== 0) {
-                recordsToUpdate.push({
-                    phoneHash: SHA256(p.phoneNumber).toString(),
-                    playerName: p.name,
-                    gameType: 'blackjack',
-                    winnings: roundNet,
-                    timestamp
-                });
-            }
-            
-            // Reset hands for next round
-            return { ...p, hands: [], lastBet: lastBet > 0 ? lastBet : endState.minBet };
-        });
-
-        if(recordsToUpdate.length > 0) {
-            bulkUpdateWinnings(recordsToUpdate);
-        }
-
-        return {
-            ...endState, // Use the state passed in
-            players: finalPlayers,
-            gameStage: 'betting',
-            currentPlayerId: null,
-            currentHandId: null,
-            dealerHand: { cards: [], status: 'playing', score: 0 },
-            isBettingLocked: true, // Lock betting for next round
-            messages: [...endState.messages, "--- ROUND OVER ---", `Bets locked to last amount. Click 'Change Bets' to unlock.`]
-        };
     };
     
     // --- PLAYER MANAGEMENT ACTIONS ---
@@ -601,7 +592,7 @@ export const useBlackjackGame = () => {
                 initialHandsCount: numHands,
                 hands: [],
                 isTakingBreak: false, 
-                lastBet: prev.minBet, // ADDED
+                lastBet: prev.minBet,
             };
             addMessage(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
             return { ...prev, players: [...prev.players, newPlayer] };
@@ -679,7 +670,6 @@ export const useBlackjackGame = () => {
          });
     }, [addMessage]);
     
-    // --- NEW ACTION ---
     const unlockAllBets = useCallback(() => {
         setGameState(prev => {
             if (prev.gameStage !== 'betting') return prev;
