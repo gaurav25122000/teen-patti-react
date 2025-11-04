@@ -20,6 +20,7 @@ export interface BlackjackPlayer {
     initialHandsCount: number; // How many hands this player plays each round
     hands: PlayerHand[];
     isTakingBreak: boolean;
+    lastBet: number; // ADDED
 }
 
 export interface DealerHand {
@@ -41,5 +42,6 @@ export interface BlackjackGameState {
     maxBet: number;
     allowSurrender: boolean;
     blackjackPayout: '3to2' | '6to5';
-    dealerNet: number; // ADDED
+    dealerNet: number;
+    isBettingLocked: boolean; // ADDED
 }

@@ -8,15 +8,18 @@ interface BlackjackPlayerHandsProps {
     isCurrentPlayer: boolean;
     currentHandId: string | null;
     gameStage: 'betting' | 'player-turn' | 'dealer-turn' | 'round-over' | 'dealing';
+    isBettingLocked: boolean; // ADDED
     onPlaceBet: (playerId: number, handIndex: number, amount: number) => void;
     onPlayerAction: (action: 'hit' | 'stand' | 'double' | 'surrender') => void;
     onSetHandStatus: (playerId: number, handId: string, status: HandStatus) => void;
+    onUnlockBet: () => void; // RENAMED
 }
 
 const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({ 
-    player, isCurrentPlayer, currentHandId, gameStage, 
-    onPlaceBet, onPlayerAction, onSetHandStatus 
+    player, isCurrentPlayer, currentHandId, gameStage, isBettingLocked,
+    onPlaceBet, onPlayerAction, onSetHandStatus, onUnlockBet
 }) => {
+    // This local state is only for when betting is unlocked
     const [betAmounts, setBetAmounts] = useState<Record<number, string>>({});
 
     const handleBetChange = (handIndex: number, amount: string) => {
@@ -31,26 +34,29 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
         }
     };
 
-    const renderBettingControls = (handIndex: number) => {
-        const hand = player.hands[handIndex];
-        if (hand.bet > 0) {
-            return (
+    const renderBettingControls = (hand: typeof player.hands[0], handIndex: number) => {
+        // --- UPDATED LOGIC ---
+        if (isBettingLocked) {
+             return (
                 <div className="hand-bet" style={{ fontSize: '1.1rem', color: 'var(--color-glow-cyan)'}}>
                     Bet: <strong>₹{hand.bet}</strong> (Locked)
                 </div>
             );
         }
+        
+        // Betting is unlocked, show input
         return (
             <div className="inline-input-group">
                 <input
                     type="number"
                     value={betAmounts[handIndex] || ''}
                     onChange={e => handleBetChange(handIndex, e.target.value)}
-                    placeholder="Enter bet"
+                    placeholder={`Bet (Min: ${player.lastBet})`}
                 />
                 <button className="btn-success" onClick={() => handleBetSubmit(handIndex)}>Place Bet</button>
             </div>
         );
+        // --- END UPDATED LOGIC ---
     };
 
     const renderPlayerTurnControls = (handId: string) => {
@@ -86,7 +92,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
             <h4>{toTitleCase(player.name)}'s Hands</h4>
             {player.hands.length === 0 && gameStage === 'betting' && (
                  <p style={{textAlign: 'center', color: 'var(--color-text-muted)'}}>
-                    This player will play {player.initialHandsCount} hand(s). Place bets below.
+                    {isBettingLocked ? `Click 'Change Bets' to place new wagers.` : `Player will play ${player.initialHandsCount} hand(s). Place bets below.`}
                  </p>
             )}
             {player.hands.map((hand, index) => (
@@ -94,7 +100,6 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                     key={hand.id} 
                     className={`player-hand ${currentHandId === hand.id ? 'current-hand' : ''} status-${hand.status}`}
                 >
-                    {/* --- UPDATED UI --- */}
                     <div className="hand-info">
                         <strong>Hand {index + 1}</strong>
                         <div style={{textAlign: 'right'}}>
@@ -106,9 +111,8 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                             }
                         </div>
                     </div>
-                    {/* --- END UPDATED UI --- */}
                     
-                    {gameStage === 'betting' && renderBettingControls(index)}
+                    {gameStage === 'betting' && renderBettingControls(hand, index)}
                     {gameStage === 'player-turn' && renderPlayerTurnControls(hand.id)}
                     {gameStage === 'dealer-turn' && renderSettlementControls(hand.id, hand.status)}
                 </div>

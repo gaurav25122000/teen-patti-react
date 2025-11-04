@@ -1,5 +1,5 @@
 // src/blackjack/components/BlackjackGameScreen.tsx
-import React, { useState, useMemo } from 'react'; // Added useMemo
+import React, { useState, useMemo } from 'react'; 
 import type { useBlackjackGame } from '../hooks/useBlackjackGame';
 import BlackjackPlayerList from './BlackjackPlayerList';
 import BlackjackPlayerHands from './BlackjackPlayerHands';
@@ -18,7 +18,7 @@ interface BlackjackGameScreenProps {
 
 const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook, onInteractionChange }) => {
     const { gameState, actions } = blackjackHook;
-    const { players, messages, gameStage, currentPlayerId, currentHandId, dealerNet } = gameState;
+    const { players, messages, gameStage, currentPlayerId, currentHandId, dealerNet, isBettingLocked } = gameState; // ADDED isBettingLocked
 
     const [modalMode, setModalMode] = useState<ModalMode>('none');
     const [showOwings, setShowOwings] = useState(false);
@@ -56,32 +56,24 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
         onInteractionChange(false);
     };
 
-    // --- ADDED LOGIC FOR BUTTON STATE ---
-    const { buttonText, isButtonDisabled } = useMemo(() => {
-        if (gameStage !== 'betting') {
-            return { buttonText: 'Deal Cards', isButtonDisabled: true };
-        }
+    // --- UPDATED LOGIC FOR BUTTON STATE ---
+    const isDealDisabled = useMemo(() => {
+        if (isBettingLocked) return true; // Disabled if bets are locked
 
         const activePlayers = players.filter(p => !p.isTakingBreak && p.initialHandsCount > 0);
-        if (activePlayers.length === 0) {
-            return { buttonText: 'No Active Players', isButtonDisabled: true };
+        if (activePlayers.length === 0) return true; // No one to deal to
+
+        // Check if all hands have bets
+        for (const player of activePlayers) {
+            if (player.hands.length === 0) return true; // Hands not even created
+            for (const hand of player.hands) {
+                if (hand.bet <= 0) return true; // Found a hand with no bet
+            }
         }
-
-        const handsAreCreated = activePlayers.every(p => p.hands.length > 0);
-
-        if (!handsAreCreated) {
-            return { buttonText: 'Show Bet Slips', isButtonDisabled: false };
-        }
-
-        const allBetsPlaced = activePlayers.every(p => p.hands.every(h => h.bet > 0));
         
-        return {
-            buttonText: 'Deal Cards',
-            isButtonDisabled: !allBetsPlaced
-        };
-
-    }, [players, gameStage]);
-    // --- END ADDED LOGIC ---
+        return false; // All hands have bets
+    }, [players, isBettingLocked]);
+    // --- END UPDATED LOGIC ---
 
     return (
         <>
@@ -102,17 +94,20 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                             onStartRound={actions.startRound}
                             onShowModal={handleShowModal}
                             onShowOwings={handleShowOwings}
-                            buttonText={buttonText} // UPDATED
-                            isButtonDisabled={isButtonDisabled} // UPDATED
+                            onUnlockBets={actions.unlockAllBets} // ADDED
+                            isBettingLocked={isBettingLocked} // ADDED
+                            isDealDisabled={isDealDisabled} // ADDED
                         />
                     )}
                     
+                    {/* --- REMOVED "Settle Bets" button --- */}
                     {gameStage === 'dealer-turn' && (
                         <div className="game-controls-container">
-                             <p>Settle all player hands (Win/Lose/Push) based on the dealer's hand.</p>
-                            <button className="btn-success btn-action-lg" onClick={actions.endRoundAndPay}>
-                                Settle Bets & End Round
-                            </button>
+                             <p style={{textAlign: 'center', fontSize: '1.2rem', color: 'var(--color-glow-yellow)'}}>
+                                Settle all player hands (Win/Lose/Push/Bust/Blackjack).
+                                <br />
+                                The round will end automatically.
+                             </p>
                         </div>
                     )}
 
@@ -124,9 +119,11 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                                 isCurrentPlayer={player.id === currentPlayerId}
                                 currentHandId={currentHandId}
                                 gameStage={gameStage}
+                                isBettingLocked={isBettingLocked} // ADDED
                                 onPlaceBet={actions.placeBet}
                                 onPlayerAction={actions.handlePlayerAction}
                                 onSetHandStatus={actions.setHandStatus}
+                                onUnlockBet={actions.unlockAllBets} // Pass unlock action
                             />
                         ))}
                     </div>

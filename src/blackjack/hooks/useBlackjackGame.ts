@@ -19,7 +19,44 @@ const createInitialBlackjackState = (): BlackjackGameState => ({
     allowSurrender: true,
     blackjackPayout: '3to2',
     dealerNet: 0, 
+    isBettingLocked: true, 
 });
+
+// --- NEW HELPER FUNCTION ---
+// This function safely loads and parses state from local storage
+// It does NOT call any React hooks, so it's safe to use for initialization.
+const loadStateFromStorage = (): BlackjackGameState | null => {
+    try {
+        const savedState = localStorage.getItem(BLACKJACK_STORAGE_KEY);
+        if (!savedState) {
+            return null;
+        }
+        
+        const parsed = JSON.parse(savedState);
+        if (!parsed || !parsed.players) {
+            return null;
+        }
+
+        // Re-hydrate the state with defaults for any missing properties
+        const initialState = createInitialBlackjackState();
+        return {
+            ...initialState,
+            ...parsed,
+            players: parsed.players.map((p: any) => ({ 
+                ...p, 
+                isTakingBreak: p.isTakingBreak || false,
+                lastBet: p.lastBet || initialState.minBet,
+            })),
+            dealerNet: parsed.dealerNet || 0,
+            isBettingLocked: parsed.isBettingLocked !== undefined ? parsed.isBettingLocked : true,
+        };
+    } catch {
+        localStorage.removeItem(BLACKJACK_STORAGE_KEY);
+        return null;
+    }
+};
+// --- END NEW HELPER FUNCTION ---
+
 
 // Simplified card logic for manager (no deck, just scoring)
 const getHandScore = (cards: string[]): number => {
@@ -42,39 +79,50 @@ const getHandScore = (cards: string[]): number => {
     return score;
 };
 
+// --- HELPER TO CHECK FOR AUTO-SETTLE ---
+const areAllHandsSettled = (players: BlackjackPlayer[]): boolean => {
+    for (const player of players) {
+        if (player.isTakingBreak) continue;
+        for (const hand of player.hands) {
+            if (hand.status === 'playing' || hand.status === 'stand') {
+                return false; // Found a hand that still needs settlement
+            }
+        }
+    }
+    return true; // All active hands are settled
+};
+
 export const useBlackjackGame = () => {
-    const [gameState, setGameState] = useState<BlackjackGameState>(createInitialBlackjackState);
+    // --- UPDATED useState ---
+    // This now lazy-initializes by calling our safe loader function.
+    // gameState will ALWAYS be a valid state object.
+    const [gameState, setGameState] = useState<BlackjackGameState>(() => {
+        return loadStateFromStorage() || createInitialBlackjackState();
+    });
+    // --- END UPDATED useState ---
 
     const addMessage = useCallback((message: string) => {
+        // This is now safe, `prev` will never be undefined
         setGameState(prev => ({
             ...prev,
             messages: [...prev.messages.slice(-100), message]
         }));
     }, []);
 
+    // --- UPDATED loadGame ---
+    // This is now just an action that re-runs the safe loader
     const loadGame = useCallback(() => {
-        const savedState = localStorage.getItem(BLACKJACK_STORAGE_KEY);
-        if (!savedState) {
+        const loadedState = loadStateFromStorage();
+        if (loadedState) {
+            setGameState(loadedState);
+            addMessage("Saved game loaded.");
+            return true;
+        } else {
             addMessage("No saved game found.");
             return false;
         }
-        try {
-            const parsed = JSON.parse(savedState);
-            // Ensure new properties are initialized
-            const initialState = createInitialBlackjackState();
-            setGameState({
-                ...initialState,
-                ...parsed,
-                players: parsed.players.map((p: any) => ({ ...p, isTakingBreak: p.isTakingBreak || false })),
-                dealerNet: parsed.dealerNet || 0,
-            });
-            return true;
-        } catch {
-            localStorage.removeItem(BLACKJACK_STORAGE_KEY);
-            addMessage("Failed to load saved game, starting fresh.");
-            return false;
-        }
     }, [addMessage]);
+    // --- END UPDATED loadGame ---
 
     useEffect(() => {
         if (gameState.players.length > 0) {
@@ -92,11 +140,12 @@ export const useBlackjackGame = () => {
             initialHandsCount: p.numHands,
             hands: [],
             isTakingBreak: false,
+            lastBet: createInitialBlackjackState().minBet, // ADDED
         }));
         setGameState({
             ...createInitialBlackjackState(),
             players: initialPlayers,
-            messages: [`Game setup with ${players.length} players. Click 'Show Bet Slips' to begin.`]
+            messages: [`Game setup with ${players.length} players. Bets are locked to ₹${createInitialBlackjackState().minBet}. Click 'Deal Cards' to play or 'Change Bets' to unlock.`]
         });
     }, []);
 
@@ -104,6 +153,10 @@ export const useBlackjackGame = () => {
         setGameState(prev => {
             if (prev.gameStage !== 'betting') {
                 addMessage("Can only place bets before the deal.");
+                return prev;
+            }
+            if (prev.isBettingLocked) {
+                addMessage("Bets are locked. Click 'Change Bets' to unlock.");
                 return prev;
             }
             if (amount < prev.minBet || amount > prev.maxBet) {
@@ -118,20 +171,18 @@ export const useBlackjackGame = () => {
                         return p;
                     }
                     const newHands = [...p.hands];
-                    // Ensure the hand exists at the index
-                    while(newHands.length <= handIndex) {
-                        newHands.push({
-                            id: `${p.id}-hand-${newHands.length}`,
+                    if (!newHands[handIndex]) {
+                         newHands[handIndex] = {
+                            id: `${p.id}-hand-${handIndex}`,
                             cards: [],
                             bet: 0,
                             status: 'playing',
                             hasHit: false,
-                        });
+                        };
                     }
                     
                     newHands[handIndex] = {
                         ...newHands[handIndex],
-                        id: `${p.id}-hand-${handIndex}`,
                         bet: amount,
                     };
                     return { ...p, hands: newHands, stack: p.stack - amount };
@@ -146,19 +197,21 @@ export const useBlackjackGame = () => {
     const startRound = useCallback(() => {
         setGameState(prev => {
             let activePlayerFound = false;
+            let totalHands = 0;
+            let handsWithBets = 0;
             
-            // 1. Create hands for players who don't have them yet
             const newPlayers = prev.players.map(p => {
-                if (p.isTakingBreak || p.stack < prev.minBet) {
-                    return { ...p, hands: [] }; // Clear hands if on break or no chips
+                if (p.isTakingBreak || p.stack < (p.lastBet || prev.minBet)) {
+                    if (p.isTakingBreak) addMessage(`${p.name} is on break.`);
+                    else addMessage(`${p.name} has insufficient chips to play.`);
+                    return { ...p, hands: [] }; // Clear hands
                 }
                 
-                let playerHasBet = false;
                 let currentHands = p.hands;
 
-                // If hands are empty, create them now so user can bet
-                if (p.hands.length === 0 && p.initialHandsCount > 0) {
-                    currentHands = Array(p.initialHandsCount).fill(null).map((_, i) => ({
+                // Create hands if they don't exist
+                if (p.hands.length === 0) {
+                     currentHands = Array(p.initialHandsCount).fill(null).map((_, i) => ({
                          id: `${p.id}-hand-${i}`,
                          cards: [],
                          bet: 0,
@@ -167,32 +220,67 @@ export const useBlackjackGame = () => {
                     }));
                 }
                 
-                // Check for any bets
-                if (currentHands.some(h => h.bet > 0)) {
-                    activePlayerFound = true;
+                // If betting is locked, auto-place bets
+                if (prev.isBettingLocked) {
+                    let playerStack = p.stack;
+                    currentHands = currentHands.map(h => {
+                        const betAmount = p.lastBet || prev.minBet;
+                        if (playerStack >= betAmount) {
+                            playerStack -= betAmount;
+                            activePlayerFound = true;
+                            handsWithBets++;
+                            return { ...h, bet: betAmount };
+                        }
+                        return { ...h, bet: 0 }; // Not enough stack for this hand
+                    });
+                    totalHands += currentHands.length;
+                    return { ...p, hands: currentHands, stack: playerStack };
+                } else {
+                    // Betting is unlocked, just check if bets are placed
+                    totalHands += currentHands.length;
+                    currentHands.forEach(h => {
+                        if (h.bet > 0) {
+                            activePlayerFound = true;
+                            handsWithBets++;
+                        }
+                    });
+                    return { ...p, hands: currentHands };
                 }
-                
-                return {...p, hands: currentHands};
             });
             
-            // 2. If no bets are found, it means we just created the hands.
-            //    Save the new hands to state and tell the user to bet.
-            if (!activePlayerFound) {
-                addMessage("Showing bet slips. Please place a bet for all active hands.");
-                return { ...prev, players: newPlayers };
+            // --- Logic for different states ---
+            
+            // 1. Betting is locked: Auto-bet and start
+            if (prev.isBettingLocked) {
+                if (!activePlayerFound) {
+                    addMessage("No players had enough chips to auto-bet. Round not started.");
+                    return { ...prev, players: newPlayers }; // Show players with empty hands
+                }
+                addMessage(`--- NEW ROUND ---`);
+                addMessage(`Auto-betting ${handsWithBets} hand(s) with last used bet.`);
+            } 
+            // 2. Betting is unlocked: Check if all hands have bets
+            else {
+                if (!activePlayerFound) {
+                    addMessage("Please place a bet for at least one hand to start.");
+                    return { ...prev, players: newPlayers };
+                }
+                if (handsWithBets < totalHands) {
+                    addMessage(`Please place bets for all ${totalHands} active hands.`);
+                    return { ...prev, players: newPlayers };
+                }
+                
+                addMessage(`--- NEW ROUND ---`);
+                addMessage(`Locking ${handsWithBets} hand(s). Dealing cards...`);
             }
 
-            addMessage("--- NEW ROUND ---");
-            addMessage("Dealing cards... (Please deal cards in real life)");
-            
-            // 3. If bets *are* found, proceed to start the round
+            // --- Find first player and start ---
             let firstPlayer: BlackjackPlayer | null = null;
             let firstHand: PlayerHand | null = null;
-
             for(const player of newPlayers) {
                 if (player.isTakingBreak || player.hands.length === 0) continue;
                 for (const hand of player.hands) {
-                    if (hand.bet > 0) { // Only start with hands that have a bet
+                    if (hand.bet > 0) { 
                         firstPlayer = player;
                         firstHand = hand;
                         break;
@@ -202,21 +290,21 @@ export const useBlackjackGame = () => {
             }
 
             if (!firstPlayer || !firstHand) {
-                addMessage("Please place a bet for at least one hand to start the round.");
-                return {...prev, gameStage: 'betting', players: newPlayers};
+                addMessage("An unexpected error occurred. No valid hands found.");
+                return prev;
             }
 
             return {
                 ...prev,
                 players: newPlayers.map(p => ({
                     ...p,
-                    // Filter out any hands that didn't get a bet
-                    hands: p.hands.filter(h => h.bet > 0).map(h => ({ ...h, status: 'playing', hasHit: false })) // Reset status
+                    hands: p.hands.filter(h => h.bet > 0).map(h => ({ ...h, status: 'playing', hasHit: false }))
                 })),
-                dealerHand: { cards: ['?', '?'], status: 'playing', score: 0 }, // '?' as placeholder
+                dealerHand: { cards: ['?', '?'], status: 'playing', score: 0 },
                 gameStage: 'player-turn',
                 currentPlayerId: firstPlayer.id,
                 currentHandId: firstHand.id,
+                isBettingLocked: true, // Lock betting on round start
                 messages: [...prev.messages, `Player turn: ${toTitleCase(firstPlayer.name)}, Hand 1`]
             };
         });
@@ -267,6 +355,7 @@ export const useBlackjackGame = () => {
             let nextPlayerId = prev.currentPlayerId;
             let nextHandId = prev.currentHandId;
             let nextStage: GameStage = 'player-turn';
+            let newDealerNet = prev.dealerNet; 
 
             const updateHand = (playerId: number, handId: string, updates: Partial<PlayerHand>) => {
                 newPlayers = newPlayers.map(p => 
@@ -319,21 +408,14 @@ export const useBlackjackGame = () => {
                     const lossAmount = hand.bet / 2; // This is what the dealer wins
                     updatePlayer(player.id, { stack: player.stack + refund });
                     updateHand(player.id, hand.id, { status: 'surrendered', bet: lossAmount }); // Store the loss amount
+                    newDealerNet += lossAmount; // --- FIX: UPDATE DEALER NET ---
                     break;
                 case 'insurance':
                      addMessage(`${player.name} (Hand ${Number(hand.id.split('-').pop()) + 1}) takes insurance.`);
                      break;
             }
             
-            // --- UPDATED LOGIC ---
-            // Find the hand *after* updates
             const updatedHand = newPlayers.find(p => p.id === player.id)?.hands.find(h => h.id === hand.id);
-            let newDealerNet = prev.dealerNet; 
-
-            // FIX: If player surrendered, update dealer net immediately
-            if (updatedHand && updatedHand.status === 'surrendered' && action === 'surrender') {
-                newDealerNet += updatedHand.bet; // 'bet' was already halved to the loss amount
-            }
 
             // If current hand's status changed, find next hand
             if (updatedHand && updatedHand.status !== 'playing') {
@@ -348,12 +430,11 @@ export const useBlackjackGame = () => {
                     nextStage = 'dealer-turn';
                     nextPlayerId = null;
                     nextHandId = null;
-                    addMessage("All players have acted. Dealer's turn.");
+                    addMessage("All players have acted. Dealer's turn. Settle all hands.");
                  }
             }
 
             return { ...prev, players: newPlayers, gameStage: nextStage, currentPlayerId: nextPlayerId, currentHandId: nextHandId, dealerNet: newDealerNet }; 
-            // --- END UPDATED LOGIC ---
         });
     };
     
@@ -394,13 +475,11 @@ export const useBlackjackGame = () => {
                         finalStatus = 'busted';
                     }
                     
-                    // --- UPDATED LOGIC ---
                     if (h.status === 'surrendered') {
                         playerWonAmount = 0; // Already refunded
-                        dealerNetChange = 0; // FIX: Already handled in player-turn
+                        dealerNetChange = 0; // Already handled in handlePlayerAction
                         finalStatus = 'surrendered';
                     }
-                    // --- END UPDATED LOGIC ---
 
                     return { ...h, status: finalStatus };
                 });
@@ -426,23 +505,47 @@ export const useBlackjackGame = () => {
 
             }
 
+            // --- AUTO-SETTLE LOGIC ---
+            if (areAllHandsSettled(newPlayers)) {
+                // All hands are done, end the round
+                addMessage("All hands settled.");
+                return endRoundAndPay({ ...prev, players: newPlayers, dealerNet: prev.dealerNet + dealerNetChange });
+            }
+            // --- END AUTO-SETTLE ---
+
             return { ...prev, players: newPlayers, dealerNet: prev.dealerNet + dealerNetChange };
          });
     };
 
-    const endRoundAndPay = () => {
+    const endRoundAndPay = (state: BlackjackGameState) => {
+        // This function is now private and only called by auto-settle
+        const endState = state || gameState;
+
         setGameState(prev => {
             const recordsToUpdate: WinningsRecord[] = [];
             const timestamp = new Date().toISOString();
             
-            const finalPlayers = prev.players.map(p => {
+            const finalPlayers = endState.players.map(p => {
                 let roundNet = 0;
+                let lastBet = p.lastBet; // Keep old lastBet if no new bet
+                
                 p.hands.forEach(h => {
-                    if (h.status === 'win') roundNet += h.bet;
-                    else if (h.status === 'blackjack') roundNet += (prev.blackjackPayout === '3to2' ? h.bet * 1.5 : h.bet * 1.2);
-                    else if (h.status === 'lose') roundNet -= h.bet;
-                    else if (h.status === 'busted') roundNet -= h.bet;
-                    else if (h.status === 'surrendered') roundNet -= h.bet; // Bet was already halved, so this is the loss
+                    let betForCalc = h.bet;
+                    if (h.status === 'surrendered') {
+                        betForCalc = h.bet * 2; // Bet was halved, restore to full for net calc
+                    }
+                    
+                    if (lastBet === 0 && betForCalc > 0) {
+                         lastBet = betForCalc; // Save the first bet as lastBet
+                    } else if (h.bet > 0) {
+                        lastBet = h.bet; // Save the last placed bet
+                    }
+                    
+                    if (h.status === 'win') roundNet += betForCalc;
+                    else if (h.status === 'blackjack') roundNet += (endState.blackjackPayout === '3to2' ? betForCalc * 1.5 : betForCalc * 1.2);
+                    else if (h.status === 'lose') roundNet -= betForCalc;
+                    else if (h.status === 'busted') roundNet -= betForCalc;
+                    else if (h.status === 'surrendered') roundNet -= betForCalc / 2; // Loss is half
                     // Push is net 0
                 });
 
@@ -457,7 +560,7 @@ export const useBlackjackGame = () => {
                 }
                 
                 // Reset hands for next round
-                return { ...p, hands: [] };
+                return { ...p, hands: [], lastBet: lastBet > 0 ? lastBet : endState.minBet };
             });
 
             if(recordsToUpdate.length > 0) {
@@ -465,15 +568,17 @@ export const useBlackjackGame = () => {
             }
             
             addMessage("--- ROUND OVER ---");
-            addMessage("All bets settled. Click 'Show Bet Slips' for the next round.");
+            addMessage(`Bets locked to last amount. Click 'Change Bets' to unlock.`);
 
             return {
-                ...prev,
+                ...endState, // Use the state passed in
                 players: finalPlayers,
                 gameStage: 'betting',
                 currentPlayerId: null,
                 currentHandId: null,
-                dealerHand: { cards: [], status: 'playing', score: 0 }
+                dealerHand: { cards: [], status: 'playing', score: 0 },
+                isBettingLocked: true, // Lock betting for next round
+                messages: [...endState.messages, "--- ROUND OVER ---", `Bets locked to last amount. Click 'Change Bets' to unlock.`]
             };
         });
     };
@@ -497,6 +602,7 @@ export const useBlackjackGame = () => {
                 initialHandsCount: numHands,
                 hands: [],
                 isTakingBreak: false, 
+                lastBet: prev.minBet, // ADDED
             };
             addMessage(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
             return { ...prev, players: [...prev.players, newPlayer] };
@@ -573,6 +679,35 @@ export const useBlackjackGame = () => {
             return { ...prev, players: newPlayers };
          });
     }, [addMessage]);
+    
+    // --- NEW ACTION ---
+    const unlockAllBets = useCallback(() => {
+        setGameState(prev => {
+            if (prev.gameStage !== 'betting') return prev;
+            
+            // Refund all bets and clear hands
+            const newPlayers = prev.players.map(p => {
+                let refundedAmount = 0;
+                p.hands.forEach(h => {
+                    refundedAmount += h.bet;
+                });
+                return {
+                    ...p,
+                    stack: p.stack + refundedAmount,
+                    hands: Array(p.initialHandsCount).fill(null).map((_, i) => ({
+                         id: `${p.id}-hand-${i}`,
+                         cards: [],
+                         bet: 0,
+                         status: 'playing',
+                         hasHit: false,
+                    })),
+                };
+            });
+            
+            addMessage("Bets unlocked. Place new bets for all active hands.");
+            return { ...prev, players: newPlayers, isBettingLocked: false };
+        });
+    }, [addMessage]);
 
 
     const actions = useMemo(() => ({
@@ -582,14 +717,14 @@ export const useBlackjackGame = () => {
         startRound,
         handlePlayerAction,
         setHandStatus,
-        endRoundAndPay,
         addPlayer,
         removePlayer,
         addChipsToPlayer,
         togglePlayerBreak,
         updatePlayerHandCount,
-    }), [setupGame, loadGame, placeBet, startRound, handlePlayerAction, setHandStatus, endRoundAndPay,
-         addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, updatePlayerHandCount]);
+        unlockAllBets, 
+    }), [setupGame, loadGame, placeBet, startRound, handlePlayerAction, setHandStatus,
+         addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, updatePlayerHandCount, unlockAllBets]);
 
     return { gameState, actions };
 };

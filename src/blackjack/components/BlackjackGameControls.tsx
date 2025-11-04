@@ -5,23 +5,41 @@ interface BlackjackGameControlsProps {
     onStartRound: () => void;
     onShowModal: (mode: 'addPlayer' | 'removePlayer' | 'addChips' | 'toggleBreak' | 'updateHands') => void;
     onShowOwings: () => void;
-    buttonText: string; // ADDED
-    isButtonDisabled: boolean; // ADDED
+    onUnlockBets: () => void; // ADDED
+    isBettingLocked: boolean; // ADDED
+    isDealDisabled: boolean; // RENAMED
 }
 
 const BlackjackGameControls: React.FC<BlackjackGameControlsProps> = ({ 
-    onStartRound, onShowModal, onShowOwings, buttonText, isButtonDisabled 
+    onStartRound, onShowModal, onShowOwings, onUnlockBets, isBettingLocked, isDealDisabled
 }) => {
     return (
         <div className="game-controls-container">
-            <button 
-                className="btn-primary btn-action-lg" 
-                onClick={onStartRound}
-                disabled={isButtonDisabled} // ADDED
-            >
-                {buttonText} {/* UPDATED */}
-            </button>
+            {/* --- UPDATED BUTTON LOGIC --- */}
+            {isBettingLocked ? (
+                <button 
+                    className="btn-primary btn-action-lg" 
+                    onClick={onStartRound}
+                >
+                    Deal Next Hand
+                </button>
+            ) : (
+                <button 
+                    className="btn-primary btn-action-lg" 
+                    onClick={onStartRound}
+                    disabled={isDealDisabled}
+                    title={isDealDisabled ? "Place bets for all active hands" : "Lock bets and deal"}
+                >
+                    Lock Bets & Deal
+                </button>
+            )}
+            
             <div className="game-actions" style={{ marginTop: '1.5rem' }}>
+                 {isBettingLocked && (
+                    <button className="btn-secondary" onClick={onUnlockBets} style={{width: '100%'}}>
+                        Change Bets
+                    </button>
+                 )}
                 <button className="btn-success" onClick={() => onShowModal('addPlayer')}>Add Player</button>
                 <button className="btn-danger" onClick={() => onShowModal('removePlayer')}>Remove Player</button>
                 <button className="btn-primary" onClick={() => onShowModal('addChips')}>Add Chips</button>

@@ -1,3 +1,6 @@
+/* --- ADDED: This MUST be at the top --- */
+@import './blackjack/components/BlackjackPlayerHands.css';
+
 /* --- 0. Global Reset --- */
 * {
   box-sizing: border-box;
@@ -1047,9 +1050,8 @@ h1 {
     font-size: 1.2em;
 }
 
-/* --- ADDED --- */
 /* 12. Blackjack Specific Styles */
-@import './blackjack/components/BlackjackPlayerHands.css';
+/* --- MOVED to top of file --- */
 
 
 @media (max-width: 600px) {
