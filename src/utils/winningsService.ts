@@ -12,7 +12,7 @@ const hashPhoneNumber = (phoneNumber: string): string => {
 export interface WinningsRecord {
     phoneHash: string;
     playerName: string; // Add playerName
-    gameType: 'teen-patti' | 'poker';
+    gameType: 'teen-patti' | 'poker' | 'blackjack'; // ADDED BLACKJACK
     winnings: number;
     timestamp: string;
 }

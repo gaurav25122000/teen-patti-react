@@ -12,9 +12,13 @@ import GameScreen from './components/GameScreen';
 import { usePokerGame } from './poker/hooks/usePokerGame';
 import PokerLobby from './poker/components/PokerLobby';
 
+// Blackjack Imports
+import { useBlackjackGame } from './blackjack/hooks/useBlackjackGame';
+import BlackjackLobby from './blackjack/components/BlackjackLobby';
+
 // General Components
 import ModeSelectionScreen from './components/ModeSelectionScreen';
-import LifetimeWinnings from './components/LifetimeWinnings'; // IMPORT
+import LifetimeWinnings from './components/LifetimeWinnings';
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,6 +29,7 @@ function App() {
 
   const teenPattiHook = useTeenPattiGame();
   const pokerHook = usePokerGame();
+  const blackjackHook = useBlackjackGame(); 
 
   const TeenPattiRoute = () => {
     const showSetup = teenPattiHook.gameState.players.length < 2;
@@ -50,7 +55,9 @@ function App() {
         <Route path="/" element={<ModeSelectionScreen />} />
         <Route path="/teen-patti" element={<TeenPattiRoute />} />
         <Route path="/poker" element={<PokerLobby pokerHook={pokerHook} onInteractionChange={handleInteractionChange} />} />
-        <Route path="/lifetime-winnings" element={<LifetimeWinnings />} /> // ADDED ROUTE
+        {/* --- UPDATED ROUTE --- */}
+        <Route path="/blackjack" element={<BlackjackLobby blackjackHook={blackjackHook} onInteractionChange={handleInteractionChange} />} />
+        <Route path="/lifetime-winnings" element={<LifetimeWinnings />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>

@@ -81,8 +81,14 @@ export default async (req) => {
 
         const teenPattiData = processDataForChart(allRecords, phoneHashes, 'teen-patti');
         const pokerData = processDataForChart(allRecords, phoneHashes, 'poker');
+        const blackjackData = processDataForChart(allRecords, phoneHashes, 'blackjack'); // ADDED
 
-        return new Response(JSON.stringify({ teenPatti: teenPattiData, poker: pokerData, allRecords: allRecords }), {
+        return new Response(JSON.stringify({ 
+            teenPatti: teenPattiData, 
+            poker: pokerData, 
+            blackjack: blackjackData, // ADDED
+            allRecords: allRecords 
+        }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });

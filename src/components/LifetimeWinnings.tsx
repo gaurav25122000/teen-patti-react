@@ -28,36 +28,40 @@ const LifetimeWinnings: React.FC = () => {
         }
     };
 
-    const COLORS = ['#00ffff', '#ff00ff', '#39ff14', '#ffd700', '#e8e8e8'];
+    const COLORS = ['#00ffff', '#ff00ff', '#39ff14', '#ffd700', '#e8e8e8', '#ff6600'];
 
     const processedTableData = useMemo(() => {
         if (!winningsData) return null;
 
-        const summary: { [key: string]: { teenPatti: number, poker: number, playerName: string } } = {};
+        const summary: { [key: string]: { teenPatti: number, poker: number, blackjack: number, playerName: string } } = {};
+
+        const initializeSummary = (hash: string, name: string) => {
+             if (!summary[hash]) {
+                summary[hash] = { teenPatti: 0, poker: 0, blackjack: 0, playerName: name };
+            }
+        };
 
         winningsData.teenPatti.players.forEach((p: any) => {
-            if (!summary[p.phoneHash]) {
-                summary[p.phoneHash] = { teenPatti: 0, poker: 0, playerName: p.playerName };
-            }
+            initializeSummary(p.phoneHash, p.playerName);
             summary[p.phoneHash].teenPatti = p.total;
         });
 
         winningsData.poker.players.forEach((p: any) => {
-            if (!summary[p.phoneHash]) {
-                summary[p.phoneHash] = { teenPatti: 0, poker: 0, playerName: p.playerName };
-            }
+            initializeSummary(p.phoneHash, p.playerName);
             summary[p.phoneHash].poker = p.total;
+        });
+
+        // ADDED: Process blackjack data
+        winningsData.blackjack.players.forEach((p: any) => {
+            initializeSummary(p.phoneHash, p.playerName);
+            summary[p.phoneHash].blackjack = p.total;
         });
 
         const allRecords = winningsData.allRecords.sort((a: any, b: any) => {
             const nameA = a.player_name.toUpperCase();
             const nameB = b.player_name.toUpperCase();
-            if (nameA < nameB) {
-                return -1;
-            }
-            if (nameA > nameB) {
-                return 1;
-            }
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
             return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
         });
 
@@ -69,12 +73,8 @@ const LifetimeWinnings: React.FC = () => {
             .sort((a, b) => {
                 const nameA = a.playerName.toUpperCase();
                 const nameB = b.playerName.toUpperCase();
-                if (nameA < nameB) {
-                    return -1;
-                }
-                if (nameA > nameB) {
-                    return 1;
-                }
+                if (nameA < nameB) return -1;
+                if (nameA > nameB) return 1;
                 return 0;
             });
 
@@ -113,18 +113,21 @@ const LifetimeWinnings: React.FC = () => {
                                         <th>Player</th>
                                         <th>Teen Patti</th>
                                         <th>Poker</th>
+                                        <th>Blackjack</th> {/* ADDED */}
                                         <th>Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {processedTableData.summaryArray.map((playerSummary) => {
-                                        const overallTotal = playerSummary.teenPatti + playerSummary.poker;
+                                        const overallTotal = playerSummary.teenPatti + playerSummary.poker + playerSummary.blackjack; // ADDED
                                         const totalClass = overallTotal >= 0 ? 'total-winnings' : 'total-losses';
                                         return (
                                             <tr key={playerSummary.hash}>
                                                 <td>{toTitleCase(playerSummary.playerName)}</td>
                                                 <td className={playerSummary.teenPatti >= 0 ? 'win-amount' : 'loss-amount'}>₹{playerSummary.teenPatti.toFixed(2)}</td>
                                                 <td className={playerSummary.poker >= 0 ? 'win-amount' : 'loss-amount'}>₹{playerSummary.poker.toFixed(2)}</td>
+                                                {/* ADDED */}
+                                                <td className={playerSummary.blackjack >= 0 ? 'win-amount' : 'loss-amount'}>₹{playerSummary.blackjack.toFixed(2)}</td>
                                                 <td className={totalClass}>₹{overallTotal.toFixed(2)}</td>
                                             </tr>
                                         );
@@ -192,6 +195,23 @@ const LifetimeWinnings: React.FC = () => {
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-gold)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-gold)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
                                 {winningsData.poker.players.map((p: any, i: number) => (
+                                    <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={toTitleCase(p.playerName)} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
+                                ))}
+                            </LineChart>
+                        </ResponsiveContainer>
+                        
+                        {/* ADDED BLACKJACK CHART */}
+                        <div className="stage-display" style={{ marginTop: '3rem', marginBottom: '2rem' }}>
+                            <h2>Blackjack Winnings Trend</h2>
+                        </div>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={winningsData.blackjack.trend}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-text-muted)" />
+                                <XAxis dataKey="date" stroke="var(--color-text)" />
+                                <YAxis stroke="var(--color-text)" />
+                                <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-magenta)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-magenta)' }} />
+                                <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
+                                {winningsData.blackjack.players.map((p: any, i: number) => (
                                     <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={toTitleCase(p.playerName)} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>

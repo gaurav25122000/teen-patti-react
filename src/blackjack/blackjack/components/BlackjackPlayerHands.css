@@ -1,0 +1,90 @@
+/* src/blackjack/components/BlackjackPlayerHands.css */
+
+.player-hands-container {
+    padding: 1rem 1.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--color-text-muted);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.player-hands-container.current-player-hands {
+    border-color: var(--color-glow-gold);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+}
+
+.player-hands-container h4 {
+    font-family: var(--font-display);
+    color: var(--color-glow-cyan);
+    margin: 0;
+    text-align: center;
+    border-bottom: 1px dashed var(--color-glow-cyan);
+    padding-bottom: 0.5rem;
+}
+
+.player-hand {
+    padding: 1rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    transition: all 0.3s ease;
+}
+
+.player-hand.current-hand {
+    border-color: var(--color-glow-gold);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+}
+
+.hand-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+}
+
+.hand-info .hand-status {
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+/* Status Colors */
+.player-hand.status-playing .hand-status {
+    color: var(--color-glow-yellow);
+}
+.player-hand.status-stand .hand-status {
+    color: var(--color-glow-cyan);
+}
+.player-hand.status-win .hand-status {
+    color: var(--color-glow-lime);
+}
+.player-hand.status-blackjack .hand-status {
+    color: var(--color-glow-lime);
+    text-shadow: 0 0 5px var(--color-glow-lime);
+    animation: neon-flicker 2s infinite alternate;
+}
+.player-hand.status-busted .hand-status,
+.player-hand.status-lose .hand-status,
+.player-hand.status-surrendered .hand-status {
+    color: var(--color-glow-magenta);
+}
+.player-hand.status-push .hand-status {
+    color: var(--color-text-muted);
+}
+
+
+.player-hand .inline-input-group {
+    width: 100%;
+}
+.player-hand .inline-input-group input {
+    flex-grow: 1;
+}
+
+.player-hand .game-actions {
+    justify-content: center;
+}

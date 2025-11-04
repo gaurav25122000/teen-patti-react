@@ -14,6 +14,10 @@ const ModeSelectionScreen: React.FC = () => {
         <Link to="/poker" className="btn btn-success" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
           Poker Manager
         </Link>
+        {/* --- ADDED LINK --- */}
+        <Link to="/blackjack" className="btn btn-error" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
+          Blackjack Manager
+        </Link>
         <Link to="/lifetime-winnings" className="btn btn-accent" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none', width: '100%', marginTop: '1rem', textAlign: 'center' }}>
           Lifetime Winnings
         </Link>
