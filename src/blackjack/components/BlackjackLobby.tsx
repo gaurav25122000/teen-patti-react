@@ -1,3 +1,4 @@
+// teen-patti-react/src/blackjack/components/BlackjackLobby.tsx
 // src/blackjack/components/BlackjackLobby.tsx
 import React, { useState } from 'react';
 import type { useBlackjackGame } from '../hooks/useBlackjackGame';
@@ -22,10 +23,15 @@ const BlackjackLobby: React.FC<BlackjackLobbyProps> = ({ blackjackHook, onIntera
         return false;
     };
 
-    // If a game is already in progress, go straight to the game.
-    if (gameState.players.length > 0 && step === 'intro') {
-         return <BlackjackGameScreen blackjackHook={blackjackHook} onInteractionChange={onInteractionChange} />;
+    // --- UPDATED: This logic now checks for setupNewGame ---
+    // If a game is in progress, go to 'game'. If hook is empty, go to 'intro'.
+    if (gameState.players.length > 0 && step !== 'game') {
+        setStep('game');
+    } else if (gameState.players.length === 0 && step === 'game') {
+        setStep('setup'); // Game was reset, go to setup
     }
+    // --- END UPDATE ---
+
 
     switch (step) {
         case 'intro':
@@ -36,7 +42,11 @@ const BlackjackLobby: React.FC<BlackjackLobbyProps> = ({ blackjackHook, onIntera
                 setStep('game');
             }} />;
         case 'game':
-            return <BlackjackGameScreen blackjackHook={blackjackHook} onInteractionChange={onInteractionChange} />;
+            return <BlackjackGameScreen 
+                     blackjackHook={blackjackHook} 
+                     onInteractionChange={onInteractionChange}
+                     onShowSetupRequest={() => setStep('setup')} // ADDED
+                   />;
     }
 };
 

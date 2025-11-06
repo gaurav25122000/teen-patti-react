@@ -1,3 +1,4 @@
+// teen-patti-react/src/blackjack/types/blackjackGameTypes.ts
 // src/blackjack/types/blackjackGameTypes.ts
 
 export type Card = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
@@ -6,7 +7,8 @@ export type HandStatus = 'playing' | 'stand' | 'busted' | 'blackjack' | 'push' |
 export interface PlayerHand {
     id: string; // Unique ID for the hand (e.g., `${playerId}-hand-${index}`)
     cards: Card[]; // Kept simple as per request, just for display/logic
-    bet: number;
+    bet: number; // The original bet amount
+    wager: number; // The amount at risk (e.g., 2x bet if doubled)
     status: HandStatus;
     hasHit: boolean; // To prevent doubling after hitting
 }
@@ -20,7 +22,7 @@ export interface BlackjackPlayer {
     initialHandsCount: number; // How many hands this player plays each round
     hands: PlayerHand[];
     isTakingBreak: boolean;
-    lastBet: number; // ADDED
+    lastBets: number[]; // UPDATED from lastBet: number
 }
 
 export interface DealerHand {

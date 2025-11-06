@@ -1,3 +1,4 @@
+// teen-patti-react/src/blackjack/hooks/useBlackjackGame.ts
 // src/blackjack/hooks/useBlackjackGame.ts
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { BlackjackGameState, BlackjackPlayer, PlayerHand, HandStatus, GameStage, DealerHand } from '../types/blackjackGameTypes';
@@ -42,7 +43,14 @@ const loadStateFromStorage = (): BlackjackGameState | null => {
             players: parsed.players.map((p: any) => ({ 
                 ...p, 
                 isTakingBreak: p.isTakingBreak || false,
-                lastBet: p.lastBet || initialState.minBet,
+                // --- FIX: Handle loading old state vs new state ---
+                lastBets: p.lastBets || (p.lastBet ? [p.lastBet] : [initialState.minBet]),
+                lastBet: undefined, // Remove old property
+                // --- FIX: Ensure wager is initialized ---
+                hands: p.hands.map((h: any) => ({
+                    ...h,
+                    wager: h.wager || h.bet || 0
+                }))
             })),
             dealerNet: parsed.dealerNet || 0,
             isBettingLocked: parsed.isBettingLocked !== undefined ? parsed.isBettingLocked : true,
@@ -114,8 +122,16 @@ export const useBlackjackGame = () => {
     useEffect(() => {
         if (gameState.players.length > 0) {
             localStorage.setItem(BLACKJACK_STORAGE_KEY, JSON.stringify(gameState));
+        } else {
+            // --- ADDED: Clear storage if game is reset ---
+            localStorage.removeItem(BLACKJACK_STORAGE_KEY);
         }
     }, [gameState]);
+
+    // --- ADDED: Action to reset game ---
+    const setupNewGame = useCallback(() => {
+        setGameState(createInitialBlackjackState());
+    }, []);
 
     const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string, numHands: number }[]) => {
         const initialPlayers: BlackjackPlayer[] = players.map((p, i) => ({
@@ -127,7 +143,7 @@ export const useBlackjackGame = () => {
             initialHandsCount: p.numHands,
             hands: [],
             isTakingBreak: false,
-            lastBet: createInitialBlackjackState().minBet,
+            lastBets: Array(p.numHands).fill(createInitialBlackjackState().minBet), // UPDATED
         }));
         setGameState({
             ...createInitialBlackjackState(),
@@ -163,6 +179,7 @@ export const useBlackjackGame = () => {
                             id: `${p.id}-hand-${handIndex}`,
                             cards: [],
                             bet: 0,
+                            wager: 0, // ADDED
                             status: 'playing',
                             hasHit: false,
                         };
@@ -171,6 +188,7 @@ export const useBlackjackGame = () => {
                     newHands[handIndex] = {
                         ...newHands[handIndex],
                         bet: amount,
+                        wager: amount, // ADDED
                     };
                     return { ...p, hands: newHands, stack: p.stack - amount };
                 }
@@ -188,7 +206,9 @@ export const useBlackjackGame = () => {
             let handsWithBets = 0;
             
             const newPlayers = prev.players.map(p => {
-                if (p.isTakingBreak || p.stack < (p.lastBet || prev.minBet)) {
+                // --- FIX: Check stack against *sum* of last bets ---
+                const totalLastBet = p.lastBets.slice(0, p.initialHandsCount).reduce((a, b) => a + b, 0);
+                if (p.isTakingBreak || p.stack < (prev.isBettingLocked ? totalLastBet : prev.minBet)) {
                     if (p.isTakingBreak) addMessage(`${p.name} is on break.`);
                     else addMessage(`${p.name} has insufficient chips to play.`);
                     return { ...p, hands: [] }; // Clear hands
@@ -202,6 +222,7 @@ export const useBlackjackGame = () => {
                          id: `${p.id}-hand-${i}`,
                          cards: [],
                          bet: 0,
+                         wager: 0, // ADDED
                          status: 'playing',
                          hasHit: false,
                     }));
@@ -210,15 +231,16 @@ export const useBlackjackGame = () => {
                 // If betting is locked, auto-place bets
                 if (prev.isBettingLocked) {
                     let playerStack = p.stack;
-                    currentHands = currentHands.map(h => {
-                        const betAmount = p.lastBet || prev.minBet;
+                    currentHands = currentHands.map((h, i) => {
+                        // --- FIX: Use the specific bet for this hand index ---
+                        const betAmount = p.lastBets[i] || p.lastBets[0] || prev.minBet;
                         if (playerStack >= betAmount) {
                             playerStack -= betAmount;
                             activePlayerFound = true;
                             handsWithBets++;
-                            return { ...h, bet: betAmount };
+                            return { ...h, bet: betAmount, wager: betAmount }; // UPDATED
                         }
-                        return { ...h, bet: 0 }; // Not enough stack for this hand
+                        return { ...h, bet: 0, wager: 0 }; // Not enough stack for this hand
                     });
                     totalHands += currentHands.length;
                     return { ...p, hands: currentHands, stack: playerStack };
@@ -337,25 +359,21 @@ export const useBlackjackGame = () => {
         
         const finalPlayers = endState.players.map(p => {
             let roundNet = 0;
-            let lastBet = p.lastBet; // Keep old lastBet if no new bet
+            // --- FIX: Store bets by index ---
+            const newLastBetsMap = new Map<number, number>();
             
-            p.hands.forEach(h => {
-                let betForCalc = h.bet;
-                if (h.status === 'surrendered') {
-                    betForCalc = h.bet * 2; // Bet was halved, restore to full for net calc
+            p.hands.forEach((h, i) => {
+                // --- FIX: Save the ORIGINAL bet (h.bet) ---
+                if (h.bet > 0) {
+                    newLastBetsMap.set(i, h.bet);
                 }
                 
-                // --- FIXED: Bet saving logic ---
-                if (betForCalc > 0) {
-                    lastBet = betForCalc; 
-                }
-                // --- END FIX ---
-                
-                if (h.status === 'win') roundNet += betForCalc;
-                else if (h.status === 'blackjack') roundNet += (endState.blackjackPayout === '3to2' ? betForCalc * 1.5 : betForCalc * 1.2);
-                else if (h.status === 'lose') roundNet -= betForCalc;
-                else if (h.status === 'busted') roundNet -= betForCalc;
-                else if (h.status === 'surrendered') roundNet -= betForCalc / 2; // Loss is half
+                // --- FIX: Calculate winnings based on correct properties ---
+                if (h.status === 'win') roundNet += h.wager;
+                else if (h.status === 'blackjack') roundNet += (endState.blackjackPayout === '3to2' ? h.bet * 1.5 : h.bet * 1.2); // BJ pays on original bet
+                else if (h.status === 'lose') roundNet -= h.wager;
+                else if (h.status === 'busted') roundNet -= h.wager;
+                else if (h.status === 'surrendered') roundNet -= h.bet / 2; // Surrender loss is half *original* bet
                 // Push is net 0
             });
 
@@ -369,8 +387,11 @@ export const useBlackjackGame = () => {
                 });
             }
             
+            // --- FIX: Merge new bets with old bets ---
+            const finalLastBets = p.lastBets.map((oldBet, i) => newLastBetsMap.get(i) || oldBet);
+
             // Reset hands for next round
-            return { ...p, hands: [], lastBet: lastBet > 0 ? lastBet : endState.minBet };
+            return { ...p, hands: [], lastBets: finalLastBets };
         });
 
         if(recordsToUpdate.length > 0) {
@@ -434,13 +455,13 @@ export const useBlackjackGame = () => {
                         addMessage("Cannot double down after hitting.");
                         return prev;
                     }
-                    if (player.stack < hand.bet) {
+                    if (player.stack < hand.bet) { // --- FIX: Check against original bet ---
                         addMessage("Not enough stack to double down.");
                         return prev;
                     }
                     addMessage(`${player.name} (Hand ${Number(hand.id.split('-').pop()) + 1}) doubles down.`);
-                    updatePlayer(player.id, { stack: player.stack - hand.bet });
-                    updateHand(player.id, hand.id, { bet: hand.bet * 2, status: 'stand' }); // Double = one card and stand
+                    updatePlayer(player.id, { stack: player.stack - hand.bet }); // --- FIX: Subtract original bet ---
+                    updateHand(player.id, hand.id, { wager: hand.bet * 2, status: 'stand' }); // --- FIX: Update wager, not bet ---
                     break;
                 case 'surrender':
                     if (!prev.allowSurrender) {
@@ -452,11 +473,11 @@ export const useBlackjackGame = () => {
                          return prev;
                     }
                     addMessage(`${player.name} (Hand ${Number(hand.id.split('-').pop()) + 1}) surrenders.`);
-                    const refund = hand.bet / 2;
-                    const lossAmount = hand.bet / 2; // This is what the dealer wins
+                    const refund = hand.bet / 2; // --- FIX: Based on original bet ---
+                    const lossAmount = hand.bet / 2; // --- FIX: Based on original bet ---
                     updatePlayer(player.id, { stack: player.stack + refund });
-                    updateHand(player.id, hand.id, { status: 'surrendered', bet: lossAmount }); // Store the loss amount
-                    newDealerNet += lossAmount; // --- FIX: UPDATE DEALER NET ---
+                    updateHand(player.id, hand.id, { status: 'surrendered' }); // --- FIX: Don't change bet/wager ---
+                    newDealerNet += lossAmount;
                     break;
                 case 'insurance':
                      addMessage(`${player.name} (Hand ${Number(hand.id.split('-').pop()) + 1}) takes insurance.`);
@@ -500,34 +521,36 @@ export const useBlackjackGame = () => {
             let dealerNetChange = 0;
             let finalStatus = status;
             let handBet = 0;
+            let handWager = 0;
 
             const newPlayers = prev.players.map(p => {
                 if (p.id !== playerId) return p;
                 
                 const newHands = p.hands.map(h => {
                     if (h.id !== handId) return h;
-                    handBet = h.bet;
+                    handBet = h.bet; // Original bet
+                    handWager = h.wager; // Amount at risk
 
                     if (status === 'blackjack') {
-                        const payout = (prev.blackjackPayout === '3to2' ? h.bet * 1.5 : h.bet * 1.2);
-                        playerWonAmount = h.bet + payout; // Return original bet + winnings
-                        dealerNetChange = -payout; // Dealer loses 1.5x
+                        const payout = (prev.blackjackPayout === '3to2' ? handBet * 1.5 : handBet * 1.2); // --- FIX: BJ pays on original bet ---
+                        playerWonAmount = handBet + payout; // Return original bet + winnings
+                        dealerNetChange = -payout; // Dealer loses 1.5x (or 1.2x)
                         finalStatus = 'blackjack';
                     } else if (status === 'win') {
-                        playerWonAmount = h.bet + h.bet; // Return original bet + 1x bet
-                        dealerNetChange = -h.bet; // Dealer loses 1x
+                        playerWonAmount = handBet + handWager; // --- FIX: Return original bet + wager ---
+                        dealerNetChange = -handWager; // --- FIX: Dealer loses wager ---
                         finalStatus = 'win';
                     } else if (status === 'lose') {
-                        playerWonAmount = 0; // Lose original bet
-                        dealerNetChange = h.bet; // Dealer wins 1x
+                        playerWonAmount = 0; // Lose original bet (already deducted)
+                        dealerNetChange = handWager; // --- FIX: Dealer wins wager ---
                         finalStatus = 'lose';
                     } else if (status === 'push') {
-                        playerWonAmount = h.bet; // Refund original bet
-                        dealerNetChange = 0; // No change
+                        playerWonAmount = handBet; // --- FIX: Refund original bet ---
+                        dealerNetChange = handWager - handBet; // --- FIX: If doubled, net 0. If not, net 0. ---
                         finalStatus = 'push';
                     } else if (status === 'busted') {
-                        playerWonAmount = 0; // Lose original bet
-                        dealerNetChange = h.bet; // Dealer wins 1x
+                        playerWonAmount = 0; // Lose original bet (already deducted)
+                        dealerNetChange = handWager; // --- FIX: Dealer wins wager ---
                         finalStatus = 'busted';
                     }
                     
@@ -555,9 +578,9 @@ export const useBlackjackGame = () => {
                 if (finalStatus === 'blackjack') addMessage(`${player.name} (Hand ${handNum}) has BLACKJACK! Wins ₹${playerWonAmount! - handBet}`);
                 else if (finalStatus === 'win') addMessage(`${player.name} (Hand ${handNum}) wins ₹${playerWonAmount! - handBet}`);
                 else if (finalStatus === 'push') addMessage(`${player.name} (Hand ${handNum}) pushes.`);
-                else if (finalStatus === 'lose') addMessage(`${player.name} (Hand ${handNum}) loses ₹${handBet}`);
-                else if (finalStatus === 'busted') addMessage(`${player.name} (Hand ${handNum}) busted and loses ₹${handBet}`);
-                else if (finalStatus === 'surrendered') addMessage(`${player.name} (Hand ${handNum}) surrendered and loses ₹${handBet}`);
+                else if (finalStatus === 'lose') addMessage(`${player.name} (Hand ${handNum}) loses ₹${handWager}`);
+                else if (finalStatus === 'busted') addMessage(`${player.name} (Hand ${handNum}) busted and loses ₹${handWager}`);
+                else if (finalStatus === 'surrendered') addMessage(`${player.name} (Hand ${handNum}) surrendered and loses ₹${handBet / 2}`); // --- FIX: Show correct loss ---
 
             }
 
@@ -592,7 +615,7 @@ export const useBlackjackGame = () => {
                 initialHandsCount: numHands,
                 hands: [],
                 isTakingBreak: false, 
-                lastBet: prev.minBet,
+                lastBets: Array(numHands).fill(prev.minBet), // UPDATED
             };
             addMessage(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
             return { ...prev, players: [...prev.players, newPlayer] };
@@ -659,9 +682,24 @@ export const useBlackjackGame = () => {
                 addMessage("Can only change hand count between rounds.");
                 return prev;
             }
-             const newPlayers = prev.players.map(p =>
-                p.id === playerId ? { ...p, initialHandsCount: numHands } : p
-            );
+             const newPlayers = prev.players.map(p => {
+                if (p.id === playerId) {
+                    // --- FIX: Adjust lastBets array to match new hand count ---
+                    const newLastBets = [...p.lastBets];
+                    if (numHands > newLastBets.length) {
+                        // Add new bets, using the first bet as default
+                        const defaultBet = newLastBets[0] || prev.minBet;
+                        for(let i = newLastBets.length; i < numHands; i++) {
+                            newLastBets.push(defaultBet);
+                        }
+                    } else if (numHands < newLastBets.length) {
+                        // Truncate bets
+                        newLastBets.length = numHands;
+                    }
+                    return { ...p, initialHandsCount: numHands, lastBets: newLastBets };
+                }
+                return p;
+             });
             const player = prev.players.find(p => p.id === playerId);
             if (player) {
                  addMessage(`${toTitleCase(player.name)} will now play ${numHands} hand(s) per round.`);
@@ -678,7 +716,7 @@ export const useBlackjackGame = () => {
             const newPlayers = prev.players.map(p => {
                 let refundedAmount = 0;
                 p.hands.forEach(h => {
-                    refundedAmount += h.bet;
+                    refundedAmount += h.bet; // --- FIX: Refund the original bet ---
                 });
                 return {
                     ...p,
@@ -687,6 +725,7 @@ export const useBlackjackGame = () => {
                          id: `${p.id}-hand-${i}`,
                          cards: [],
                          bet: 0,
+                         wager: 0, // ADDED
                          status: 'playing',
                          hasHit: false,
                     })),
@@ -700,6 +739,7 @@ export const useBlackjackGame = () => {
 
 
     const actions = useMemo(() => ({
+        setupNewGame, // ADDED
         setupGame,
         loadGame,
         placeBet,
@@ -712,7 +752,7 @@ export const useBlackjackGame = () => {
         togglePlayerBreak,
         updatePlayerHandCount,
         unlockAllBets, 
-    }), [setupGame, loadGame, placeBet, startRound, handlePlayerAction, setHandStatus,
+    }), [setupNewGame, setupGame, loadGame, placeBet, startRound, handlePlayerAction, setHandStatus, // ADDED setupNewGame
          addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, updatePlayerHandCount, unlockAllBets]);
 
     return { gameState, actions };

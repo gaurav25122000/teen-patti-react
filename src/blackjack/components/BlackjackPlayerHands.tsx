@@ -1,3 +1,4 @@
+// teen-patti-react/src/blackjack/components/BlackjackPlayerHands.tsx
 // src/blackjack/components/BlackjackPlayerHands.tsx
 import React, { useState } from 'react';
 import type { BlackjackPlayer, HandStatus } from '../types/blackjackGameTypes';
@@ -39,11 +40,15 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
         if (isBettingLocked) {
              return (
                 <div className="hand-bet" style={{ fontSize: '1.1rem', color: 'var(--color-glow-cyan)'}}>
-                    Bet: <strong>₹{hand.bet}</strong> (Locked)
+                    {/* UPDATED to show wager */}
+                    Bet: <strong>₹{hand.wager}</strong> (Locked)
                 </div>
             );
         }
         
+        // --- FIX: Get the last bet for this specific hand ---
+        const lastBetForThisHand = player.lastBets[handIndex] || player.lastBets[0] || 10; // Fallback
+
         // Betting is unlocked, show input
         return (
             <div className="inline-input-group">
@@ -51,7 +56,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                     type="number"
                     value={betAmounts[handIndex] || ''}
                     onChange={e => handleBetChange(handIndex, e.target.value)}
-                    placeholder={`Bet (Min: ${player.lastBet})`}
+                    placeholder={`Bet (Last: ${lastBetForThisHand})`}
                 />
                 <button className="btn-success" onClick={() => handleBetSubmit(handIndex)}>Place Bet</button>
             </div>
@@ -104,9 +109,10 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                         <strong>Hand {index + 1}</strong>
                         <div style={{textAlign: 'right'}}>
                             <span className="hand-status">{toTitleCase(hand.status)}</span>
-                            {hand.bet > 0 && 
+                            {/* --- UPDATED LOGIC --- */}
+                            {hand.wager > 0 && 
                                 <span style={{color: 'var(--color-text-muted)', display: 'block', fontSize: '0.9rem'}}>
-                                    Bet: ₹{hand.bet}
+                                    Bet: ₹{hand.wager} {hand.wager !== hand.bet && `(2x${hand.bet})`}
                                 </span>
                             }
                         </div>

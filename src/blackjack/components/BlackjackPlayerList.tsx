@@ -1,3 +1,4 @@
+// teen-patti-react/src/blackjack/components/BlackjackPlayerList.tsx
 // src/blackjack/components/BlackjackPlayerList.tsx
 import React from 'react';
 import type { BlackjackPlayer, BlackjackGameState } from '../types/blackjackGameTypes';
@@ -38,7 +39,8 @@ const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, game
                             status = 'Waiting for Settle';
                         }
                         
-                        const totalBet = p.hands.reduce((acc, h) => acc + h.bet, 0);
+                        // --- UPDATED LOGIC ---
+                        const totalWager = p.hands.reduce((acc, h) => acc + h.wager, 0);
 
                         return (
                             <tr key={p.id} className={isCurrent ? 'current-player' : (p.isTakingBreak ? 'on-break' : '')}>
@@ -46,7 +48,7 @@ const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, game
                                 <td data-label="Stack / Buy-In">₹ {p.stack} / ₹ {p.totalBuyIn}</td>
                                 <td data-label="Status">
                                     {status}
-                                    {totalBet > 0 && ` (Bet: ₹${totalBet})`}
+                                    {totalWager > 0 && ` (Bet: ₹${totalWager})`}
                                 </td>
                             </tr>
                         );

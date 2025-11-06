@@ -1,3 +1,4 @@
+// teen-patti-react/src/blackjack/components/BlackjackGameScreen.tsx
 // src/blackjack/components/BlackjackGameScreen.tsx
 import React, { useState, useMemo } from 'react'; 
 import type { useBlackjackGame } from '../hooks/useBlackjackGame';
@@ -14,9 +15,10 @@ import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
 interface BlackjackGameScreenProps {
     blackjackHook: ReturnType<typeof useBlackjackGame>;
     onInteractionChange: (isOpen: boolean) => void; 
+    onShowSetupRequest: () => void; // ADDED
 }
 
-const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook, onInteractionChange }) => {
+const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook, onInteractionChange, onShowSetupRequest }) => {
     const { gameState, actions } = blackjackHook;
     const { players, messages, gameStage, currentPlayerId, currentHandId, dealerNet, isBettingLocked } = gameState; // ADDED isBettingLocked
 
@@ -54,6 +56,14 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     const handleCloseOwings = () => {
         setShowOwings(false);
         onInteractionChange(false);
+    };
+    
+    // --- ADDED: Handler for new button ---
+    const handleShowSetup = () => {
+        if (window.confirm("Are you sure you want to end this game and start a new one? All progress will be lost.")) {
+            actions.setupNewGame(); // 1. Clears the hook state
+            onShowSetupRequest();   // 2. Tells lobby to change view
+        }
     };
 
     // --- UPDATED LOGIC FOR BUTTON STATE ---
@@ -94,9 +104,10 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                             onStartRound={actions.startRound}
                             onShowModal={handleShowModal}
                             onShowOwings={handleShowOwings}
-                            onUnlockBets={actions.unlockAllBets} // ADDED
-                            isBettingLocked={isBettingLocked} // ADDED
-                            isDealDisabled={isDealDisabled} // ADDED
+                            onUnlockBets={actions.unlockAllBets} 
+                            isBettingLocked={isBettingLocked} 
+                            isDealDisabled={isDealDisabled}
+                            onShowSetup={handleShowSetup} // ADDED
                         />
                     )}
                     
@@ -119,11 +130,11 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                                 isCurrentPlayer={player.id === currentPlayerId}
                                 currentHandId={currentHandId}
                                 gameStage={gameStage}
-                                isBettingLocked={isBettingLocked} // ADDED
+                                isBettingLocked={isBettingLocked} 
                                 onPlaceBet={actions.placeBet}
                                 onPlayerAction={actions.handlePlayerAction}
                                 onSetHandStatus={actions.setHandStatus}
-                                onUnlockBet={actions.unlockAllBets} // Pass unlock action
+                                onUnlockBet={actions.unlockAllBets} 
                             />
                         ))}
                     </div>
