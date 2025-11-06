@@ -517,49 +517,52 @@ export const useBlackjackGame = () => {
     
     const setHandStatus = (playerId: number, handId: string, status: HandStatus, dealerScore: number = 0) => {
          setGameState(prev => {
-            let playerWonAmount: number | null = null;
+            // --- RE-BUILT PAYOUT LOGIC ---
+            let playerWonAmount: number | null = null; // This is the total amount to ADD to the stack
             let dealerNetChange = 0;
             let finalStatus = status;
-            let handBet = 0;
-            let handWager = 0;
+            let handBet = 0; // The original bet
+            let handWager = 0; // The total amount at risk (bet or 2*bet)
 
             const newPlayers = prev.players.map(p => {
                 if (p.id !== playerId) return p;
                 
                 const newHands = p.hands.map(h => {
                     if (h.id !== handId) return h;
-                    handBet = h.bet; // Original bet
-                    handWager = h.wager; // Amount at risk
+                    handBet = h.bet; 
+                    handWager = h.wager;
+
+                    if (h.status === 'surrendered') {
+                        playerWonAmount = 0; // Already handled
+                        dealerNetChange = 0; // Already handled
+                        finalStatus = 'surrendered';
+                        return { ...h, status: finalStatus };
+                    }
 
                     if (status === 'blackjack') {
-                        const payout = (prev.blackjackPayout === '3to2' ? handBet * 1.5 : handBet * 1.2); // --- FIX: BJ pays on original bet ---
-                        playerWonAmount = handBet + payout; // Return original bet + winnings
-                        dealerNetChange = -payout; // Dealer loses 1.5x (or 1.2x)
+                        // Pays 1.5x on the *wager*. This is a house rule if it's on a doubled bet.
+                        const payout = handWager*1.5;
+                        playerWonAmount = payout; // Return wager + payout
+                        dealerNetChange = -payout;
                         finalStatus = 'blackjack';
                     } else if (status === 'win') {
-                        playerWonAmount = handBet + handWager; // --- FIX: Return original bet + wager ---
-                        dealerNetChange = -handWager; // --- FIX: Dealer loses wager ---
+                        playerWonAmount = handWager * 2; // Return wager + win wager
+                        dealerNetChange = -handWager;
                         finalStatus = 'win';
                     } else if (status === 'lose') {
-                        playerWonAmount = 0; // Lose original bet (already deducted)
-                        dealerNetChange = handWager; // --- FIX: Dealer wins wager ---
+                        playerWonAmount = 0; // Wager is lost
+                        dealerNetChange = handWager;
                         finalStatus = 'lose';
                     } else if (status === 'push') {
-                        playerWonAmount = handBet; // --- FIX: Refund original bet ---
-                        dealerNetChange = handWager - handBet; // --- FIX: If doubled, net 0. If not, net 0. ---
+                        playerWonAmount = handWager; // Return wager
+                        dealerNetChange = 0;
                         finalStatus = 'push';
                     } else if (status === 'busted') {
-                        playerWonAmount = 0; // Lose original bet (already deducted)
-                        dealerNetChange = handWager; // --- FIX: Dealer wins wager ---
+                        playerWonAmount = 0; // Wager is lost
+                        dealerNetChange = handWager;
                         finalStatus = 'busted';
                     }
                     
-                    if (h.status === 'surrendered') {
-                        playerWonAmount = 0; // Already refunded
-                        dealerNetChange = 0; // Already handled in handlePlayerAction
-                        finalStatus = 'surrendered';
-                    }
-
                     return { ...h, status: finalStatus };
                 });
                 
@@ -575,14 +578,15 @@ export const useBlackjackGame = () => {
                 const player = prev.players.find(p => p.id === playerId)!;
                 const handNum = Number(handId.split('-').pop()) + 1;
                 
-                if (finalStatus === 'blackjack') addMessage(`${player.name} (Hand ${handNum}) has BLACKJACK! Wins ₹${playerWonAmount! - handBet}`);
-                else if (finalStatus === 'win') addMessage(`${player.name} (Hand ${handNum}) wins ₹${playerWonAmount! - handBet}`);
+                if (finalStatus === 'blackjack') addMessage(`${player.name} (Hand ${handNum}) has BLACKJACK! Wins ₹${playerWonAmount}`);
+                else if (finalStatus === 'win') addMessage(`${player.name} (Hand ${handNum}) wins ₹${playerWonAmount! - handWager}`);
                 else if (finalStatus === 'push') addMessage(`${player.name} (Hand ${handNum}) pushes.`);
                 else if (finalStatus === 'lose') addMessage(`${player.name} (Hand ${handNum}) loses ₹${handWager}`);
                 else if (finalStatus === 'busted') addMessage(`${player.name} (Hand ${handNum}) busted and loses ₹${handWager}`);
-                else if (finalStatus === 'surrendered') addMessage(`${player.name} (Hand ${handNum}) surrendered and loses ₹${handBet / 2}`); // --- FIX: Show correct loss ---
+                else if (finalStatus === 'surrendered') addMessage(`${player.name} (Hand ${handNum}) surrendered and loses ₹${handBet / 2}`);
 
             }
+            // --- END RE-BUILT LOGIC ---
 
             // --- AUTO-SETTLE LOGIC ---
             if (areAllHandsSettled(newPlayers)) {
