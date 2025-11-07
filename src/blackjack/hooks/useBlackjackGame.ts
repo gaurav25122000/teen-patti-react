@@ -463,6 +463,47 @@ export const useBlackjackGame = () => {
                     updatePlayer(player.id, { stack: player.stack - hand.bet }); // --- FIX: Subtract original bet ---
                     updateHand(player.id, hand.id, { wager: hand.bet * 2, status: 'stand' }); // --- FIX: Update wager, not bet ---
                     break;
+                // --- SPLIT LOGIC ADDED ---
+                case 'split':
+                    if (hand.hasHit) {
+                        addMessage("Cannot split after hitting.");
+                        return prev;
+                    }
+                    if (player.stack < hand.bet) { // Check stack against original bet
+                        addMessage("Not enough stack to split.");
+                        return prev;
+                    }
+
+                    const currentHandIndex = player.hands.findIndex(h => h.id === prev.currentHandId);
+                    if (currentHandIndex === -1) return prev; // Should not happen
+
+                    addMessage(`${player.name} (Hand ${Number(hand.id.split('-').pop()) + 1}) splits.`);
+                    
+                    const newHand: PlayerHand = {
+                        id: `${player.id}-hand-split-${Date.now()}`, // Unique ID
+                        cards: [],
+                        bet: hand.bet,
+                        wager: hand.bet,
+                        status: 'playing',
+                        hasHit: false,
+                    };
+                    
+                    const newStack = player.stack - newHand.bet; // Deduct bet for new hand
+
+                    newPlayers = newPlayers.map(p => {
+                        if (p.id !== player.id) return p;
+
+                        const newHands = [...p.hands];
+                        // Insert the new hand immediately after the one being split
+                        newHands.splice(currentHandIndex + 1, 0, newHand); 
+
+                        return { ...p, stack: newStack, hands: newHands };
+                    });
+                    
+                    // The turn stays on the current hand. The player will play this hand,
+                    // and findNextHand() will move to the newly inserted hand afterward.
+                    return { ...prev, players: newPlayers };
+                // --- END SPLIT LOGIC ---
                 case 'surrender':
                     if (!prev.allowSurrender) {
                         addMessage("Surrender is not allowed.");

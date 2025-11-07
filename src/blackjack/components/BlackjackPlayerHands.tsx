@@ -11,7 +11,7 @@ interface BlackjackPlayerHandsProps {
     gameStage: 'betting' | 'player-turn' | 'dealer-turn' | 'round-over' | 'dealing';
     isBettingLocked: boolean; // ADDED
     onPlaceBet: (playerId: number, handIndex: number, amount: number) => void;
-    onPlayerAction: (action: 'hit' | 'stand' | 'double' | 'surrender') => void;
+    onPlayerAction: (action: 'hit' | 'stand' | 'double' | 'surrender' | 'split') => void;
     onSetHandStatus: (playerId: number, handId: string, status: HandStatus) => void;
     onUnlockBet: () => void; // RENAMED
 }
@@ -73,6 +73,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                 <button className="btn-primary" onClick={() => onPlayerAction('hit')}>Hit</button>
                 <button className="btn-secondary" onClick={() => onPlayerAction('stand')}>Stand</button>
                 <button className="btn-success" onClick={() => onPlayerAction('double')}>Double</button>
+                <button className="btn-accent" onClick={() => onPlayerAction('split')}>Split</button>
                 <button className="btn-error" onClick={() => onPlayerAction('surrender')}>Surrender</button>
             </div>
         );
