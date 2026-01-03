@@ -14,7 +14,7 @@ interface PokerGameScreenProps {
     onInteractionChange: (isOpen: boolean) => void;
 }
 
-type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown' | 'owings' | 'toggleBreak';
+type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown' | 'owings' | 'toggleBreak' | 'streakWinnings';
 
 const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteractionChange }) => {
     const { gameState, actions } = pokerHook;
@@ -22,13 +22,14 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
 
     const [modalMode, setModalMode] = useState<ModalMode>('none');
 
-    const [selectedWinnerId, setSelectedWinnerId] = useState<number | null>(null);
+    const [selectedWinnerIds, setSelectedWinnerIds] = useState<Set<number>>(new Set());
 
     const [managePlayerId, setManagePlayerId] = useState<string>('');
     const [addPlayerName, setAddPlayerName] = useState('');
     const [addPlayerStack, setAddPlayerStack] = useState('1000');
     const [addPlayerPhone, setAddPlayerPhone] = useState('');
     const [addChipsAmount, setAddChipsAmount] = useState('1000');
+    const [streakAmount, setStreakAmount] = useState('50');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
     const currentPlayer = activePlayerIndex > -1 ? players[activePlayerIndex] : null;
@@ -39,9 +40,13 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             const eligiblePlayers = Array.from(currentPot.eligiblePlayers);
 
             if (eligiblePlayers.length === 1) {
-                actions.awardPot(0, eligiblePlayers[0]);
+                actions.awardPot(0, [eligiblePlayers[0]]);
                 if (modalMode === 'showdown') setModalMode('none');
             } else if (eligiblePlayers.length > 1) {
+                // Pre-select all eligible players by default? Or none? Let's select none or the first.
+                // Actually, if we want to allow splitting, let's start with empty or just the first.
+                // Better UX: Pre-select all? No, usually one winner.
+                setSelectedWinnerIds(new Set([eligiblePlayers[0]]));
                 setModalMode('showdown');
             }
         } else if (gameStage !== 'showdown' && modalMode === 'showdown') {
@@ -54,9 +59,13 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         onInteractionChange(isModalOpen);
 
         if (modalMode === 'showdown' && pot.length > 0 && pot[0].eligiblePlayers.size > 0) {
-            setSelectedWinnerId(Array.from(pot[0].eligiblePlayers)[0]);
+            // Already handled in the effect above, but ensuring consistency
+             if (selectedWinnerIds.size === 0) {
+                const eligible = Array.from(pot[0].eligiblePlayers);
+                if (eligible.length > 0) setSelectedWinnerIds(new Set([eligible[0]]));
+             }
         }
-        if ((modalMode === 'removePlayer' || modalMode === 'addChips' || modalMode === 'toggleBreak') && players.length > 0 && !managePlayerId) {
+        if ((modalMode === 'removePlayer' || modalMode === 'addChips' || modalMode === 'toggleBreak' || modalMode === 'streakWinnings') && players.length > 0 && !managePlayerId) {
             setManagePlayerId(String(players[0].id));
         } else if (modalMode === 'addPlayer') {
             setManagePlayerId('');
@@ -71,9 +80,21 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     };
 
     const handleAwardPot = () => {
-        if (selectedWinnerId !== null) {
-            actions.awardPot(0, selectedWinnerId);
+        if (selectedWinnerIds.size > 0) {
+            actions.awardPot(0, Array.from(selectedWinnerIds));
+        } else {
+            alert("Please select at least one winner.");
         }
+    };
+
+    const toggleWinnerSelection = (id: number) => {
+        const newSet = new Set(selectedWinnerIds);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        setSelectedWinnerIds(newSet);
     };
 
     const handleShowOwings = () => {
@@ -102,6 +123,11 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             case 'toggleBreak':
                 if (!managePlayerId) return alert("Please select a player.");
                 actions.togglePlayerBreak(parseInt(managePlayerId, 10));
+                break;
+            case 'streakWinnings':
+                if (!managePlayerId) return alert("Please select a player.");
+                if (!streakAmount || parseInt(streakAmount, 10) <= 0) return alert("Please enter a valid amount.");
+                actions.applyStreakWinnings(parseInt(managePlayerId, 10), parseInt(streakAmount, 10));
                 break;
         }
         closeModal();
@@ -149,7 +175,15 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                     break;
                 case 'toggleBreak':
                     title = "Toggle Player Break";
-                    body = <div className="form-group"><label>Select Player</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>;
+                    body = <div className="form-group"><label>Select Player</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)} ({p.isTakingBreak ? "On Break" : "Active"})</option>)}</select></div>;
+                    break;
+                case 'streakWinnings':
+                    title = "Give Streak Winnings";
+                    body = <>
+                        <div className="form-group"><label>Select Winner</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                        <div className="form-group"><label>Amount (from each other player)</label><input type="number" value={streakAmount} onChange={e => setStreakAmount(e.target.value)} /></div>
+                        <p className="text-muted" style={{ fontSize: '0.9em', marginTop: '10px' }}>This will deduct ₹{streakAmount} from everyone else and add the total to the selected player.</p>
+                    </>;
                     break;
             }
 
@@ -166,10 +200,41 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         const title = `Awarding Pot (${currentPot.amount})`;
         const theme = 'success';
         const body = <div className="form-group">
-            <label htmlFor="winner-select">Select Winner</label>
-            <select id="winner-select" onChange={e => setSelectedWinnerId(Number(e.target.value))} value={selectedWinnerId ?? ''}>
-                {eligiblePlayers.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}
-            </select>
+            <label style={{ marginBottom: '12px', display: 'block', fontWeight: 'bold' }}>Select Winner(s) to Split Pot</label>
+            <div className="winner-selection-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {eligiblePlayers.map(p => {
+                    const isSelected = selectedWinnerIds.has(p.id);
+                    return (
+                        <label key={p.id} style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '12px', 
+                            cursor: 'pointer', 
+                            padding: '12px', 
+                            background: isSelected ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.05)', 
+                            border: isSelected ? '1px solid #4CAF50' : '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px',
+                            transition: 'all 0.2s ease'
+                        }}>
+                            <input 
+                                type="checkbox" 
+                                checked={isSelected} 
+                                onChange={() => toggleWinnerSelection(p.id)}
+                                style={{ transform: 'scale(1.2)', cursor: 'pointer', width: 'auto', margin: 0 }}
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontWeight: '500', fontSize: '1.05em' }}>{toTitleCase(p.name)}</span>
+                            </div>
+                        </label>
+                    );
+                })}
+            </div>
+            {selectedWinnerIds.size > 1 && (
+                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', textAlign: 'center' }}>
+                    <p style={{ margin: 0, fontSize: '0.95em', color: '#aaa' }}>Pot Total: <strong style={{ color: '#fff' }}>₹{currentPot.amount}</strong></p>
+                    <p style={{ margin: '4px 0 0 0', fontWeight: 'bold', color: '#4CAF50' }}>Split: ₹{Math.floor(currentPot.amount / selectedWinnerIds.size)} each</p>
+                </div>
+            )}
         </div>;
         const footer = <button className="btn-modal btn-modal-primary theme-success" onClick={handleAwardPot}>Award Pot to Winner</button>;
 
@@ -197,6 +262,9 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         </button>
                         <button className="btn-success" onClick={handleShowOwings} disabled={gameStage !== 'pre-deal'}>
                             Final Owings
+                        </button>
+                        <button className="btn-primary" style={{ backgroundColor: '#ff9800' }} onClick={() => setModalMode('streakWinnings')}>
+                            Streak Winnings
                         </button>
                     </div>)}
 

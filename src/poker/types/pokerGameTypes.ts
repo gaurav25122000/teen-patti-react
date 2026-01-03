@@ -13,6 +13,8 @@ export interface PokerPlayer {
     totalPotContribution: number;
     isTakingBreak: boolean; // ADDED
     canOnlyCall: boolean; // ADDED
+    winningStreak: number; // ADDED
+    roundWinnings: number; // ADDED for determining streak winner at end of hand
 }
 
 export type GameStage = 'pre-deal' | 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown';

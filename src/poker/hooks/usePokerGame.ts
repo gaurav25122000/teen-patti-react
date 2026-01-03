@@ -49,6 +49,13 @@ export const usePokerGame = () => {
                     }
                 });
             }
+            if (parsed.players) {
+                parsed.players = parsed.players.map((p: any) => ({
+                    ...p,
+                    winningStreak: p.winningStreak ?? 0,
+                    roundWinnings: 0 // Always reset on load
+                }));
+            }
             setGameState(parsed);
             return true;
         } catch {
@@ -120,9 +127,9 @@ export const usePokerGame = () => {
         const finalPlayers = updatedPlayers.map(p => {
             const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false, canOnlyCall: false };
             if (p.id === winner.id) {
-                return { ...playerWithReset, stack: p.stack + totalPot };
+                return { ...playerWithReset, stack: p.stack + totalPot, winningStreak: p.winningStreak + 1 };
             }
-            return playerWithReset;
+            return { ...playerWithReset, winningStreak: 0 };
         });
 
         const finalWinner = finalPlayers.find(p => p.id === winner.id)!;
@@ -130,7 +137,7 @@ export const usePokerGame = () => {
 
         return {
             ...createInitialPokerState(),
-            players: finalPlayers,
+            players: finalPlayers.map(p => ({ ...p, roundWinnings: 0 })), // Reset round winnings
             dealerButtonIndex: prevGameState.dealerButtonIndex,
             smallBlindAmount: prevGameState.smallBlindAmount,
             bigBlindAmount: prevGameState.bigBlindAmount,
@@ -288,7 +295,9 @@ export const usePokerGame = () => {
             id: i + 1, name: toTitleCase(p.name), stack: p.stack,
             totalBuyIn: p.stack, phoneNumber: p.phoneNumber,
             inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false,
-            isTakingBreak: false, canOnlyCall: false
+            isTakingBreak: false, canOnlyCall: false,
+            winningStreak: 0,
+            roundWinnings: 0
         }));
 
         setGameState({
@@ -372,21 +381,23 @@ export const usePokerGame = () => {
         });
     }, [addMessage]);
 
-    const awardPot = useCallback((potIndex: number, winnerId: number) => {
+    const awardPot = useCallback((potIndex: number, winnerIds: number[]) => {
         setGameState(prev => {
             const potToAward = prev.pot[potIndex];
             if (!potToAward) return prev;
 
-            let winnerName = '';
+            const splitAmount = Math.floor(potToAward.amount / winnerIds.length);
+            const winnerNames: string[] = [];
+
             const newPlayers = prev.players.map(p => {
-                if (p.id === winnerId) {
-                    winnerName = toTitleCase(p.name);
-                    return { ...p, stack: p.stack + potToAward.amount };
+                if (winnerIds.includes(p.id)) {
+                    winnerNames.push(toTitleCase(p.name));
+                    return { ...p, stack: p.stack + splitAmount, roundWinnings: p.roundWinnings + splitAmount };
                 }
                 return p;
             });
 
-            addMessage(`${winnerName} wins a pot of ₹${potToAward.amount}.`);
+            addMessage(`${winnerNames.join(' & ')} win(s) the pot of ₹${potToAward.amount} (Split: ₹${splitAmount} each).`);
 
             const newPots = prev.pot.filter((_, index) => index !== potIndex);
 
@@ -418,10 +429,25 @@ export const usePokerGame = () => {
 
                 bulkUpdateWinnings(recordsToUpdate);
 
-                const finalPlayers = newPlayers.map(p => ({ ...p, inHand: false, isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false, canOnlyCall: false }));
+                const maxRoundWinnings = Math.max(...newPlayers.map(p => p.roundWinnings));
+                
+                // Reset hand state for everyone, apply streak logic
+                const finalPlayersWithStreak = newPlayers.map(p => ({ 
+                    ...p, 
+                    inHand: false, 
+                    isAllIn: false, 
+                    roundBet: 0, 
+                    totalPotContribution: 0, 
+                    hasActed: false, 
+                    canOnlyCall: false,
+                    winningStreak: (p.roundWinnings === maxRoundWinnings && p.roundWinnings > 0) ? p.winningStreak + 1 : 0, 
+                    roundWinnings: 0, // Reset for next hand
+                    totalBuyIn: p.totalBuyIn 
+                }));
+
                 return {
                     ...prev,
-                    players: finalPlayers.map(p => ({ ...p, totalBuyIn: p.totalBuyIn })), 
+                    players: finalPlayersWithStreak, 
                     pot: [],
                     gameStage: 'pre-deal',
                     activePlayerIndex: -1,
@@ -452,7 +478,9 @@ export const usePokerGame = () => {
                 totalPotContribution: 0,
                 hasActed: false,
                 isTakingBreak: false, 
-                canOnlyCall: false 
+                canOnlyCall: false,
+                winningStreak: 0,
+                roundWinnings: 0
             };
             addMessage(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
             return { ...prev, players: [...prev.players, newPlayer] };
@@ -513,10 +541,39 @@ export const usePokerGame = () => {
         });
     }, [addMessage]);
 
+    const applyStreakWinnings = useCallback((winnerId: number, amount: number) => {
+        setGameState(prev => {
+            if (amount <= 0) return prev;
+            
+            const winner = prev.players.find(p => p.id === winnerId);
+            if (!winner) return prev;
+
+            let totalDeducted = 0;
+            const newPlayers = prev.players.map(p => {
+                if (p.id === winnerId) return p; // Will update winner later
+
+                // Deduct from everyone else
+                const deduction = amount;
+                totalDeducted += deduction;
+                return { ...p, stack: p.stack - deduction };
+            });
+
+            // Add to winner and update streaks
+            const finalPlayers = newPlayers.map(p => {
+                if (p.id === winnerId) {
+                    return { ...p, stack: p.stack + totalDeducted, winningStreak: p.winningStreak + 1 };
+                }
+                return { ...p, winningStreak: 0 };
+            });
+
+            addMessage(`Streak Winnings! ${toTitleCase(winner.name)} receives ₹${totalDeducted} (₹${amount} from each player).`);
+            return { ...prev, players: finalPlayers };
+        });
+    }, [addMessage]);
 
     const actions = useMemo(() => ({
-        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak
-    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak]);
+        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings
+    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings]);
 
     return { gameState, actions };
 };
