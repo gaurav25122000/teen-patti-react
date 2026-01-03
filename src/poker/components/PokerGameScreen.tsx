@@ -8,15 +8,17 @@ import InteractionModal from '../../components/InteractionModal';
 import OwingsModal from '../../components/OwingsModal';
 import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
 import { toTitleCase } from '../../utils/formatters';
+import { useBroadcast } from '../../hooks/useBroadcast';
 
 interface PokerGameScreenProps {
     pokerHook: ReturnType<typeof usePokerGame>;
     onInteractionChange: (isOpen: boolean) => void;
+    isReadOnly?: boolean;
 }
 
 type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown' | 'owings' | 'toggleBreak' | 'streakWinnings';
 
-const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteractionChange }) => {
+const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteractionChange, isReadOnly = false }) => {
     const { gameState, actions } = pokerHook;
     const { players, activePlayerIndex, messages, gameStage, pot } = gameState;
 
@@ -32,7 +34,35 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const [streakAmount, setStreakAmount] = useState('50');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
+
+    // Streaming Hook
+    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast(gameState);
+    const [showStreamModal, setShowStreamModal] = useState(false);
+
+    // Broadcast state changes
+    useEffect(() => {
+        if (isStreaming && !isReadOnly) {
+            broadcast({ ...gameState, gameType: 'poker' });
+        }
+    }, [gameState, isStreaming, broadcast, isReadOnly]);
+
     const currentPlayer = activePlayerIndex > -1 ? players[activePlayerIndex] : null;
+
+    const handleStartStream = () => {
+        startStreaming();
+        setShowStreamModal(true);
+    };
+
+    const handleStopStream = () => {
+        stopStreaming();
+        setShowStreamModal(false);
+    };
+
+    const copyStreamLink = () => {
+        const link = `${window.location.origin}/watch/${streamId}`;
+        navigator.clipboard.writeText(link);
+        alert('Stream link copied to clipboard!');
+    };
 
     useEffect(() => {
         if (gameStage === 'showdown' && pot.length > 0) {
@@ -134,19 +164,80 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     };
 
     const renderStageDisplay = () => (
-        <div className="stage-display">
+        <div className="stage-display" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <h2>{toTitleCase(gameStage)}</h2>
+            {isReadOnly && <div className="badge badge-warning" style={{ marginTop: '0.5rem' }}>SPECTATOR MODE</div>}
+            
+            {!isReadOnly && !isStreaming && (
+                <button 
+                    className="btn-sm btn-outline-info" 
+                    style={{ marginTop: '0.5rem' }} 
+                    onClick={handleStartStream}
+                >
+                    Start Live Stream
+                </button>
+            )}
+            
+            {!isReadOnly && isStreaming && (
+                <div style={{ marginTop: '0.5rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                     <span className="badge badge-success">LIVE ({viewerCount})</span>
+                     <button className="btn-sm btn-outline-secondary" onClick={() => setShowStreamModal(true)}>Link</button>
+                     <button className="btn-sm btn-outline-danger" onClick={handleStopStream}>Stop</button>
+                </div>
+            )}
         </div>
     );
 
     const renderModal = () => {
-        if (modalMode === 'none') return null;
+        if (modalMode === 'none' && !showStreamModal) return null;
 
         if (modalMode === 'owings') {
             return <OwingsModal isOpen={true} onClose={closeModal} transactions={transactions} />;
         }
 
-        if (modalMode !== 'showdown') {
+        if (showStreamModal && !streamId) {
+             return (
+                 <InteractionModal 
+                    isOpen={true} 
+                    onClose={() => setShowStreamModal(false)}
+                    title="Starting Stream..."
+                    theme="default"
+                    footerContent={null}
+                >
+                    <div style={{ padding: '20px', textAlign: 'center' }}>Connecting to stream server...</div>
+                </InteractionModal>
+             );
+        }
+
+        if (showStreamModal && streamId) {
+             return (
+                 <InteractionModal 
+                    isOpen={true} 
+                    onClose={() => setShowStreamModal(false)}
+                    title="Live Stream Started"
+                    theme="success"
+                    footerContent={<button className="btn-modal btn-modal-primary" onClick={() => setShowStreamModal(false)}>Close</button>}
+                >
+                    <div style={{ textAlign: 'center' }}>
+                        <p>Share this link with friends to let them watch:</p>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                            <input 
+                                type="text" 
+                                readOnly 
+                                value={`${window.location.origin}/watch/${streamId}`} 
+                                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #444', color: '#fff' }}
+                            />
+                            <button className="btn-secondary" onClick={copyStreamLink}>Copy</button>
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '12px' }}>
+                            Keep this tab open. Stream ends if you leave.
+                        </p>
+                    </div>
+                </InteractionModal>
+             );
+        }
+
+        if (modalMode !== 'none' && modalMode !== 'showdown') {
             let title = '';
             let body: React.ReactNode = null;
             let footer: React.ReactNode = null;
@@ -251,19 +342,19 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 <div className="main-content-container">
                     {renderStageDisplay()}
                     {gameStage === 'pre-deal' && (<div className="game-controls-container">
-                        <button className="btn-primary" onClick={actions.startNewHand} disabled={gameStage !== 'pre-deal'}>
+                        <button className="btn-primary" onClick={actions.startNewHand} disabled={isReadOnly || gameStage !== 'pre-deal'}>
                             Start Next Hand
                         </button>
-                        <button className="btn-secondary" onClick={() => setModalMode('addChips')} disabled={gameStage !== 'pre-deal'}>Manage Rebuys</button>
-                        <button className="btn-secondary" onClick={() => setModalMode('addPlayer')} disabled={gameStage !== 'pre-deal'}>Add Player</button>
-                        <button className="btn-danger" onClick={() => setModalMode('removePlayer')} disabled={gameStage !== 'pre-deal' || players.length < 1}>Remove Player</button>
-                        <button className="btn-secondary" onClick={() => setModalMode('toggleBreak')} disabled={gameStage !== 'pre-deal'}>
+                        <button className="btn-secondary" onClick={() => setModalMode('addChips')} disabled={isReadOnly || gameStage !== 'pre-deal'}>Manage Rebuys</button>
+                        <button className="btn-secondary" onClick={() => setModalMode('addPlayer')} disabled={isReadOnly || gameStage !== 'pre-deal'}>Add Player</button>
+                        <button className="btn-danger" onClick={() => setModalMode('removePlayer')} disabled={isReadOnly || gameStage !== 'pre-deal' || players.length < 1}>Remove Player</button>
+                        <button className="btn-secondary" onClick={() => setModalMode('toggleBreak')} disabled={isReadOnly || gameStage !== 'pre-deal'}>
                             Toggle Player Break
                         </button>
-                        <button className="btn-success" onClick={handleShowOwings} disabled={gameStage !== 'pre-deal'}>
+                        <button className="btn-success" onClick={handleShowOwings} disabled={isReadOnly || gameStage !== 'pre-deal'}>
                             Final Owings
                         </button>
-                        <button className="btn-primary" style={{ backgroundColor: '#ff9800' }} onClick={() => setModalMode('streakWinnings')}>
+                        <button className="btn-primary" style={{ backgroundColor: '#ff9800' }} onClick={() => setModalMode('streakWinnings')} disabled={isReadOnly}>
                             Streak Winnings
                         </button>
                     </div>)}
@@ -276,7 +367,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         </div>
                     )}
 
-                    {currentPlayer && gameStage !== 'pre-deal' && gameStage !== 'showdown' && (
+                    {currentPlayer && gameStage !== 'pre-deal' && gameStage !== 'showdown' && !isReadOnly && (
                         <PokerRoundControls gameState={gameState} currentPlayer={currentPlayer} actions={actions} />
                     )}
 

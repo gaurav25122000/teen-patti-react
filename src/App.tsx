@@ -19,6 +19,7 @@ import BlackjackLobby from './blackjack/components/BlackjackLobby';
 // General Components
 import ModeSelectionScreen from './components/ModeSelectionScreen';
 import LifetimeWinnings from './components/LifetimeWinnings';
+import SpectatorWrapper from './components/SpectatorWrapper';
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,6 +58,7 @@ function App() {
         <Route path="/poker" element={<PokerLobby pokerHook={pokerHook} onInteractionChange={handleInteractionChange} />} />
         {/* --- UPDATED ROUTE --- */}
         <Route path="/blackjack" element={<BlackjackLobby blackjackHook={blackjackHook} onInteractionChange={handleInteractionChange} />} />
+        <Route path="/watch/:streamId" element={<SpectatorWrapper />} />
         <Route path="/lifetime-winnings" element={<LifetimeWinnings />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

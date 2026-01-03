@@ -12,6 +12,7 @@ import InteractionModal from './InteractionModal';
 import EntityManager from './EntityManager';
 import { calculateOwings, type Transaction } from '../utils/owingsLogic';
 import { toTitleCase } from '../utils/formatters';
+import { useBroadcast } from '../hooks/useBroadcast';
 
 // --- SVG Icons ---
 const IconTrophy = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9a9 9 0 119 0zM16.5 18.75a9 9 0 00-9 0m9 0a9 9 0 01-9 0m9 0v-4.5A3.375 3.375 0 0012 10.5h-1.5a3.375 3.375 0 00-3.375 3.375v4.5m5.906-9.043c.124.083.242.172.355.267.112.096.22.2.322.308.1.107.196.22.286.338a3.743 3.743 0 01.286.338c.107.112.208.228.308.347.1.118.19.242.27.375M8.094 9.457c.124-.083.242-.172.355-.267.112-.096.22-.2.322-.308.1-.107.196-.22.286-.338a3.743 3.743 0 00.286-.338c.107-.112.208-.228.308-.347.1-.118.19-.242.27-.375" /></svg>;
@@ -25,15 +26,43 @@ const IconPlay = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewB
 interface GameScreenProps {
     gameHook: ReturnType<typeof useTeenPattiGame>;
     onShowSetup: () => void;
+    isReadOnly?: boolean;
 }
 
-const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
+const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOnly = false }) => {
     const { gameState, activePlayers, currentPlayer, precedingPlayer, addMessage, actions } = gameHook;
 
     const [interaction, setInteraction] = useState<InteractionType>('idle');
     const [showOwings, setShowOwings] = useState(false);
     const [showEntityManager, setShowEntityManager] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+    // Streaming Hook
+    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast(gameState);
+    const [showStreamModal, setShowStreamModal] = useState(false);
+
+    // Broadcast state changes
+    useEffect(() => {
+        if (isStreaming && !isReadOnly) {
+            broadcast({ ...gameState, gameType: 'teen-patti' });
+        }
+    }, [gameState, isStreaming, broadcast, isReadOnly]);
+
+    const handleStartStream = () => {
+        startStreaming();
+        setShowStreamModal(true);
+    };
+
+    const handleStopStream = () => {
+        stopStreaming();
+        setShowStreamModal(false);
+    };
+
+    const copyStreamLink = () => {
+        const link = `${window.location.origin}/watch/${streamId}`;
+        navigator.clipboard.writeText(link);
+        alert('Stream link copied to clipboard!');
+    };
 
     const [bootAmount, setBootAmount] = useState('10');
     const [startPlayerId, setStartPlayerId] = useState('');
@@ -130,6 +159,50 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
     };
 
     const renderModal = () => {
+        if (interaction === 'idle' && !showStreamModal) return null;
+            
+        if (showStreamModal && streamId) {
+             return (
+                 <InteractionModal 
+                    isOpen={true} 
+                    onClose={() => setShowStreamModal(false)}
+                    title="Live Stream Started"
+                    theme="success"
+                    footerContent={<button className="btn-modal btn-modal-primary" onClick={() => setShowStreamModal(false)}>Close</button>}
+                >
+                    <div style={{ textAlign: 'center' }}>
+                        <p>Share this link with friends to let them watch:</p>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                            <input 
+                                type="text" 
+                                readOnly 
+                                value={`${window.location.origin}/watch/${streamId}`} 
+                                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #444', color: '#fff' }}
+                            />
+                            <button className="btn-secondary" onClick={copyStreamLink}>Copy</button>
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '12px' }}>
+                            Keep this tab open. Stream ends if you leave.
+                        </p>
+                    </div>
+                </InteractionModal>
+             );
+        }
+
+        if (showStreamModal && !streamId) {
+             return (
+                 <InteractionModal 
+                    isOpen={true} 
+                    onClose={() => setShowStreamModal(false)}
+                    title="Starting Stream..."
+                    theme="default"
+                    footerContent={null}
+                >
+                    <div style={{ padding: '20px', textAlign: 'center' }}>Connecting to stream server...</div>
+                </InteractionModal>
+             );
+        }
+
         if (interaction === 'idle') return null;
 
         let title = '';
@@ -188,11 +261,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                     title = "Showdown!"; theme = 'confirmation'; icon = <IconUsers />;
                     body = requester && target ? (
                         <div className="form-group">
-                            <p><strong>{toTitleCase(requester.name)}</strong> vs <strong>{toTitleCase(target.name)}</strong></p>
+                            <p><strong>{toTitleCase(requester?.name || '')}</strong> vs <strong>{toTitleCase(target?.name || '')}</strong></p>
                             <label>Who folds?</label>
                             <select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>
-                                <option value={requester.id}>{toTitleCase(requester.name)}</option>
-                                <option value={target.id}>{toTitleCase(target.name)}</option>
+                                <option value={requester?.id}>{toTitleCase(requester?.name || '')}</option>
+                                <option value={target?.id}>{toTitleCase(target?.name || '')}</option>
                             </select>
                         </div>
                     ) : <p>Error initializing showdown.</p>;
@@ -290,20 +363,42 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup }) => {
                 </div>
                 <div className="main-content-container">
                     <div className="game-controls-container">
-                        <GameControls
-                            gameState={gameState}
-                            onStartRound={handleStartRound}
-                            onChangeBoot={() => setInteraction('gettingBoot')}
-                            onAddPlayer={() => setInteraction('addingPlayer')}
-                            onRemovePlayer={() => setInteraction('removingPlayer')}
-                            onReorderPlayers={() => setInteraction('reorderingPlayers')}
-                            onDeductAndDistribute={() => setInteraction('deductAndDistribute')}
-                            onShowOwings={handleShowOwings}
-                            onShowSetup={onShowSetup}
-                            onManageEntities={() => setShowEntityManager(true)}
-                            onTogglePlayerBreak={() => setInteraction('toggleBreak')} // ADDED
-                        />
-                        {gameState.roundActive && currentPlayer && (
+                        {isReadOnly && <div className="badge badge-warning" style={{ alignSelf: 'center', marginBottom: '1rem' }}>SPECTATOR MODE</div>}
+                        
+                         {!isReadOnly && !isStreaming && (
+                            <button 
+                                className="btn-sm btn-outline-info" 
+                                style={{ marginBottom: '1rem' }} 
+                                onClick={handleStartStream}
+                            >
+                                Start Live Stream
+                            </button>
+                        )}
+                        
+                        {!isReadOnly && isStreaming && (
+                            <div style={{ marginBottom: '1rem', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
+                                <span className="badge badge-success">LIVE ({viewerCount})</span>
+                                <button className="btn-sm btn-outline-secondary" onClick={() => setShowStreamModal(true)}>Link</button>
+                                <button className="btn-sm btn-outline-danger" onClick={handleStopStream}>Stop</button>
+                            </div>
+                        )}
+
+                        {!isReadOnly && (
+                            <GameControls
+                                gameState={gameState}
+                                onStartRound={handleStartRound}
+                                onChangeBoot={() => setInteraction('gettingBoot')}
+                                onAddPlayer={() => setInteraction('addingPlayer')}
+                                onRemovePlayer={() => setInteraction('removingPlayer')}
+                                onReorderPlayers={() => setInteraction('reorderingPlayers')}
+                                onDeductAndDistribute={() => setInteraction('deductAndDistribute')}
+                                onShowOwings={handleShowOwings}
+                                onShowSetup={onShowSetup}
+                                onManageEntities={() => setShowEntityManager(true)}
+                                onTogglePlayerBreak={() => setInteraction('toggleBreak')} // ADDED
+                            />
+                        )}
+                        {gameState.roundActive && currentPlayer && !isReadOnly && (
                             <RoundControls
                                 gameState={gameState}
                                 currentPlayer={currentPlayer}
