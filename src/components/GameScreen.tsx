@@ -13,6 +13,7 @@ import EntityManager from './EntityManager';
 import { calculateOwings, type Transaction } from '../utils/owingsLogic';
 import { toTitleCase } from '../utils/formatters';
 import { useBroadcast } from '../hooks/useBroadcast';
+import ActionToast from './ActionToast';
 
 // --- SVG Icons ---
 const IconTrophy = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9a9 9 0 119 0zM16.5 18.75a9 9 0 00-9 0m9 0a9 9 0 01-9 0m9 0v-4.5A3.375 3.375 0 0012 10.5h-1.5a3.375 3.375 0 00-3.375 3.375v4.5m5.906-9.043c.124.083.242.172.355.267.112.096.22.2.322.308.1.107.196.22.286.338a3.743 3.743 0 01.286.338c.107.112.208.228.308.347.1.118.19.242.27.375M8.094 9.457c.124-.083.242-.172.355-.267.112-.096.22-.2.322-.308.1-.107.196-.22.286-.338a3.743 3.743 0 00.286-.338c.107-.112.208-.228.308-.347.1-.118.19-.242.27-.375" /></svg>;
@@ -38,7 +39,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
     // Streaming Hook
-    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast(gameState);
+    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast(); // REMOVED ARG
     const [showStreamModal, setShowStreamModal] = useState(false);
 
     // Broadcast state changes
@@ -204,6 +205,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
         }
 
         if (interaction === 'idle') return null;
+        
+        // Spectre Mode Enforcement: Block all interaction modals
+        if (isReadOnly) return null;
 
         let title = '';
         let theme: 'confirmation' | 'danger' | 'success' | 'default' = 'default';
@@ -271,10 +275,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     ) : <p>Error initializing showdown.</p>;
                     
                     primaryAction = () => {
-                        const cost = gameState.blindPlayerIds.has(requester.id) ? gameState.currentStake : gameState.currentStake * 2;
+                        const cost = gameState.blindPlayerIds.has(requester!.id) ? gameState.currentStake : gameState.currentStake * 2;
                         actions.requestShow(cost);
                         actions.resolveShow(parseInt(selectedPlayerId, 10));
-                        addMessage(`${toTitleCase(requester.name)} pays ₹ ${cost} for Show with ${toTitleCase(target.name)}.`);
+                        addMessage(`${toTitleCase(requester!.name)} pays ₹ ${cost} for Show with ${toTitleCase(target!.name)}.`);
                         closeModal();
                     };
                     break;
@@ -357,6 +361,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
     return (
         <>
+            {isReadOnly && <ActionToast messages={gameState.messages} />}
             <div className="game-screen">
                 <div className="player-list-container">
                     <PlayerList players={gameState.players} gameState={gameState} currentPlayer={currentPlayer} />
@@ -383,22 +388,23 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                             </div>
                         )}
 
-                        {!isReadOnly && (
-                            <GameControls
-                                gameState={gameState}
-                                onStartRound={handleStartRound}
-                                onChangeBoot={() => setInteraction('gettingBoot')}
-                                onAddPlayer={() => setInteraction('addingPlayer')}
-                                onRemovePlayer={() => setInteraction('removingPlayer')}
-                                onReorderPlayers={() => setInteraction('reorderingPlayers')}
-                                onDeductAndDistribute={() => setInteraction('deductAndDistribute')}
-                                onShowOwings={handleShowOwings}
-                                onShowSetup={onShowSetup}
-                                onManageEntities={() => setShowEntityManager(true)}
-                                onTogglePlayerBreak={() => setInteraction('toggleBreak')} // ADDED
-                            />
-                        )}
-                        {gameState.roundActive && currentPlayer && !isReadOnly && (
+                    <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
+                        <GameControls
+                            gameState={gameState}
+                            onStartRound={handleStartRound}
+                            onChangeBoot={() => setInteraction('gettingBoot')}
+                            onAddPlayer={() => setInteraction('addingPlayer')}
+                            onRemovePlayer={() => setInteraction('removingPlayer')}
+                            onReorderPlayers={() => setInteraction('reorderingPlayers')}
+                            onDeductAndDistribute={() => setInteraction('deductAndDistribute')}
+                            onShowOwings={handleShowOwings}
+                            onShowSetup={onShowSetup}
+                            onManageEntities={() => setShowEntityManager(true)}
+                            onTogglePlayerBreak={() => setInteraction('toggleBreak')}
+                        />
+                    </div>
+                    {gameState.roundActive && currentPlayer && (
+                        <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
                             <RoundControls
                                 gameState={gameState}
                                 currentPlayer={currentPlayer}
@@ -406,7 +412,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                                 activePlayers={activePlayers}
                                 actions={{ ...actions, onShowClick: handleShowClick, onEndBettingClick: () => setInteraction('selectingWinner') }}
                             />
-                        )}
+                        </div>
+                    )}
                     </div>
                     <div className="side-panel-container">
                         <Notes roundActive={gameState.roundActive} />

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Peer, { type DataConnection } from 'peerjs';
+import { rehydrateState } from '../utils/serialization';
 
 export const useSpectate = (streamId: string | undefined) => {
     const [gameState, setGameState] = useState<any | null>(null);
@@ -15,7 +16,7 @@ export const useSpectate = (streamId: string | undefined) => {
 
         const peer = new Peer();
 
-        peer.on('open', (id) => {
+        peer.on('open', () => {
             const conn = peer.connect(streamId);
 
             conn.on('open', () => {
@@ -23,7 +24,8 @@ export const useSpectate = (streamId: string | undefined) => {
             });
 
             conn.on('data', (data: any) => {
-                setGameState(data);
+                const rehydratedState = rehydrateState(data);
+                setGameState(rehydratedState);
             });
 
             conn.on('close', () => {

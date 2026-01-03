@@ -9,6 +9,7 @@ import OwingsModal from '../../components/OwingsModal';
 import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
 import { toTitleCase } from '../../utils/formatters';
 import { useBroadcast } from '../../hooks/useBroadcast';
+import ActionToast from '../../components/ActionToast';
 
 interface PokerGameScreenProps {
     pokerHook: ReturnType<typeof usePokerGame>;
@@ -36,7 +37,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
 
 
     // Streaming Hook
-    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast(gameState);
+    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast();
     const [showStreamModal, setShowStreamModal] = useState(false);
 
     // Broadcast state changes
@@ -70,7 +71,12 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             const eligiblePlayers = Array.from(currentPot.eligiblePlayers);
 
             if (eligiblePlayers.length === 1) {
-                actions.awardPot(0, [eligiblePlayers[0]]);
+                // GUARD: Only the host (active player) should trigger state changes.
+                // Spectators should just observe the state provided by the stream.
+                if (!isReadOnly) {
+                    actions.awardPot(0, [eligiblePlayers[0]]);
+                }
+                
                 if (modalMode === 'showdown') setModalMode('none');
             } else if (eligiblePlayers.length > 1) {
                 // Pre-select all eligible players by default? Or none? Let's select none or the first.
@@ -191,6 +197,15 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const renderModal = () => {
         if (modalMode === 'none' && !showStreamModal) return null;
 
+        // Stream modals are allowed in read-only (e.g. success modal might show up, but typically spectators don't see it?)
+        // Actually, spectators shouldn't see 'Start Stream' button so they won't trigger stream modals. 
+        // But if they are viewing, they might see other things.
+        
+        // Critical: If read-only, we should NOT show interactive game management modals.
+        if (isReadOnly && modalMode !== 'none') {
+            return null;
+        }
+
         if (modalMode === 'owings') {
             return <OwingsModal isOpen={true} onClose={closeModal} transactions={transactions} />;
         }
@@ -286,6 +301,10 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         const currentPot = pot[0];
         if (!currentPot) return null;
         const eligiblePlayers = players.filter(p => currentPot.eligiblePlayers.has(p.id));
+        
+        // Disable Award Pot modal for spectators
+        if (isReadOnly) return null;
+        
         if (eligiblePlayers.length <= 1) return null;
 
         const title = `Awarding Pot (${currentPot.amount})`;
@@ -334,6 +353,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
 
     return (
         <>
+            {isReadOnly && <ActionToast messages={messages} />}
             <div className="game-screen">
                 <div className="player-list-container">
                     <PokerPlayerList players={players} gameState={gameState} />
@@ -367,8 +387,10 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         </div>
                     )}
 
-                    {currentPlayer && gameStage !== 'pre-deal' && gameStage !== 'showdown' && !isReadOnly && (
-                        <PokerRoundControls gameState={gameState} currentPlayer={currentPlayer} actions={actions} />
+                    {currentPlayer && gameStage !== 'pre-deal' && gameStage !== 'showdown' && (
+                        <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
+                            <PokerRoundControls gameState={gameState} currentPlayer={currentPlayer} actions={actions} />
+                        </div>
                     )}
 
                     {gameStage !== 'pre-deal' && (

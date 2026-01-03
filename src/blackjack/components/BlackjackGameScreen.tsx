@@ -11,6 +11,7 @@ import { toTitleCase } from '../../utils/formatters';
 import OwingsModal from '../../components/OwingsModal';
 import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
 import { useBroadcast } from '../../hooks/useBroadcast';
+import ActionToast from '../../components/ActionToast';
 
 interface BlackjackGameScreenProps {
     blackjackHook: ReturnType<typeof useBlackjackGame>;
@@ -28,7 +29,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
     // Streaming Hook
-    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast(gameState);
+    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast();
     const [showStreamModal, setShowStreamModal] = useState(false);
 
     // Broadcast state changes
@@ -55,6 +56,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     };
 
     const handleShowModal = (mode: ModalMode) => {
+        if (isReadOnly) return;
         setModalMode(mode);
         onInteractionChange(true);
     };
@@ -115,7 +117,8 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
 
     return (
         <>
-            <div className="game-screen">
+            {isReadOnly && <ActionToast messages={messages} />}
+            <div className="blackjack-game-screen">
                 <div className="player-list-container">
                     <BlackjackPlayerList players={players} gameState={gameState} />
                     <ActionLog messages={messages} />
@@ -146,16 +149,18 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
 
                     <BlackjackDealerDisplay dealerNet={dealerNet} />
 
-                    {gameStage === 'betting' && !isReadOnly && (
-                        <BlackjackGameControls
-                            onStartRound={actions.startRound}
-                            onShowModal={handleShowModal}
-                            onShowOwings={handleShowOwings}
-                            onUnlockBets={actions.unlockAllBets} 
-                            isBettingLocked={isBettingLocked} 
-                            isDealDisabled={isDealDisabled}
-                            onShowSetup={handleShowSetup} // ADDED
-                        />
+                    {gameStage === 'betting' && (
+                        <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
+                            <BlackjackGameControls
+                                onStartRound={actions.startRound}
+                                onShowModal={handleShowModal}
+                                onShowOwings={handleShowOwings}
+                                onUnlockBets={actions.unlockAllBets} 
+                                isBettingLocked={isBettingLocked} 
+                                isDealDisabled={isDealDisabled}
+                                onShowSetup={handleShowSetup}
+                            />
+                        </div>
                     )}
                     
                     {/* --- REMOVED "Settle Bets" button --- */}
@@ -171,18 +176,19 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
 
                     <div className="blackjack-hands-area" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem' }}>
                         {players.filter(p => !p.isTakingBreak).map(player => (
-                            <BlackjackPlayerHands
-                                key={player.id}
-                                player={player}
-                                isCurrentPlayer={player.id === currentPlayerId}
-                                currentHandId={currentHandId}
-                                gameStage={gameStage}
-                                isBettingLocked={isBettingLocked} 
-                                onPlaceBet={actions.placeBet}
-                                onPlayerAction={actions.handlePlayerAction}
-                                onSetHandStatus={actions.setHandStatus}
-                                onUnlockBet={actions.unlockAllBets} 
-                            />
+                            <div key={player.id} style={isReadOnly ? { pointerEvents: 'none' } : {}}>
+                                <BlackjackPlayerHands
+                                    player={player}
+                                    isCurrentPlayer={player.id === currentPlayerId}
+                                    currentHandId={currentHandId}
+                                    gameStage={gameStage}
+                                    isBettingLocked={isBettingLocked} 
+                                    onPlaceBet={actions.placeBet}
+                                    onPlayerAction={actions.handlePlayerAction}
+                                    onSetHandStatus={actions.setHandStatus}
+                                    onUnlockBet={actions.unlockAllBets} 
+                                />
+                            </div>
                         ))}
                     </div>
                 </div>

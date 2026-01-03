@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Peer, { type DataConnection } from 'peerjs';
+import { sanitizeState } from '../utils/serialization';
 
-export const useBroadcast = (initialState: any) => {
+export const useBroadcast = () => {
     const [streamId, setStreamId] = useState<string | null>(null);
     const [isStreaming, setIsStreaming] = useState(false);
     const [viewerCount, setViewerCount] = useState(0);
@@ -56,9 +57,11 @@ export const useBroadcast = (initialState: any) => {
     const broadcast = useCallback((state: any) => {
         if (!peerRef.current || connectionsRef.current.length === 0) return;
         
+        const sanitizedData = sanitizeState(state);
+
         connectionsRef.current.forEach(conn => {
             if (conn.open) {
-                conn.send(state);
+                conn.send(sanitizedData);
             }
         });
     }, []);

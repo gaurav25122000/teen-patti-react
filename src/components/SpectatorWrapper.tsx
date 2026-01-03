@@ -66,6 +66,12 @@ const SpectatorWrapper: React.FC = () => {
                 endHand: mockAction,
                 buyIn: mockAction,
                 updateBlind: mockAction,
+                awardPot: mockAction, // Added missing mock
+                addPlayer: mockAction,
+                removePlayer: mockAction,
+                addChipsToPlayer: mockAction,
+                togglePlayerBreak: mockAction,
+                applyStreakWinnings: mockAction,
             }
         };
         // @ts-ignore - We are mocking the hook
@@ -91,6 +97,9 @@ const SpectatorWrapper: React.FC = () => {
                 updateEntities: mockAction,
                 updatePlayers: mockAction,
                 deductAndDistribute: mockAction,
+                addChipsToPlayer: mockAction,
+                togglePlayerBreak: mockAction,
+                endRound: mockAction,
             }
         };
         // @ts-ignore
@@ -124,6 +133,12 @@ const SpectatorWrapper: React.FC = () => {
                  settleDealer: mockAction,
                  resetGame: mockAction,
                  updateBalance: mockAction,
+                 setupNewGame: mockAction,
+                 addPlayer: mockAction,
+                 removePlayer: mockAction,
+                 addChipsToPlayer: mockAction,
+                 togglePlayerBreak: mockAction,
+                 changeHandCount: mockAction,
              }
          };
 
