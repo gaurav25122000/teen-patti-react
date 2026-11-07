@@ -10,6 +10,7 @@ import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
 import { toTitleCase } from '../../utils/formatters';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
+import Celebration from '../../components/Celebration';
 
 interface PokerGameScreenProps {
     pokerHook: ReturnType<typeof usePokerGame>;
@@ -20,7 +21,7 @@ interface PokerGameScreenProps {
 type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown' | 'owings' | 'toggleBreak' | 'streakWinnings';
 
 const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteractionChange, isReadOnly = false }) => {
-    const { gameState, actions } = pokerHook;
+    const { gameState, actions, autoAwardPot, undo, canUndo } = pokerHook;
     const { players, activePlayerIndex, messages, gameStage, pot } = gameState;
 
     const [modalMode, setModalMode] = useState<ModalMode>('none');
@@ -47,7 +48,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 // GUARD: Only the host (active player) should trigger state changes.
                 // Spectators should just observe the state provided by the stream.
                 if (!isReadOnly) {
-                    actions.awardPot(0, [eligiblePlayers[0]]);
+                    autoAwardPot(0, [eligiblePlayers[0]]);
                 }
                 
                 if (modalMode === 'showdown') setModalMode('none');
@@ -61,7 +62,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         } else if (gameStage !== 'showdown' && modalMode === 'showdown') {
             setModalMode('none');
         }
-    }, [gameStage, pot, actions, modalMode]);
+    }, [gameStage, pot, autoAwardPot, isReadOnly, modalMode]);
 
     useEffect(() => {
         const isModalOpen = modalMode !== 'none';
@@ -148,6 +149,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             {isReadOnly && <div className="badge badge-warning" style={{ marginTop: '0.5rem' }}>SPECTATOR MODE</div>}
             
             {!isReadOnly && <StreamControls gameState={gameState} gameType="poker" style={{ marginTop: '0.5rem' }} />}
+            {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
         </div>
     );
 
@@ -265,6 +267,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     return (
         <>
             {isReadOnly && <ActionToast messages={messages} />}
+            <Celebration messages={messages} />
             <div className="game-screen">
                 <div className="player-list-container">
                     <PokerPlayerList players={players} gameState={gameState} />

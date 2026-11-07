@@ -2,6 +2,8 @@
 import React from 'react';
 import type { PokerPlayer, PokerGameState } from '../types/pokerGameTypes';
 import { toTitleCase } from '../../utils/formatters';
+import TableView, { ViewToggle } from '../../components/TableView';
+import { useStoredState } from '../../hooks/useStoredState';
 
 interface PokerPlayerListProps {
     players: PokerPlayer[];
@@ -10,10 +12,38 @@ interface PokerPlayerListProps {
 
 const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState }) => {
     const { dealerButtonIndex, smallBlindIndex, bigBlindIndex, activePlayerIndex, gameStage } = gameState;
+    const [view, setView] = useStoredState('seatView', 'list');
+
+    const rows = players.map((p, index) => {
+        const isDealer = index === dealerButtonIndex && gameStage !== 'pre-deal';
+        const isSB = index === smallBlindIndex && gameStage !== 'pre-deal';
+        const isBB = index === bigBlindIndex && gameStage !== 'pre-deal';
+        const isCurrent = index === activePlayerIndex && gameStage !== 'pre-deal';
+
+        let status = '';
+        if (p.isTakingBreak) {
+            status = ' (On Break)';
+        } else if (gameStage !== 'pre-deal') {
+            if (isDealer) status += ' (D)';
+            if (isSB) status += ' (SB)';
+            if (isBB) status += ' (BB)';
+            if (!p.inHand) status = 'Folded';
+            if (p.isAllIn) status = 'All-In';
+        }
+        const className = !p.inHand && gameStage !== 'pre-deal' ? 'folded' : (isCurrent ? 'current-player' : (p.isTakingBreak ? 'on-break' : ''));
+        return { p, status, className };
+    });
+    const totalPot = players.reduce((sum, p) => sum + p.totalPotContribution, 0);
 
     return (
         <div className="player-list">
-            <h3>Players ({players.length})</h3>
+            <h3>Players ({players.length}) <ViewToggle view={view} onChange={setView} /></h3>
+            {view === 'table' ? (
+                <TableView
+                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), amount: `₹ ${p.stack}`, status: [status.trim(), p.roundBet > 0 ? `Bet ₹${p.roundBet}` : ''].filter(Boolean).join(' · '), className }))}
+                    center={<>{toTitleCase(gameStage)}<br />Pot ₹{totalPot}</>}
+                />
+            ) : (
             <table>
                 <thead>
                     <tr>
@@ -24,26 +54,9 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                     </tr>
                 </thead>
                 <tbody>
-                    {players.map((p, index) => {
-                        const isDealer = index === dealerButtonIndex && gameStage !== 'pre-deal';
-                        const isSB = index === smallBlindIndex && gameStage !== 'pre-deal';
-                        const isBB = index === bigBlindIndex && gameStage !== 'pre-deal';
-                        const isCurrent = index === activePlayerIndex && gameStage !== 'pre-deal';
-
-                        let status = '';
-                        if (p.isTakingBreak) {
-                            status = ' (On Break)';
-                        } else if (gameStage !== 'pre-deal') {
-                            if (isDealer) status += ' (D)';
-                            if (isSB) status += ' (SB)';
-                            if (isBB) status += ' (BB)';
-                            if (!p.inHand) status = 'Folded';
-                            if (p.isAllIn) status = 'All-In';
-                        }
-
-
+                    {rows.map(({ p, status, className }) => {
                         return (
-                            <tr key={p.id} className={!p.inHand && gameStage !== 'pre-deal' ? 'folded' : (isCurrent ? 'current-player' : (p.isTakingBreak ? 'on-break' : ''))}>
+                            <tr key={p.id} className={className} data-player-id={p.id}>
                                 <td data-label="Name">
                                     {toTitleCase(p.name)} {status}
                                     <span style={{ marginLeft: '8px', opacity: p.winningStreak > 0 ? 1 : 0.3 }} title="Winning Streak">🔥 {p.winningStreak}</span>
@@ -56,6 +69,7 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                     })}
                 </tbody>
             </table>
+            )}
         </div>
     );
 };

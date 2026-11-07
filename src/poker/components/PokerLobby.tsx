@@ -1,5 +1,5 @@
 // src/poker/components/PokerLobby.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { usePokerGame } from '../hooks/usePokerGame';
 import PokerGameSetup from './PokerGameSetup';
 import PokerGameScreen from './PokerGameScreen';
@@ -21,6 +21,11 @@ const PokerLobby: React.FC<PokerLobbyProps> = ({ pokerHook, onInteractionChange 
         }
         return false;
     };
+
+    // A phone taking over hosting arrives with ?host=1 and its saved game already written.
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).has('host') && pokerActions.loadGame()) setPokerStep('game');
+    }, [pokerActions]);
 
     // If a game is already in progress (e.g., loaded from storage), go straight to the game.
     if (pokerState.players.length > 0 && pokerStep !== 'setup') {

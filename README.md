@@ -17,6 +17,12 @@ The application leverages local storage to save game state, allowing you to clos
   * **State Persistence:** Your game state (players, balances, last winner) is automatically saved to the browser's `localStorage`, so you can pick up where you left off.
   * **Action Log:** A running terminal-style log keeps a history of every action taken during the game for easy reference.
   * **Interactive Modals:** A sleek, unified modal system for all user interactions, complete with a background blur effect for focus.
+  * **Undo:** The host can undo one action per tap, back to the start of the current round. A finished round can't be undone, because its winnings are already saved.
+  * **Table View:** Teen Patti and Poker players can be shown around a round table instead of a list; each device remembers its choice.
+  * **Win Celebrations:** Confetti and a winner banner on the host and every stream viewer.
+  * **Live Stream:** Share a link or QR code. Viewers pick who they are to see their balance, their row highlighted and a "Your turn!" alert (with vibration on Android). The host can hand the game to a viewer's phone, which starts a new stream link.
+  * **Install & Offline:** Installable as an app; local games work without internet once the app has loaded. Streaming and Lifetime Winnings need a connection.
+  * **Notes:** Saved automatically as you type.
 
 ## 🚀 Tech Stack
 

@@ -1,15 +1,126 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useSpectate } from '../hooks/useSpectate';
 import { derivePlayers } from '../hooks/useTeenPattiGame';
+import { useStoredState } from '../hooks/useStoredState';
+import { POKER_STORAGE_KEY } from '../poker/hooks/usePokerGame';
+import { BLACKJACK_STORAGE_KEY } from '../blackjack/hooks/useBlackjackGame';
+import { LOCAL_STORAGE_KEY } from '../constants/gameConstants';
+import { toTitleCase } from '../utils/formatters';
 import PokerGameScreen from '../poker/components/PokerGameScreen';
 import GameScreen from './GameScreen';
 import BlackjackGameScreen from '../blackjack/components/BlackjackGameScreen';
+import InteractionModal from './InteractionModal';
 
+// Where a handed-over game is saved and opened on the new host's phone.
+const GAMES: Record<string, { route: string; storageKey: string; label: string }> = {
+    'teen-patti': { route: '/teen-patti', storageKey: LOCAL_STORAGE_KEY, label: 'Teen Patti' },
+    poker: { route: '/poker', storageKey: POKER_STORAGE_KEY, label: 'Poker' },
+    blackjack: { route: '/blackjack', storageKey: BLACKJACK_STORAGE_KEY, label: 'Blackjack' },
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- stream state is untyped across three games
+const currentTurnId = (state: any): number | null => {
+    if (state.gameType === 'teen-patti') return derivePlayers(state).currentPlayer?.id ?? null;
+    if (state.gameType === 'poker') {
+        const live = state.activePlayerIndex > -1 && state.gameStage !== 'pre-deal' && state.gameStage !== 'showdown';
+        return live ? state.players[state.activePlayerIndex]?.id ?? null : null;
+    }
+    if (state.gameType === 'blackjack') return state.gameStage === 'player-turn' ? state.currentPlayerId : null;
+    return null;
+};
 
 const SpectatorWrapper: React.FC = () => {
     const { streamId } = useParams<{ streamId: string }>();
-    const { gameState, connectionStatus } = useSpectate(streamId);
+    const { gameState, connectionStatus, handoverOffer, clearHandoverOffer, hostMovedTo, send } = useSpectate(streamId);
+    const [viewerName, setViewerName] = useStoredState('viewerName', '');
+    const [handoverError, setHandoverError] = useState<string | null>(null);
+    const [leaving, setLeaving] = useState(false);
+
+    // Player view: the viewer picks who they are; ids come from the host, so coerce before use in CSS.
+    const players: { id: number; name: string; balance?: number; stack?: number }[] = Array.isArray(gameState?.players) ? gameState.players : [];
+    const me = players.find(p => p.name === viewerName) ?? null;
+    const myId = me && Number.isFinite(Number(me.id)) ? Number(me.id) : null;
+    const isMyTurn = myId !== null && gameState !== null && currentTurnId(gameState) === myId;
+
+    useEffect(() => {
+        if (connectionStatus === 'connected') send({ type: 'viewer-name', name: me?.name ?? null });
+    }, [connectionStatus, me?.name, send]);
+
+    useEffect(() => {
+        if (isMyTurn) navigator.vibrate?.([200, 100, 200]);
+    }, [isMyTurn]);
+
+    const replyToHandover = (accepted: boolean, error?: string) => {
+        send({ type: 'handover-reply', accepted });
+        clearHandoverOffer();
+        setHandoverError(error ?? null);
+    };
+
+    const acceptHandover = () => {
+        const game = handoverOffer && GAMES[String(handoverOffer.gameType)];
+        if (!handoverOffer || !game || !Array.isArray(handoverOffer.players)) {
+            replyToHandover(false, 'That game could not be taken over.');
+            return;
+        }
+        const saved = { ...handoverOffer };
+        delete saved.gameType;
+        try {
+            localStorage.setItem(game.storageKey, JSON.stringify(saved));
+        } catch {
+            replyToHandover(false, "This phone can't save the game (storage is blocked).");
+            return;
+        }
+        replyToHandover(true);
+        setLeaving(true);
+        setTimeout(() => window.location.assign(`${game.route}?host=1`), 1500);
+    };
+
+    const offeredGame = handoverOffer ? GAMES[String(handoverOffer.gameType)] : undefined;
+    const withViewerUi = (screen: React.ReactNode) => (
+        <>
+            <div className="viewer-bar">
+                <label>
+                    Watching as{' '}
+                    <select value={me ? me.name : ''} onChange={e => setViewerName(e.target.value)}>
+                        <option value="">Just watching</option>
+                        {players.map(p => <option key={p.id} value={p.name}>{toTitleCase(p.name)}</option>)}
+                    </select>
+                </label>
+                {me && <span className="viewer-balance">You: ₹{me.balance ?? me.stack}</span>}
+            </div>
+            {isMyTurn && <div className="your-turn-banner" role="status">Your turn!</div>}
+            {myId !== null && <style>{`[data-player-id="${myId}"] { outline: 2px solid var(--color-glow-lime); outline-offset: -2px; }`}</style>}
+            {screen}
+            {handoverOffer && (
+                <InteractionModal
+                    isOpen={true}
+                    onClose={() => replyToHandover(false)}
+                    title="Take over as host?"
+                    theme="confirmation"
+                    footerContent={<>
+                        <button className="btn-modal btn-modal-secondary" onClick={() => replyToHandover(false)}>No thanks</button>
+                        <button className="btn-modal btn-modal-primary" onClick={acceptHandover}>Take over</button>
+                    </>}
+                >
+                    <p>The host wants to hand this {offeredGame?.label ?? ''} game to your phone. It replaces any saved {offeredGame?.label ?? ''} game here, and you'll get a new stream link to share.</p>
+                </InteractionModal>
+            )}
+            {handoverError && (
+                <InteractionModal isOpen={true} onClose={() => setHandoverError(null)} title="Hand over failed" theme="danger" footerContent={null}>
+                    <p>{handoverError}</p>
+                </InteractionModal>
+            )}
+        </>
+    );
+
+    if (leaving) {
+        return (
+            <div className="spectator-loading">
+                <h2>Taking over as host...</h2>
+            </div>
+        );
+    }
 
     if (connectionStatus === 'connecting') {
         return (
@@ -24,7 +135,9 @@ const SpectatorWrapper: React.FC = () => {
         return (
             <div className="spectator-error">
                 <h2>Stream Unavailable</h2>
-                <p>The stream has ended or the connection failed.</p>
+                <p>{hostMovedTo
+                    ? `Hosting moved to ${toTitleCase(hostMovedTo)}'s phone. Ask them for the new stream link.`
+                    : 'The stream has ended or the connection failed.'}</p>
                 <Link to="/" className="btn-primary">Go Home</Link>
             </div>
         );
@@ -76,7 +189,7 @@ const SpectatorWrapper: React.FC = () => {
             }
         };
         // @ts-ignore - We are mocking the hook
-        return <PokerGameScreen pokerHook={mockPokerHook} onInteractionChange={() => {}} isReadOnly={true} />;
+        return withViewerUi(<PokerGameScreen pokerHook={mockPokerHook} onInteractionChange={() => {}} isReadOnly={true} />);
     }
 
     if (gameType === 'teen-patti') {
@@ -105,7 +218,7 @@ const SpectatorWrapper: React.FC = () => {
             }
         };
         // @ts-ignore
-        return <GameScreen gameHook={mockTeenPattiHook} onShowSetup={() => {}} isReadOnly={true} />;
+        return withViewerUi(<GameScreen gameHook={mockTeenPattiHook} onShowSetup={() => {}} isReadOnly={true} />);
     }
 
     if (gameType === 'blackjack') {
@@ -136,7 +249,7 @@ const SpectatorWrapper: React.FC = () => {
          };
 
          // @ts-ignore
-         return <BlackjackGameScreen blackjackHook={mockBlackjackHook} onInteractionChange={() => {}} onShowSetupRequest={() => {}} isReadOnly={true} />;
+         return withViewerUi(<BlackjackGameScreen blackjackHook={mockBlackjackHook} onInteractionChange={() => {}} onShowSetupRequest={() => {}} isReadOnly={true} />);
     }
 
     return <div>Unknown Game Type: {gameType}</div>;

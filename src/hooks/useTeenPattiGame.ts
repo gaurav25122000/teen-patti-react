@@ -1,11 +1,14 @@
 // src/hooks/useTeenPattiGame.ts
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import type { GameState, Player, Entity } from '../types/gameTypes';
 import { loadStateFromLocalStorage, saveStateToLocalStorage } from '../utils/localStorage';
 import { toTitleCase } from '../utils/formatters';
 import { bulkUpdateWinnings, type WinningsRecord } from '../utils/winningsService';
+import { splitEvenly } from '../utils/money';
 import { SHA256 } from 'crypto-js';
+import { useUndo } from './useUndo';
+import { useGameState } from './useGameState';
 
 const createInitialGameState = (): GameState => ({
   players: [],
@@ -49,9 +52,11 @@ export const derivePlayers = (gameState: Pick<GameState, 'players' | 'foldedPlay
 };
 
 export const useTeenPattiGame = () => {
-  const [gameState, setGameState] = useState<GameState>(() => {
+  const [gameState, setGameState, log] = useGameState<GameState>(() => {
     return loadStateFromLocalStorage() || createInitialGameState();
   });
+
+  const { record, undo, canUndo } = useUndo(gameState, setGameState, gameState.roundActive);
 
   // --- Persistence ---
   useEffect(() => {
@@ -60,11 +65,8 @@ export const useTeenPattiGame = () => {
 
   // --- Utility Functions ---
   const addMessage = useCallback((message: string, isError: boolean = false) => {
-    setGameState(prev => ({
-      ...prev,
-      messages: [...prev.messages.slice(-100), `${isError ? "ERROR: " : ""}${message}`]
-    }));
-  }, []);
+    log(`${isError ? "ERROR: " : ""}${message}`);
+  }, [log]);
 
   // --- DERIVED STATE ---
   const { players, foldedPlayerIds, roundActive, currentPlayerIndex } = gameState;
@@ -91,7 +93,7 @@ export const useTeenPattiGame = () => {
 
       return { ...prev, currentPlayerIndex: nextIndex, messages: newMessages };
     });
-  }, []);
+  }, [setGameState]);
 
   const checkForWinner = useCallback((currentPlayers: Player[], foldedIds: Set<number>): Player | null => {
     const active = currentPlayers.filter(p => !foldedIds.has(p.id));
@@ -156,7 +158,7 @@ export const useTeenPattiGame = () => {
         messages: finalMessages,
       };
     });
-  }, []);
+  }, [setGameState]);
 
   // --- Player Actions ---
   const startNewGame = (newPlayers: Player[]) => {
@@ -431,15 +433,18 @@ export const useTeenPattiGame = () => {
         return prev;
       }
       const amountToDistribute = Math.floor(amount / (players.length - 1));
+      const shares = splitEvenly(amount, players.length - 1);
+      let shareIndex = 0;
       const updatedPlayers = players.map(p => {
         if (p.id === playerId) {
           return { ...p, balance: p.balance - amount };
         } else {
-          return { ...p, balance: p.balance + amountToDistribute };
+          return { ...p, balance: p.balance + shares[shareIndex++] };
         }
       });
 
-      addMessage(`Deducted ₹${amount} from ${toTitleCase(playerToDeduct.name)} and distributed ₹${amountToDistribute} to everyone else.`);
+      const leftoverNote = shares.some(s => s !== amountToDistribute) ? ' (leftover to the first players in order)' : '';
+      addMessage(`Deducted ₹${amount} from ${toTitleCase(playerToDeduct.name)} and distributed ₹${amountToDistribute} to everyone else${leftoverNote}.`);
       return { ...prev, players: updatedPlayers };
     });
   };
@@ -460,7 +465,7 @@ export const useTeenPattiGame = () => {
         }
         return { ...prev, players: newPlayers };
     });
-  }, [addMessage]);
+  }, [addMessage, setGameState]);
 
   return {
     gameState,
@@ -468,7 +473,9 @@ export const useTeenPattiGame = () => {
     activePlayers,
     currentPlayer,
     precedingPlayer,
-    actions: {
+    undo,
+    canUndo,
+    actions: record({
       startNewGame,
       loadGame,
       startRound,
@@ -486,6 +493,6 @@ export const useTeenPattiGame = () => {
       updateEntities,
       updatePlayers,
       togglePlayerBreak, // ADDED
-    }
+    })
   };
 };

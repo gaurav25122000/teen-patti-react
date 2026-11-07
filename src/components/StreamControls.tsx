@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import InteractionModal from './InteractionModal';
 import { useBroadcast } from '../hooks/useBroadcast';
+import { toTitleCase } from '../utils/formatters';
 
 interface StreamControlsProps {
     gameState: object;
@@ -9,8 +10,11 @@ interface StreamControlsProps {
 }
 
 const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, style }) => {
-    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast();
+    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewers, viewerCount, handover, handOver, resetHandover } = useBroadcast();
     const [showStreamModal, setShowStreamModal] = useState(false);
+    const [showHandoverModal, setShowHandoverModal] = useState(false);
+    const [qrCode, setQrCode] = useState<string | null>(null);
+    const streamLink = streamId ? `${window.location.origin}/watch/${streamId}` : null;
 
     // Broadcast state changes
     useEffect(() => {
@@ -18,6 +22,27 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
             broadcast({ ...gameState, gameType });
         }
     }, [gameState, gameType, isStreaming, broadcast]);
+
+    // A phone that just took over hosting arrives with ?host=1 and starts a fresh stream.
+    useEffect(() => {
+        if (!new URLSearchParams(window.location.search).has('host')) return;
+        window.history.replaceState(null, '', window.location.pathname);
+        startStreaming();
+        setShowStreamModal(true);
+    }, [startStreaming]);
+
+    useEffect(() => {
+        if (!streamLink) {
+            setQrCode(null);
+            return;
+        }
+        let cancelled = false;
+        import('qrcode')
+            .then(QRCode => QRCode.toDataURL(streamLink, { margin: 1, width: 360 }))
+            .then(url => { if (!cancelled) setQrCode(url); })
+            .catch(err => console.error('QR code failed:', err));
+        return () => { cancelled = true; };
+    }, [streamLink]);
 
     const handleStartStream = () => {
         startStreaming();
@@ -35,6 +60,31 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
         alert('Stream link copied to clipboard!');
     };
 
+    const closeHandover = () => {
+        setShowHandoverModal(false);
+        resetHandover();
+    };
+
+    const handoverBody = () => {
+        if (handover.status === 'waiting') return <p>Waiting for {handover.name} to accept...</p>;
+        if (handover.status === 'declined') return <p>{handover.name} said no.</p>;
+        if (handover.status === 'done') {
+            return <p>Hosting moved to {handover.name}'s phone. They'll share a new stream link. Your copy of the game here is no longer live.</p>;
+        }
+        if (viewers.length === 0) return <p>No one is watching right now.</p>;
+        return (
+            <>
+                <p>Pick the phone that will run the game from now on:</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {viewers.map((viewer, i) => {
+                        const name = viewer.name ? toTitleCase(viewer.name) : `Viewer ${i + 1}`;
+                        return <button key={viewer.id} className="btn-secondary" onClick={() => handOver(viewer, name)}>{name}</button>;
+                    })}
+                </div>
+            </>
+        );
+    };
+
     return (
         <>
             {!isStreaming && (
@@ -47,6 +97,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
                 <div style={{ ...style, display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
                     <span className="badge badge-success">LIVE ({viewerCount})</span>
                     <button className="btn-sm btn-outline-secondary" onClick={() => setShowStreamModal(true)}>Link</button>
+                    {viewerCount > 0 && <button className="btn-sm btn-outline-secondary" onClick={() => setShowHandoverModal(true)}>Hand over</button>}
                     <button className="btn-sm btn-outline-danger" onClick={handleStopStream}>Stop</button>
                 </div>
             )}
@@ -73,6 +124,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
                 >
                     <div style={{ textAlign: 'center' }}>
                         <p>Share this link with friends to let them watch:</p>
+                        {qrCode && <img src={qrCode} alt="QR code for the stream link" width={180} height={180} style={{ marginTop: '8px', borderRadius: '8px' }} />}
                         <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                             <input
                                 type="text"
@@ -86,6 +138,18 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
                             Keep this tab open. Stream ends if you leave.
                         </p>
                     </div>
+                </InteractionModal>
+            )}
+
+            {(showHandoverModal || handover.status === 'done') && (
+                <InteractionModal
+                    isOpen={true}
+                    onClose={closeHandover}
+                    title="Hand over the host"
+                    theme="default"
+                    footerContent={<button className="btn-modal btn-modal-secondary" onClick={closeHandover}>{handover.status === 'waiting' ? 'Cancel' : 'Close'}</button>}
+                >
+                    {handoverBody()}
                 </InteractionModal>
             )}
         </>

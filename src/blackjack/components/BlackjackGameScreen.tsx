@@ -11,6 +11,7 @@ import OwingsModal from '../../components/OwingsModal';
 import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
+import Celebration from '../../components/Celebration';
 
 interface BlackjackGameScreenProps {
     blackjackHook: ReturnType<typeof useBlackjackGame>;
@@ -20,7 +21,7 @@ interface BlackjackGameScreenProps {
 }
 
 const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook, onInteractionChange, onShowSetupRequest, isReadOnly = false }) => {
-    const { gameState, actions } = blackjackHook;
+    const { gameState, actions, undo, canUndo } = blackjackHook;
     const { players, messages, gameStage, currentPlayerId, currentHandId, dealerNet, isBettingLocked } = gameState; // ADDED isBettingLocked
 
     const [modalMode, setModalMode] = useState<ModalMode>('none');
@@ -90,6 +91,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     return (
         <>
             {isReadOnly && <ActionToast messages={messages} />}
+            <Celebration messages={messages} />
             <div className="blackjack-game-screen">
                 <div className="player-list-container">
                     <BlackjackPlayerList players={players} gameState={gameState} />
@@ -101,6 +103,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                         {isReadOnly && <div className="badge badge-warning" style={{ marginTop: '0.5rem' }}>SPECTATOR MODE</div>}
             
                         {!isReadOnly && <StreamControls gameState={gameState} gameType="blackjack" style={{ marginTop: '0.5rem' }} />}
+                        {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
                     </div>
 
                     <BlackjackDealerDisplay dealerNet={dealerNet} />
@@ -132,7 +135,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
 
                     <div className="blackjack-hands-area" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem' }}>
                         {players.filter(p => !p.isTakingBreak).map(player => (
-                            <div key={player.id} style={isReadOnly ? { pointerEvents: 'none' } : {}}>
+                            <div key={player.id} data-player-id={player.id} style={isReadOnly ? { pointerEvents: 'none' } : {}}>
                                 <BlackjackPlayerHands
                                     player={player}
                                     isCurrentPlayer={player.id === currentPlayerId}

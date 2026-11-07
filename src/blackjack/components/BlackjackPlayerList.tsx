@@ -43,7 +43,7 @@ const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, game
                         const totalWager = p.hands.reduce((acc, h) => acc + h.wager, 0);
 
                         return (
-                            <tr key={p.id} className={isCurrent ? 'current-player' : (p.isTakingBreak ? 'on-break' : '')}>
+                            <tr key={p.id} className={isCurrent ? 'current-player' : (p.isTakingBreak ? 'on-break' : '')} data-player-id={p.id}>
                                 <td data-label="Name">{toTitleCase(p.name)}</td>
                                 <td data-label="Stack / Buy-In">₹ {p.stack} / ₹ {p.totalBuyIn}</td>
                                 <td data-label="Status">

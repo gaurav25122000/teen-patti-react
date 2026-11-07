@@ -10,6 +10,8 @@ export default defineConfig({
   appType: 'spa', 
   build: {
     outDir: 'dist',
+    // Lists every built file; public/sw.js caches them for offline use.
+    manifest: 'asset-manifest.json',
     // ... other build options
   },
 })

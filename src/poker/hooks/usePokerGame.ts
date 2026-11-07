@@ -1,12 +1,15 @@
 // src/poker/hooks/usePokerGame.ts
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import type { PokerGameState, PokerPlayer, GameStage, Pot } from '../types/pokerGameTypes';
 import { calculatePots } from '../utils/pokerLogic';
 import { toTitleCase } from '../../utils/formatters';
 import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsService';
+import { splitEvenly } from '../../utils/money';
 import { SHA256 } from 'crypto-js';
+import { useUndo } from '../../hooks/useUndo';
+import { useGameState } from '../../hooks/useGameState';
 
-const POKER_STORAGE_KEY = 'pokerGameState';
+export const POKER_STORAGE_KEY = 'pokerGameState';
 
 const createInitialPokerState = (): PokerGameState => ({
     players: [],
@@ -25,14 +28,8 @@ const createInitialPokerState = (): PokerGameState => ({
 });
 
 export const usePokerGame = () => {
-    const [gameState, setGameState] = useState<PokerGameState>(createInitialPokerState);
-
-    const addMessage = useCallback((message: string) => {
-        setGameState(prev => ({
-            ...prev,
-            messages: [...prev.messages.slice(-100), message]
-        }));
-    }, []);
+    const [gameState, setGameState, addMessage] = useGameState<PokerGameState>(createInitialPokerState);
+    const { record, undo, canUndo } = useUndo(gameState, setGameState, gameState.gameStage !== 'pre-deal');
 
     const loadGame = useCallback(() => {
         const savedState = localStorage.getItem(POKER_STORAGE_KEY);
@@ -63,7 +60,7 @@ export const usePokerGame = () => {
             addMessage("Failed to load saved game, starting fresh.");
             return false;
         }
-    }, [addMessage]);
+    }, [addMessage, setGameState]);
 
     useEffect(() => {
         if (gameState.players.length > 0) {
@@ -209,6 +206,7 @@ export const usePokerGame = () => {
                     player.stack -= costToPlayer;
                     player.totalPotContribution += costToPlayer;
                     player.roundBet = amount;
+                    if (player.stack === 0) player.isAllIn = true;
                     newCurrentBet = amount;
                     players.forEach((p: PokerPlayer) => {
                         if (p.id !== player.id) {
@@ -288,7 +286,7 @@ export const usePokerGame = () => {
             addMessage(`Action is on ${toTitleCase(players[nextIndex].name)}.`);
             return { ...prev, players, currentBet: newCurrentBet, lastRaiseAmount: newLastRaiseAmount, activePlayerIndex: nextIndex };
         });
-    }, [addMessage, advanceToNextStageOrShowdown, getEndOfHandState]);
+    }, [addMessage, advanceToNextStageOrShowdown, getEndOfHandState, setGameState]);
 
     const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }) => {
         const initialPlayers: PokerPlayer[] = players.map((p, i) => ({
@@ -308,7 +306,7 @@ export const usePokerGame = () => {
             dealerButtonIndex: -1,
             messages: [`Game setup with ${players.length} players. Blinds are ${blinds.sb}/${blinds.bb}. Click 'Start Next Hand' to begin.`]
         });
-    }, []);
+    }, [setGameState]);
 
     const startNewHand = useCallback(() => {
         setGameState(prev => {
@@ -379,25 +377,34 @@ export const usePokerGame = () => {
                 messages,
             };
         });
-    }, [addMessage]);
+    }, [addMessage, setGameState]);
 
     const awardPot = useCallback((potIndex: number, winnerIds: number[]) => {
         setGameState(prev => {
             const potToAward = prev.pot[potIndex];
             if (!potToAward) return prev;
 
-            const splitAmount = Math.floor(potToAward.amount / winnerIds.length);
+            // Odd chips go to the winners first left of the dealer button.
+            const n = prev.players.length;
+            const winnersBySeat = prev.players
+                .map((_, i) => prev.players[(prev.dealerButtonIndex + 1 + i + n) % n].id)
+                .filter(id => winnerIds.includes(id));
+            const shares = splitEvenly(potToAward.amount, winnersBySeat.length);
+            const shareOf = new Map(winnersBySeat.map((id, i) => [id, shares[i]]));
+            const splitAmount = Math.floor(potToAward.amount / winnersBySeat.length);
             const winnerNames: string[] = [];
 
             const newPlayers = prev.players.map(p => {
-                if (winnerIds.includes(p.id)) {
+                const share = shareOf.get(p.id);
+                if (share !== undefined) {
                     winnerNames.push(toTitleCase(p.name));
-                    return { ...p, stack: p.stack + splitAmount, roundWinnings: p.roundWinnings + splitAmount };
+                    return { ...p, stack: p.stack + share, roundWinnings: p.roundWinnings + share };
                 }
                 return p;
             });
 
-            addMessage(`${winnerNames.join(' & ')} win(s) the pot of ₹${potToAward.amount} (Split: ₹${splitAmount} each).`);
+            const oddNote = shares.some(s => s !== splitAmount) ? ', odd chips to the first left of the dealer' : '';
+            addMessage(`${winnerNames.join(' & ')} win(s) the pot of ₹${potToAward.amount} (Split: ₹${splitAmount} each${oddNote}).`);
 
             const newPots = prev.pot.filter((_, index) => index !== potIndex);
 
@@ -456,7 +463,7 @@ export const usePokerGame = () => {
 
             return { ...prev, players: newPlayers, pot: newPots };
         });
-    }, [addMessage]);
+    }, [addMessage, setGameState]);
 
     const addPlayer = useCallback((name: string, stack: number, phoneNumber: string) => {
         if (!name || stack < 0) return;
@@ -485,7 +492,7 @@ export const usePokerGame = () => {
             addMessage(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
             return { ...prev, players: [...prev.players, newPlayer] };
         });
-    }, [addMessage]);
+    }, [addMessage, setGameState]);
 
     const removePlayer = useCallback((playerId: number) => {
         setGameState(prev => {
@@ -499,7 +506,7 @@ export const usePokerGame = () => {
             }
             return { ...prev, players: prev.players.filter(p => p.id !== playerId) };
         });
-    }, [addMessage]);
+    }, [addMessage, setGameState]);
 
     const addChipsToPlayer = useCallback((playerId: number, amount: number) => {
         if (amount <= 0) return;
@@ -522,7 +529,7 @@ export const usePokerGame = () => {
             });
             return { ...prev, players: newPlayers };
         });
-    }, [addMessage]);
+    }, [addMessage, setGameState]);
 
     const togglePlayerBreak = useCallback((playerId: number) => {
         setGameState(prev => {
@@ -539,7 +546,7 @@ export const usePokerGame = () => {
             }
             return { ...prev, players: newPlayers };
         });
-    }, [addMessage]);
+    }, [addMessage, setGameState]);
 
     const applyStreakWinnings = useCallback((winnerId: number, amount: number) => {
         setGameState(prev => {
@@ -569,11 +576,14 @@ export const usePokerGame = () => {
             addMessage(`Streak Winnings! ${toTitleCase(winner.name)} receives ₹${totalDeducted} (₹${amount} from each player).`);
             return { ...prev, players: finalPlayers };
         });
-    }, [addMessage]);
+    }, [addMessage, setGameState]);
 
     const actions = useMemo(() => ({
         setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings
     }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings]);
 
-    return { gameState, actions };
+    const recordedActions = useMemo(() => record(actions), [record, actions]);
+
+    // autoAwardPot is unrecorded: the showdown effect calls it, and undo must not land on a state it re-fires from.
+    return { gameState, actions: recordedActions, autoAwardPot: awardPot, undo, canUndo };
 };
