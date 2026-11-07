@@ -52,7 +52,7 @@ export const derivePlayers = (gameState: Pick<GameState, 'players' | 'foldedPlay
 };
 
 export const useTeenPattiGame = () => {
-  const [gameState, setGameState, log] = useGameState<GameState>(() => {
+  const [gameState, setGameState, log, afterCommit] = useGameState<GameState>(() => {
     return loadStateFromLocalStorage() || createInitialGameState();
   });
 
@@ -131,7 +131,7 @@ export const useTeenPattiGame = () => {
           }
         });
 
-        bulkUpdateWinnings(recordsToUpdate);
+        afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
 
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
@@ -158,7 +158,7 @@ export const useTeenPattiGame = () => {
         messages: finalMessages,
       };
     });
-  }, [setGameState]);
+  }, [setGameState, afterCommit]);
 
   // --- Player Actions ---
   const startNewGame = (newPlayers: Player[]) => {

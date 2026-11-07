@@ -1,23 +1,31 @@
-import { useCallback, useRef, useState, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
 import { LOG_LIMIT, mergeLog } from '../utils/log';
 
 /**
- * useState for a game's state plus addMessage. The hooks call addMessage inside setGameState updaters,
- * where a nested setState is dropped, so lines written there are collected into that same update.
+ * useState for a game's state, plus addMessage and afterCommit for use inside setGameState updaters:
+ * a nested setState there is dropped and updaters can re-run, so lines and side effects are collected per update.
  */
 export const useGameState = <S extends { messages: string[] }>(initial: S | (() => S)) => {
     const [gameState, setRawGameState] = useState<S>(initial);
     const writtenRef = useRef<string[] | null>(null);
+    const effectsRef = useRef<(() => void)[] | null>(null);
+    // Keyed per setGameState call, so a re-run of the same updater replaces its effects instead of adding more.
+    const queuedRef = useRef(new Map<object, (() => void)[]>());
 
     const setGameState = useCallback((action: SetStateAction<S>) => {
+        const update = {};
         setRawGameState(prev => {
             writtenRef.current = [];
+            effectsRef.current = [];
             try {
                 const next = typeof action === 'function' ? (action as (state: S) => S)(prev) : action;
+                if (effectsRef.current.length > 0) queuedRef.current.set(update, effectsRef.current);
+                else queuedRef.current.delete(update);
                 const written = writtenRef.current;
                 return written.length === 0 ? next : { ...next, messages: mergeLog(prev.messages, next.messages, written) };
             } finally {
                 writtenRef.current = null;
+                effectsRef.current = null;
             }
         });
     }, []);
@@ -30,5 +38,17 @@ export const useGameState = <S extends { messages: string[] }>(initial: S | (() 
         }
     }, []);
 
-    return [gameState, setGameState, addMessage] as const;
+    // Runs a side effect (a database write) once the update commits; immediately when called outside an updater.
+    const afterCommit = useCallback((effect: () => void) => {
+        if (effectsRef.current) effectsRef.current.push(effect);
+        else effect();
+    }, []);
+
+    useEffect(() => {
+        const effects = [...queuedRef.current.values()].flat();
+        queuedRef.current.clear();
+        effects.forEach(effect => effect());
+    }, [gameState]);
+
+    return [gameState, setGameState, addMessage, afterCommit] as const;
 };

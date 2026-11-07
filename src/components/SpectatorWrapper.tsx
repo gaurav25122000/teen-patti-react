@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useSpectate } from '../hooks/useSpectate';
 import { derivePlayers } from '../hooks/useTeenPattiGame';
@@ -32,10 +32,12 @@ const currentTurnId = (state: any): number | null => {
 
 const SpectatorWrapper: React.FC = () => {
     const { streamId } = useParams<{ streamId: string }>();
-    const { gameState, connectionStatus, handoverOffer, clearHandoverOffer, hostMovedTo, send } = useSpectate(streamId);
+    const { gameState, connectionStatus, handoverOffer, clearHandoverOffer, hostMovedTo, handoverConfirmed, send } = useSpectate(streamId);
     const [viewerName, setViewerName] = useStoredState('viewerName', '');
     const [handoverError, setHandoverError] = useState<string | null>(null);
     const [leaving, setLeaving] = useState(false);
+    // What this phone had saved before accepting, restored if the host never confirms.
+    const acceptedRef = useRef<{ storageKey: string; previous: string | null; route: string } | null>(null);
 
     // Player view: the viewer picks who they are; ids come from the host, so coerce before use in CSS.
     const players: { id: number; name: string; balance?: number; stack?: number }[] = Array.isArray(gameState?.players) ? gameState.players : [];
@@ -66,15 +68,38 @@ const SpectatorWrapper: React.FC = () => {
         const saved = { ...handoverOffer };
         delete saved.gameType;
         try {
+            acceptedRef.current = { storageKey: game.storageKey, previous: localStorage.getItem(game.storageKey), route: game.route };
             localStorage.setItem(game.storageKey, JSON.stringify(saved));
         } catch {
+            acceptedRef.current = null;
             replyToHandover(false, "This phone can't save the game (storage is blocked).");
             return;
         }
         replyToHandover(true);
         setLeaving(true);
-        setTimeout(() => window.location.assign(`${game.route}?host=1`), 1500);
     };
+
+    // Move only once the host confirms; a host that cancelled meanwhile never does.
+    useEffect(() => {
+        if (handoverConfirmed && acceptedRef.current) window.location.assign(`${acceptedRef.current.route}?host=1`);
+    }, [handoverConfirmed]);
+
+    useEffect(() => {
+        if (!leaving) return;
+        const timer = setTimeout(() => {
+            const accepted = acceptedRef.current;
+            acceptedRef.current = null;
+            if (accepted) {
+                try {
+                    if (accepted.previous === null) localStorage.removeItem(accepted.storageKey);
+                    else localStorage.setItem(accepted.storageKey, accepted.previous);
+                } catch { /* storage blocked: nothing was written */ }
+            }
+            setLeaving(false);
+            setHandoverError("The host didn't confirm the hand over. Nothing changed on this phone.");
+        }, 30_000);
+        return () => clearTimeout(timer);
+    }, [leaving]);
 
     const offeredGame = handoverOffer ? GAMES[String(handoverOffer.gameType)] : undefined;
     const withViewerUi = (screen: React.ReactNode) => (
@@ -117,7 +142,7 @@ const SpectatorWrapper: React.FC = () => {
     if (leaving) {
         return (
             <div className="spectator-loading">
-                <h2>Taking over as host...</h2>
+                <h2>Waiting for the host to confirm...</h2>
             </div>
         );
     }

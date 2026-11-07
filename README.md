@@ -20,9 +20,10 @@ The application leverages local storage to save game state, allowing you to clos
   * **Undo:** The host can undo one action per tap, back to the start of the current round. A finished round can't be undone, because its winnings are already saved.
   * **Table View:** Teen Patti and Poker players can be shown around a round table instead of a list; each device remembers its choice.
   * **Win Celebrations:** Confetti and a winner banner on the host and every stream viewer.
-  * **Live Stream:** Share a link or QR code. Viewers pick who they are to see their balance, their row highlighted and a "Your turn!" alert (with vibration on Android). The host can hand the game to a viewer's phone, which starts a new stream link.
+  * **Live Stream:** Share a link or QR code. Viewers pick who they are to see their balance, their row highlighted and a "Your turn!" alert (with vibration on Android). The host can hand the game to a viewer's phone: it moves there (and is removed from the host's phone) and starts a new stream link.
   * **Install & Offline:** Installable as an app; local games work without internet once the app has loaded. Streaming and Lifetime Winnings need a connection.
   * **Notes:** Saved automatically as you type.
+  * **Blackjack Insurance:** A side bet of half the hand's bet; at the dealer's turn the host says whether the dealer had blackjack, and it pays 2:1.
 
 ## 🚀 Tech Stack
 

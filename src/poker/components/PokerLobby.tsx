@@ -4,6 +4,7 @@ import type { usePokerGame } from '../hooks/usePokerGame';
 import PokerGameSetup from './PokerGameSetup';
 import PokerGameScreen from './PokerGameScreen';
 import PokerIntroScreen from './PokerIntroScreen';
+import { isHandoverArrival } from '../../utils/hostHandover';
 
 interface PokerLobbyProps {
     pokerHook: ReturnType<typeof usePokerGame>;
@@ -22,9 +23,9 @@ const PokerLobby: React.FC<PokerLobbyProps> = ({ pokerHook, onInteractionChange 
         return false;
     };
 
-    // A phone taking over hosting arrives with ?host=1 and its saved game already written.
+    // A phone taking over hosting arrives with its saved game already written.
     useEffect(() => {
-        if (new URLSearchParams(window.location.search).has('host') && pokerActions.loadGame()) setPokerStep('game');
+        if (isHandoverArrival() && pokerActions.loadGame()) setPokerStep('game');
     }, [pokerActions]);
 
     // If a game is already in progress (e.g., loaded from storage), go straight to the game.

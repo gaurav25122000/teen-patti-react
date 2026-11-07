@@ -68,7 +68,7 @@ const areAllHandsSettled = (players: BlackjackPlayer[]): boolean => {
     for (const player of players) {
         if (player.isTakingBreak) continue;
         for (const hand of player.hands) {
-            if (hand.status === 'playing' || hand.status === 'stand') {
+            if (hand.status === 'playing' || hand.status === 'stand' || (hand.insurance && !hand.insuranceResult)) {
                 return false; // Found a hand that still needs settlement
             }
         }
@@ -77,7 +77,7 @@ const areAllHandsSettled = (players: BlackjackPlayer[]): boolean => {
 };
 
 export const useBlackjackGame = () => {
-    const [gameState, setGameState, addMessage] = useGameState<BlackjackGameState>(() => {
+    const [gameState, setGameState, addMessage, afterCommit] = useGameState<BlackjackGameState>(() => {
         return loadStateFromStorage() || createInitialBlackjackState();
     });
     const { record, undo, canUndo } = useUndo(gameState, setGameState, gameState.gameStage !== 'betting');
@@ -326,7 +326,7 @@ export const useBlackjackGame = () => {
     };
 
     // This function must be defined *before* it is used in setHandStatus
-    const endRoundAndPay_internal = (state: BlackjackGameState): BlackjackGameState => {
+    const endRoundAndPay_internal = useCallback((state: BlackjackGameState): BlackjackGameState => {
         const endState = state || gameState;
 
         const recordsToUpdate: WinningsRecord[] = [];
@@ -349,6 +349,9 @@ export const useBlackjackGame = () => {
                 else if (h.status === 'lose') roundNet -= h.wager;
                 else if (h.status === 'busted') roundNet -= h.wager;
                 else if (h.status === 'surrendered') roundNet -= h.bet / 2; // Surrender loss is half *original* bet
+                // Insurance pays 2:1, settled separately from the hand
+                if (h.insuranceResult === 'won') roundNet += h.insurance! * 2;
+                else if (h.insuranceResult === 'lost') roundNet -= h.insurance!;
                 // Push is net 0
             });
 
@@ -370,7 +373,7 @@ export const useBlackjackGame = () => {
         });
 
         if(recordsToUpdate.length > 0) {
-            bulkUpdateWinnings(recordsToUpdate);
+            afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
         }
 
         return {
@@ -383,7 +386,7 @@ export const useBlackjackGame = () => {
             isBettingLocked: true, // Lock betting for next round
             messages: [...endState.messages, "--- ROUND OVER ---", `Bets locked to last amount. Click 'Change Bets' to unlock.`]
         };
-    };
+    }, [gameState, afterCommit]);
 
     const handlePlayerAction = (action: 'hit' | 'stand' | 'double' | 'split' | 'surrender' | 'insurance') => {
         setGameState(prev => {
@@ -495,9 +498,21 @@ export const useBlackjackGame = () => {
                     updateHand(player.id, hand.id, { status: 'surrendered' }); // --- FIX: Don't change bet/wager ---
                     newDealerNet += lossAmount;
                     break;
-                case 'insurance':
-                     addMessage(`${player.name} (Hand ${Number(hand.id.split('-').pop()) + 1}) takes insurance.`);
-                     break;
+                case 'insurance': {
+                    if (hand.hasHit || hand.insurance) {
+                        addMessage("Insurance is offered once per hand, before hitting.");
+                        return prev;
+                    }
+                    const insurance = hand.bet / 2;
+                    if (player.stack < insurance) {
+                        addMessage("Not enough stack for insurance.");
+                        return prev;
+                    }
+                    addMessage(`${player.name} (Hand ${Number(hand.id.split('-').pop()) + 1}) takes insurance for ₹${insurance}.`);
+                    updatePlayer(player.id, { stack: player.stack - insurance });
+                    updateHand(player.id, hand.id, { insurance });
+                    break;
+                }
             }
             
             const updatedHand = newPlayers.find(p => p.id === player.id)?.hands.find(h => h.id === hand.id);
@@ -616,6 +631,37 @@ export const useBlackjackGame = () => {
          });
     };
     
+    // Host answers whether the dealer had blackjack: insured hands get the side bet back plus 2:1, or lose it.
+    const settleInsurance = useCallback((dealerHasBlackjack: boolean) => {
+        setGameState(prev => {
+            if (prev.gameStage !== 'dealer-turn') return prev;
+            let dealerNetChange = 0;
+            const newPlayers = prev.players.map(p => {
+                let stack = p.stack;
+                const hands = p.hands.map(h => {
+                    if (!h.insurance || h.insuranceResult) return h;
+                    const handNum = Number(h.id.split('-').pop()) + 1;
+                    if (dealerHasBlackjack) {
+                        stack += h.insurance * 3;
+                        dealerNetChange -= h.insurance * 2;
+                        addMessage(`${p.name} (Hand ${handNum}) insurance pays ₹${h.insurance * 2}.`);
+                        return { ...h, insuranceResult: 'won' as const };
+                    }
+                    dealerNetChange += h.insurance;
+                    addMessage(`${p.name} (Hand ${handNum}) loses insurance of ₹${h.insurance}.`);
+                    return { ...h, insuranceResult: 'lost' as const };
+                });
+                return { ...p, stack, hands };
+            });
+            const next = { ...prev, players: newPlayers, dealerNet: prev.dealerNet + dealerNetChange };
+            if (areAllHandsSettled(newPlayers)) {
+                addMessage("All hands settled.");
+                return endRoundAndPay_internal(next);
+            }
+            return next;
+        });
+    }, [setGameState, addMessage, endRoundAndPay_internal]);
+
     // --- PLAYER MANAGEMENT ACTIONS ---
     
     const addPlayer = useCallback((name: string, stack: number, phoneNumber: string, numHands: number) => {
@@ -772,8 +818,9 @@ export const useBlackjackGame = () => {
         togglePlayerBreak,
         updatePlayerHandCount,
         unlockAllBets, 
+        settleInsurance,
     }), [setupNewGame, setupGame, loadGame, placeBet, startRound, handlePlayerAction, setHandStatus, // ADDED setupNewGame
-         addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, updatePlayerHandCount, unlockAllBets]);
+         addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, updatePlayerHandCount, unlockAllBets, settleInsurance]);
 
     const recordedActions = useMemo(() => record(actions), [record, actions]);
 

@@ -301,7 +301,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     <div className="game-controls-container">
                         {isReadOnly && <div className="badge badge-warning" style={{ alignSelf: 'center', marginBottom: '1rem' }}>SPECTATOR MODE</div>}
                         
-                        {!isReadOnly && <StreamControls gameState={gameState} gameType="teen-patti" style={{ marginBottom: '1rem' }} />}
+                        {!isReadOnly && <StreamControls gameState={gameState} gameType="teen-patti" style={{ marginBottom: '1rem' }} onHandedOver={() => actions.startNewGame([])} />}
                         {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginBottom: '1rem', alignSelf: 'center' }} onClick={undo}>↩ Undo</button>}
 
                     <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>

@@ -11,6 +11,8 @@ export interface PlayerHand {
     wager: number; // The amount at risk (e.g., 2x bet if doubled)
     status: HandStatus;
     hasHit: boolean; // To prevent doubling after hitting
+    insurance?: number; // side bet, half the original bet
+    insuranceResult?: 'won' | 'lost';
 }
 
 export interface BlackjackPlayer {

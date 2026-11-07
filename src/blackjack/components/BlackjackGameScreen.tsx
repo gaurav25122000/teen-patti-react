@@ -102,7 +102,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                         <h2>{toTitleCase(gameStage)}</h2>
                         {isReadOnly && <div className="badge badge-warning" style={{ marginTop: '0.5rem' }}>SPECTATOR MODE</div>}
             
-                        {!isReadOnly && <StreamControls gameState={gameState} gameType="blackjack" style={{ marginTop: '0.5rem' }} />}
+                        {!isReadOnly && <StreamControls gameState={gameState} gameType="blackjack" style={{ marginTop: '0.5rem' }} onHandedOver={actions.setupNewGame} />}
                         {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
                     </div>
 
@@ -130,6 +130,13 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                                 <br />
                                 The round will end automatically.
                              </p>
+                             {!isReadOnly && players.some(p => p.hands.some(h => h.insurance && !h.insuranceResult)) && (
+                                <div className="game-actions" style={{ justifyContent: 'center' }}>
+                                    <span>Insurance: did the dealer have blackjack?</span>
+                                    <button className="btn-success" onClick={() => actions.settleInsurance(true)}>Yes</button>
+                                    <button className="btn-error" onClick={() => actions.settleInsurance(false)}>No</button>
+                                </div>
+                             )}
                         </div>
                     )}
 

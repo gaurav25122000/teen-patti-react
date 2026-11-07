@@ -9,6 +9,7 @@ export const useSpectate = (streamId: string | undefined) => {
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
     const [handoverOffer, setHandoverOffer] = useState<Record<string, unknown> | null>(null);
     const [hostMovedTo, setHostMovedTo] = useState<string | null>(null);
+    const [handoverConfirmed, setHandoverConfirmed] = useState(false);
     const peerRef = useRef<Peer | null>(null);
     const connRef = useRef<DataConnection | null>(null);
 
@@ -32,6 +33,7 @@ export const useSpectate = (streamId: string | undefined) => {
                 const message = parseHostMessage(data);
                 if (message?.type === 'state') setGameState(rehydrateState(message.state));
                 else if (message?.type === 'handover') setHandoverOffer(message.state);
+                else if (message?.type === 'handover-confirmed') setHandoverConfirmed(true);
                 else if (message?.type === 'host-moved') setHostMovedTo(message.to);
             });
 
@@ -74,6 +76,7 @@ export const useSpectate = (streamId: string | undefined) => {
         handoverOffer,
         clearHandoverOffer: useCallback(() => setHandoverOffer(null), []),
         hostMovedTo,
+        handoverConfirmed,
         send,
     };
 };

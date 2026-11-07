@@ -2,7 +2,10 @@
 const CACHE = 'bets-manager-v1';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
-// Caches every file in Vite's build manifest, so routes never visited also open offline; drops old build files.
+const isHtml = response => (response.headers.get('content-type') || '').includes('text/html');
+
+// Caches every file in Vite's build manifest (routes never visited open offline too), then drops old build files.
+// Adding before deleting means a dropped connection leaves the previous build complete.
 const syncBuildFiles = async () => {
   const response = await fetch('/asset-manifest.json', { cache: 'no-store' });
   if (!response.ok) return;
@@ -13,15 +16,15 @@ const syncBuildFiles = async () => {
     (entry.assets || []).forEach(file => files.add(`/${file}`));
   }
   const cache = await caches.open(CACHE);
-  for (const request of await cache.keys()) {
-    const path = new URL(request.url).pathname;
-    if (path.startsWith('/assets/') && !files.has(path)) await cache.delete(request);
-  }
   const missing = [];
   for (const file of files) {
     if (!(await cache.match(file))) missing.push(file);
   }
   await cache.addAll(missing);
+  for (const request of await cache.keys()) {
+    const path = new URL(request.url).pathname;
+    if (path.startsWith('/assets/') && !files.has(path)) await cache.delete(request);
+  }
 };
 
 self.addEventListener('install', event => {
@@ -41,17 +44,19 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/.netlify/')) return;
 
   if (request.mode === 'navigate') {
-    // Network first, so a new deploy shows up; refresh the cached build while online.
+    // Network first, so a new deploy shows up; only a real app page becomes the offline shell.
     event.respondWith(
       fetch(request)
         .then(response => {
-          const copy = response.clone();
-          event.waitUntil(
-            caches.open(CACHE)
-              .then(cache => cache.put('/index.html', copy))
-              .then(syncBuildFiles)
-              .catch(err => console.error('Offline cache refresh failed:', err))
-          );
+          if (response.ok && isHtml(response)) {
+            const copy = response.clone();
+            event.waitUntil(
+              caches.open(CACHE)
+                .then(cache => cache.put('/index.html', copy))
+                .then(syncBuildFiles)
+                .catch(err => console.error('Offline cache refresh failed:', err))
+            );
+          }
           return response;
         })
         .catch(() => caches.match('/index.html'))
@@ -59,15 +64,31 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Build files are content-hashed and never change, so cache first. ignoreVary: the app's crossorigin
-  // requests carry an Origin header, which misses entries cached without one when a server sends Vary: Origin.
+  if (url.pathname.startsWith('/assets/')) {
+    // Hashed files never change: cache first. ignoreVary because crossorigin requests send Origin (Vary: Origin).
+    // A missing chunk comes back as Netlify's index.html (200), so HTML is never cached under an asset path.
+    event.respondWith(
+      caches.match(request, { ignoreVary: true }).then(cached => cached || fetch(request).then(response => {
+        if (response.ok && !isHtml(response)) {
+          const copy = response.clone();
+          event.waitUntil(caches.open(CACHE).then(cache => cache.put(request, copy)));
+        }
+        return response;
+      }))
+    );
+    return;
+  }
+
+  // Unhashed files (manifest, icons): network first so they refresh, cache as the offline fallback.
   event.respondWith(
-    caches.match(request, { ignoreVary: true }).then(cached => cached || fetch(request).then(response => {
-      if (response.ok) {
-        const copy = response.clone();
-        event.waitUntil(caches.open(CACHE).then(cache => cache.put(request, copy)));
-      }
-      return response;
-    }))
+    fetch(request)
+      .then(response => {
+        if (response.ok) {
+          const copy = response.clone();
+          event.waitUntil(caches.open(CACHE).then(cache => cache.put(request, copy)));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request, { ignoreVary: true }))
   );
 });

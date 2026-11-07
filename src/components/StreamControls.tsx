@@ -2,15 +2,20 @@ import React, { useEffect, useState } from 'react';
 import InteractionModal from './InteractionModal';
 import { useBroadcast } from '../hooks/useBroadcast';
 import { toTitleCase } from '../utils/formatters';
+import { consumeHandoverArrival } from '../utils/hostHandover';
 
 interface StreamControlsProps {
     gameState: object;
     gameType: 'teen-patti' | 'poker' | 'blackjack';
     style: React.CSSProperties;
+    onHandedOver: () => void; // removes this phone's copy once a viewer has taken the game
 }
 
-const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, style }) => {
-    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewers, viewerCount, handover, handOver, resetHandover } = useBroadcast();
+const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, style, onHandedOver }) => {
+    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewers, viewerCount, handover, handOver, resetHandover } = useBroadcast(name => {
+        alert(`Hosting moved to ${name}'s phone. They'll share a new stream link. The game has been removed from this phone.`);
+        onHandedOver();
+    });
     const [showStreamModal, setShowStreamModal] = useState(false);
     const [showHandoverModal, setShowHandoverModal] = useState(false);
     const [qrCode, setQrCode] = useState<string | null>(null);
@@ -23,10 +28,9 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
         }
     }, [gameState, gameType, isStreaming, broadcast]);
 
-    // A phone that just took over hosting arrives with ?host=1 and starts a fresh stream.
+    // A phone that just took over hosting starts a fresh stream.
     useEffect(() => {
-        if (!new URLSearchParams(window.location.search).has('host')) return;
-        window.history.replaceState(null, '', window.location.pathname);
+        if (!consumeHandoverArrival()) return;
         startStreaming();
         setShowStreamModal(true);
     }, [startStreaming]);
@@ -68,18 +72,22 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
     const handoverBody = () => {
         if (handover.status === 'waiting') return <p>Waiting for {handover.name} to accept...</p>;
         if (handover.status === 'declined') return <p>{handover.name} said no.</p>;
-        if (handover.status === 'done') {
-            return <p>Hosting moved to {handover.name}'s phone. They'll share a new stream link. Your copy of the game here is no longer live.</p>;
-        }
         if (viewers.length === 0) return <p>No one is watching right now.</p>;
+        // Names are self-reported; number repeats so each phone can be told apart.
+        const seen = new Map<string, number>();
+        const labels = viewers.map((viewer, i) => {
+            const base = viewer.name ? toTitleCase(viewer.name) : `Viewer ${i + 1}`;
+            const count = (seen.get(base) ?? 0) + 1;
+            seen.set(base, count);
+            return count > 1 ? `${base} (${count})` : base;
+        });
         return (
             <>
-                <p>Pick the phone that will run the game from now on:</p>
+                <p>Pick the phone that will run the game from now on. The game moves there and is removed from this phone. Names are what each viewer picked.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {viewers.map((viewer, i) => {
-                        const name = viewer.name ? toTitleCase(viewer.name) : `Viewer ${i + 1}`;
-                        return <button key={viewer.id} className="btn-secondary" onClick={() => handOver(viewer, name)}>{name}</button>;
-                    })}
+                    {viewers.map((viewer, i) => (
+                        <button key={viewer.id} className="btn-secondary" onClick={() => handOver(viewer, labels[i])}>{labels[i]}</button>
+                    ))}
                 </div>
             </>
         );
@@ -141,7 +149,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
                 </InteractionModal>
             )}
 
-            {(showHandoverModal || handover.status === 'done') && (
+            {showHandoverModal && (
                 <InteractionModal
                     isOpen={true}
                     onClose={closeHandover}

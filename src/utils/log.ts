@@ -1,4 +1,5 @@
 export const LOG_LIMIT = 101;
+export const UNDO_LINE = '↩ Last action undone.';
 
 /**
  * Puts log lines written during a state update into that update's log: before the lines the update

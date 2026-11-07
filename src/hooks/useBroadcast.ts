@@ -11,7 +11,7 @@ export interface Viewer {
 
 export type Handover =
     | { status: 'idle' }
-    | { status: 'waiting' | 'declined' | 'done'; name: string };
+    | { status: 'waiting' | 'declined'; name: string };
 
 const sendToAll = (connections: DataConnection[], message: HostMessage) => {
     connections.forEach(conn => {
@@ -19,7 +19,8 @@ const sendToAll = (connections: DataConnection[], message: HostMessage) => {
     });
 };
 
-export const useBroadcast = () => {
+// onHandedOver runs once the stream has stopped after a viewer accepted the game.
+export const useBroadcast = (onHandedOver: (name: string) => void) => {
     const [streamId, setStreamId] = useState<string | null>(null);
     const [isStreaming, setIsStreaming] = useState(false);
     const [viewers, setViewers] = useState<Viewer[]>([]);
@@ -28,6 +29,8 @@ export const useBroadcast = () => {
     const connectionsRef = useRef<DataConnection[]>([]);
     const latestStateRef = useRef<Record<string, unknown> | null>(null);
     const handoverTargetRef = useRef<{ id: string; name: string } | null>(null);
+    const onHandedOverRef = useRef(onHandedOver);
+    onHandedOverRef.current = onHandedOver;
 
     const stopStreaming = useCallback(() => {
         if (peerRef.current) {
@@ -65,7 +68,9 @@ export const useBroadcast = () => {
             conn.on('data', (data) => {
                 const message = parseViewerMessage(data);
                 if (message?.type === 'viewer-name') {
-                    setViewers(prev => prev.map(v => (v.id === conn.connectionId ? { ...v, name: message.name } : v)));
+                    setViewers(prev => (prev.some(v => v.id === conn.connectionId && v.name !== message.name)
+                        ? prev.map(v => (v.id === conn.connectionId ? { ...v, name: message.name } : v))
+                        : prev));
                 } else if (message?.type === 'handover-reply' && handoverTargetRef.current?.id === conn.connectionId) {
                     const { name } = handoverTargetRef.current;
                     handoverTargetRef.current = null;
@@ -73,9 +78,13 @@ export const useBroadcast = () => {
                         setHandover({ status: 'declined', name });
                         return;
                     }
+                    conn.send({ type: 'handover-confirmed' } satisfies HostMessage);
                     sendToAll(connectionsRef.current, { type: 'host-moved', to: name });
-                    setHandover({ status: 'done', name });
-                    setTimeout(stopStreaming, 800); // let host-moved reach viewers first
+                    setHandover({ status: 'idle' });
+                    setTimeout(() => { // let the messages reach viewers first
+                        stopStreaming();
+                        onHandedOverRef.current(name);
+                    }, 800);
                 }
             });
 

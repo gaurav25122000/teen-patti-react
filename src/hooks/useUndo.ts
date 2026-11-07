@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { sanitizeState } from '../utils/serialization';
+import { UNDO_LINE } from '../utils/log';
 
 // Compares game state ignoring the action log, so a rejected action (log line only) is not an undo step.
 const sameGame = (a: object, b: object) =>
@@ -46,7 +47,7 @@ export const useUndo = <T extends { messages: string[] }>(
         const previous = history[history.length - 1];
         if (!previous) return;
         setHistory(history.slice(0, -1));
-        setGameState({ ...previous, messages: [...previous.messages, '↩ Last action undone.'] });
+        setGameState({ ...previous, messages: [...previous.messages, UNDO_LINE] });
     }, [history, setGameState]);
 
     return { record, undo, canUndo: history.length > 0 };

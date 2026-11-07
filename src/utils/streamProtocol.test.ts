@@ -20,6 +20,7 @@ test('host messages: state, handover and host-moved; old hosts send raw state', 
     assert.deepEqual(parseHostMessage({ type: 'state', state }), { type: 'state', state });
     assert.deepEqual(parseHostMessage({ type: 'handover', state }), { type: 'handover', state });
     assert.deepEqual(parseHostMessage({ type: 'host-moved', to: 'Ravi' }), { type: 'host-moved', to: 'Ravi' });
+    assert.deepEqual(parseHostMessage({ type: 'handover-confirmed' }), { type: 'handover-confirmed' });
     assert.deepEqual(parseHostMessage(state), { type: 'state', state });
 
     assert.equal(parseHostMessage({ type: 'host-moved', to: 'x'.repeat(100) })?.type, 'host-moved');

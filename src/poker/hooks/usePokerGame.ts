@@ -28,7 +28,7 @@ const createInitialPokerState = (): PokerGameState => ({
 });
 
 export const usePokerGame = () => {
-    const [gameState, setGameState, addMessage] = useGameState<PokerGameState>(createInitialPokerState);
+    const [gameState, setGameState, addMessage, afterCommit] = useGameState<PokerGameState>(createInitialPokerState);
     const { record, undo, canUndo } = useUndo(gameState, setGameState, gameState.gameStage !== 'pre-deal');
 
     const loadGame = useCallback(() => {
@@ -119,7 +119,7 @@ export const usePokerGame = () => {
             }
         });
 
-        bulkUpdateWinnings(recordsToUpdate);
+        afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
 
         const finalPlayers = updatedPlayers.map(p => {
             const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false, canOnlyCall: false };
@@ -130,7 +130,7 @@ export const usePokerGame = () => {
         });
 
         const finalWinner = finalPlayers.find(p => p.id === winner.id)!;
-        const newMessages = [...prevGameState.messages.slice(-99), `--- HAND OVER ---`, `${toTitleCase(winner.name)} wins the pot of ₹${totalPot}. Their final stack is ₹${finalWinner.stack}.`];
+        const newMessages = [...prevGameState.messages, `--- HAND OVER ---`, `${toTitleCase(winner.name)} wins the pot of ₹${totalPot}. Their final stack is ₹${finalWinner.stack}.`];
 
         return {
             ...createInitialPokerState(),
@@ -140,7 +140,7 @@ export const usePokerGame = () => {
             bigBlindAmount: prevGameState.bigBlindAmount,
             messages: newMessages,
         };
-    }, []);
+    }, [afterCommit]);
 
     const handlePlayerAction = useCallback((action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in', amount = 0) => {
         setGameState(prev => {
@@ -418,8 +418,8 @@ export const usePokerGame = () => {
                     if (p_initial.phoneNumber) {
                         const p_final = newPlayers.find(p => p.id === p_initial.id);
                         if (p_final) {
-                            const amountWon = p_final.stack - p_initial.stack;
-                            const finalWinnings = amountWon - p_initial.totalPotContribution;
+                            // Whole-hand result: every pot this player won, not just this last one.
+                            const finalWinnings = p_final.roundWinnings - p_initial.totalPotContribution;
 
                             if (finalWinnings !== 0) {
                                 recordsToUpdate.push({
@@ -434,7 +434,7 @@ export const usePokerGame = () => {
                     }
                 });
 
-                bulkUpdateWinnings(recordsToUpdate);
+                afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
 
                 const maxRoundWinnings = Math.max(...newPlayers.map(p => p.roundWinnings));
                 
@@ -463,7 +463,7 @@ export const usePokerGame = () => {
 
             return { ...prev, players: newPlayers, pot: newPots };
         });
-    }, [addMessage, setGameState]);
+    }, [addMessage, setGameState, afterCommit]);
 
     const addPlayer = useCallback((name: string, stack: number, phoneNumber: string) => {
         if (!name || stack < 0) return;
@@ -551,36 +551,48 @@ export const usePokerGame = () => {
     const applyStreakWinnings = useCallback((winnerId: number, amount: number) => {
         setGameState(prev => {
             if (amount <= 0) return prev;
-            
+            if (prev.gameStage !== 'pre-deal') {
+                addMessage("Can only give streak winnings between hands.");
+                return prev;
+            }
+
             const winner = prev.players.find(p => p.id === winnerId);
             if (!winner) return prev;
 
-            let totalDeducted = 0;
-            const newPlayers = prev.players.map(p => {
-                if (p.id === winnerId) return p; // Will update winner later
-
-                // Deduct from everyone else
-                const deduction = amount;
-                totalDeducted += deduction;
-                return { ...p, stack: p.stack - deduction };
+            // Players on break don't pay.
+            const payerIds = new Set(prev.players.filter(p => p.id !== winnerId && !p.isTakingBreak).map(p => p.id));
+            const totalDeducted = amount * payerIds.size;
+            const finalPlayers = prev.players.map(p => {
+                if (p.id === winnerId) return { ...p, stack: p.stack + totalDeducted };
+                return payerIds.has(p.id) ? { ...p, stack: p.stack - amount } : p;
             });
 
-            // Add to winner and update streaks
-            const finalPlayers = newPlayers.map(p => {
-                if (p.id === winnerId) {
-                    return { ...p, stack: p.stack + totalDeducted, winningStreak: p.winningStreak + 1 };
-                }
-                return { ...p, winningStreak: 0 };
-            });
+            const timestamp = new Date().toISOString();
+            const recordsToUpdate: WinningsRecord[] = prev.players
+                .filter(p => p.phoneNumber && (p.id === winnerId || payerIds.has(p.id)))
+                .map(p => ({
+                    phoneHash: SHA256(p.phoneNumber!).toString(),
+                    playerName: p.name,
+                    gameType: 'poker',
+                    winnings: p.id === winnerId ? totalDeducted : -amount,
+                    timestamp,
+                }));
+            if (totalDeducted > 0) afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
 
-            addMessage(`Streak Winnings! ${toTitleCase(winner.name)} receives ₹${totalDeducted} (₹${amount} from each player).`);
+            addMessage(`Streak Winnings! ${toTitleCase(winner.name)} receives ₹${totalDeducted} (₹${amount} from each of ${payerIds.size} player${payerIds.size === 1 ? '' : 's'}).`);
             return { ...prev, players: finalPlayers };
         });
-    }, [addMessage, setGameState]);
+    }, [addMessage, setGameState, afterCommit]);
+
+    // Empties the game and its saved copy (used after handing the game to another phone).
+    const clearGame = useCallback(() => {
+        localStorage.removeItem(POKER_STORAGE_KEY);
+        setGameState(createInitialPokerState());
+    }, [setGameState]);
 
     const actions = useMemo(() => ({
-        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings
-    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings]);
+        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame
+    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame]);
 
     const recordedActions = useMemo(() => record(actions), [record, actions]);
 

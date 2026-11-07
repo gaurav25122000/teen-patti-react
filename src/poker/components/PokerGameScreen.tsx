@@ -148,7 +148,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             <h2>{toTitleCase(gameStage)}</h2>
             {isReadOnly && <div className="badge badge-warning" style={{ marginTop: '0.5rem' }}>SPECTATOR MODE</div>}
             
-            {!isReadOnly && <StreamControls gameState={gameState} gameType="poker" style={{ marginTop: '0.5rem' }} />}
+            {!isReadOnly && <StreamControls gameState={gameState} gameType="poker" style={{ marginTop: '0.5rem' }} onHandedOver={actions.clearGame} />}
             {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
         </div>
     );

@@ -2,6 +2,7 @@
 export type HostMessage =
     | { type: 'state'; state: Record<string, unknown> }
     | { type: 'handover'; state: Record<string, unknown> }
+    | { type: 'handover-confirmed' }
     | { type: 'host-moved'; to: string };
 
 export type ViewerMessage =
@@ -29,6 +30,7 @@ export const parseHostMessage = (data: unknown): HostMessage | null => {
     if ((data.type === 'state' || data.type === 'handover') && isRecord(data.state)) {
         return { type: data.type, state: data.state };
     }
+    if (data.type === 'handover-confirmed') return { type: 'handover-confirmed' };
     if (data.type === 'host-moved' && typeof data.to === 'string') {
         return { type: 'host-moved', to: data.to.slice(0, MAX_NAME_LENGTH) };
     }
