@@ -8,7 +8,7 @@ import InteractionModal from '../../components/InteractionModal';
 import OwingsModal from '../../components/OwingsModal';
 import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
 import { toTitleCase } from '../../utils/formatters';
-import { useBroadcast } from '../../hooks/useBroadcast';
+import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
 
 interface PokerGameScreenProps {
@@ -36,34 +36,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
 
-    // Streaming Hook
-    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast();
-    const [showStreamModal, setShowStreamModal] = useState(false);
-
-    // Broadcast state changes
-    useEffect(() => {
-        if (isStreaming && !isReadOnly) {
-            broadcast({ ...gameState, gameType: 'poker' });
-        }
-    }, [gameState, isStreaming, broadcast, isReadOnly]);
-
     const currentPlayer = activePlayerIndex > -1 ? players[activePlayerIndex] : null;
-
-    const handleStartStream = () => {
-        startStreaming();
-        setShowStreamModal(true);
-    };
-
-    const handleStopStream = () => {
-        stopStreaming();
-        setShowStreamModal(false);
-    };
-
-    const copyStreamLink = () => {
-        const link = `${window.location.origin}/watch/${streamId}`;
-        navigator.clipboard.writeText(link);
-        alert('Stream link copied to clipboard!');
-    };
 
     useEffect(() => {
         if (gameStage === 'showdown' && pot.length > 0) {
@@ -174,35 +147,15 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             <h2>{toTitleCase(gameStage)}</h2>
             {isReadOnly && <div className="badge badge-warning" style={{ marginTop: '0.5rem' }}>SPECTATOR MODE</div>}
             
-            {!isReadOnly && !isStreaming && (
-                <button 
-                    className="btn-sm btn-outline-info" 
-                    style={{ marginTop: '0.5rem' }} 
-                    onClick={handleStartStream}
-                >
-                    Start Live Stream
-                </button>
-            )}
-            
-            {!isReadOnly && isStreaming && (
-                <div style={{ marginTop: '0.5rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                     <span className="badge badge-success">LIVE ({viewerCount})</span>
-                     <button className="btn-sm btn-outline-secondary" onClick={() => setShowStreamModal(true)}>Link</button>
-                     <button className="btn-sm btn-outline-danger" onClick={handleStopStream}>Stop</button>
-                </div>
-            )}
+            {!isReadOnly && <StreamControls gameState={gameState} gameType="poker" style={{ marginTop: '0.5rem' }} />}
         </div>
     );
 
     const renderModal = () => {
-        if (modalMode === 'none' && !showStreamModal) return null;
+        if (modalMode === 'none') return null;
 
-        // Stream modals are allowed in read-only (e.g. success modal might show up, but typically spectators don't see it?)
-        // Actually, spectators shouldn't see 'Start Stream' button so they won't trigger stream modals. 
-        // But if they are viewing, they might see other things.
-        
         // Critical: If read-only, we should NOT show interactive game management modals.
-        if (isReadOnly && modalMode !== 'none') {
+        if (isReadOnly) {
             return null;
         }
 
@@ -210,49 +163,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             return <OwingsModal isOpen={true} onClose={closeModal} transactions={transactions} />;
         }
 
-        if (showStreamModal && !streamId) {
-             return (
-                 <InteractionModal 
-                    isOpen={true} 
-                    onClose={() => setShowStreamModal(false)}
-                    title="Starting Stream..."
-                    theme="default"
-                    footerContent={null}
-                >
-                    <div style={{ padding: '20px', textAlign: 'center' }}>Connecting to stream server...</div>
-                </InteractionModal>
-             );
-        }
-
-        if (showStreamModal && streamId) {
-             return (
-                 <InteractionModal 
-                    isOpen={true} 
-                    onClose={() => setShowStreamModal(false)}
-                    title="Live Stream Started"
-                    theme="success"
-                    footerContent={<button className="btn-modal btn-modal-primary" onClick={() => setShowStreamModal(false)}>Close</button>}
-                >
-                    <div style={{ textAlign: 'center' }}>
-                        <p>Share this link with friends to let them watch:</p>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                            <input 
-                                type="text" 
-                                readOnly 
-                                value={`${window.location.origin}/watch/${streamId}`} 
-                                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #444', color: '#fff' }}
-                            />
-                            <button className="btn-secondary" onClick={copyStreamLink}>Copy</button>
-                        </div>
-                        <p style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '12px' }}>
-                            Keep this tab open. Stream ends if you leave.
-                        </p>
-                    </div>
-                </InteractionModal>
-             );
-        }
-
-        if (modalMode !== 'none' && modalMode !== 'showdown') {
+        if (modalMode !== 'showdown') {
             let title = '';
             let body: React.ReactNode = null;
             let footer: React.ReactNode = null;

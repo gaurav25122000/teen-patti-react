@@ -1,9 +1,10 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useSpectate } from '../hooks/useSpectate';
+import { derivePlayers } from '../hooks/useTeenPattiGame';
 import PokerGameScreen from '../poker/components/PokerGameScreen';
 import GameScreen from './GameScreen';
-// BlackjackLobby removed as we use BlackjackGameScreen dynamically or via require
+import BlackjackGameScreen from '../blackjack/components/BlackjackGameScreen';
 
 
 const SpectatorWrapper: React.FC = () => {
@@ -81,6 +82,7 @@ const SpectatorWrapper: React.FC = () => {
     if (gameType === 'teen-patti') {
         const mockTeenPattiHook = {
             gameState: actualState,
+            ...derivePlayers(actualState),
             actions: {
                 startNewGame: mockAction,
                 loadGame: mockAction,
@@ -107,15 +109,6 @@ const SpectatorWrapper: React.FC = () => {
     }
 
     if (gameType === 'blackjack') {
-         // For Blackjack, the State is complex.
-         // And BlackjackLobby manages 'step' (intro/setup/game).
-         // If we are spectating, we likely want to jump straight to 'game'.
-         // But BlackjackLobby renders BlackjackGameScreen.
-         // Let's see if we can render BlackjackGameScreen directly if we have state.
-         
-         // Ideally we export BlackjackGameScreen and use it here.
-         // Let's check imports. I imported BlackjackLobby above, but I should probably import BlackjackGameScreen directly if I can mock the hook.
-         
          const mockBlackjackHook = {
             gameState: actualState,
              actions: {
@@ -141,15 +134,6 @@ const SpectatorWrapper: React.FC = () => {
                  changeHandCount: mockAction,
              }
          };
-
-         // I need to import BlackjackGameScreen dynamically or make sure it's exported
-         // For now, I'll assume I can import it.
-         // Wait, I can't easily change imports in this file block if I don't know if it's exported.
-         // Based on file outline of BlackjackLobby, it imports BlackjackGameScreen.
-         // I should check if BlackjackGameScreen is the default export of its file.
-         
-         // Assuming BlackjackGameScreen is available (I will verify and fix imports if needed).
-         const BlackjackGameScreen = require('../blackjack/components/BlackjackGameScreen').default;
 
          // @ts-ignore
          return <BlackjackGameScreen blackjackHook={mockBlackjackHook} onInteractionChange={() => {}} onShowSetupRequest={() => {}} isReadOnly={true} />;

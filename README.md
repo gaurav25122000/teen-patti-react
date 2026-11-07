@@ -54,6 +54,27 @@ Follow these steps to get the project running on your local machine.
 4.  **Open in Browser**
     Navigate to the local URL provided by Vite (usually `http://localhost:5173`).
 
+5.  **Run the Tests**
+    Needs Node 22.18+ (runs TypeScript tests directly):
+
+    ```bash
+    npm test
+    ```
+
+`npm run build` type-checks (`tsc -b`) before building, so type errors fail the build.
+
+## 📡 Live Streaming (TURN)
+
+Spectator streams use WebRTC via PeerJS. Viewers on other networks (especially mobile data) need a TURN relay; PeerJS's built-in one no longer works. Set these build-time env vars (in Netlify: Site configuration → Environment variables, then redeploy):
+
+| Variable | Example |
+| --- | --- |
+| `VITE_TURN_URLS` | `turn:relay.example.com:3478,turns:relay.example.com:443?transport=tcp` |
+| `VITE_TURN_USERNAME` | TURN username |
+| `VITE_TURN_CREDENTIAL` | TURN password |
+
+All three are needed together. They are embedded in the public bundle, so use credentials you can rotate. Without them, streaming falls back to STUN only and works only when both sides can connect directly.
+
 ## 📁 Project Structure
 
 The project is organized into a clean, component-based architecture for better maintainability.

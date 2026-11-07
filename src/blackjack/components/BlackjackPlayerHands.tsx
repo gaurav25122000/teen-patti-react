@@ -18,7 +18,7 @@ interface BlackjackPlayerHandsProps {
 
 const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({ 
     player, isCurrentPlayer, currentHandId, gameStage, isBettingLocked,
-    onPlaceBet, onPlayerAction, onSetHandStatus, onUnlockBet
+    onPlaceBet, onPlayerAction, onSetHandStatus
 }) => {
     // This local state is only for when betting is unlocked
     const [betAmounts, setBetAmounts] = useState<Record<number, string>>({});

@@ -26,7 +26,7 @@ export interface BlackjackPlayer {
 }
 
 export interface DealerHand {
-    cards: Card[];
+    cards: (Card | '?')[]; // '?' = face-down placeholder
     status: 'playing' | 'busted' | 'stand';
     score: number;
 }

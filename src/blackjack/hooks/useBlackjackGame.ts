@@ -1,7 +1,7 @@
 // teen-patti-react/src/blackjack/hooks/useBlackjackGame.ts
 // src/blackjack/hooks/useBlackjackGame.ts
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { BlackjackGameState, BlackjackPlayer, PlayerHand, HandStatus, GameStage, DealerHand } from '../types/blackjackGameTypes';
+import type { BlackjackGameState, BlackjackPlayer, PlayerHand, HandStatus, GameStage } from '../types/blackjackGameTypes';
 import { toTitleCase } from '../../utils/formatters';
 import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsService';
 import { SHA256 } from 'crypto-js';
@@ -59,27 +59,6 @@ const loadStateFromStorage = (): BlackjackGameState | null => {
         localStorage.removeItem(BLACKJACK_STORAGE_KEY);
         return null;
     }
-};
-
-// Simplified card logic for manager (no deck, just scoring)
-const getHandScore = (cards: string[]): number => {
-    let score = 0;
-    let aces = 0;
-    for (const card of cards) {
-        if (['K', 'Q', 'J', '10'].includes(card)) {
-            score += 10;
-        } else if (card === 'A') {
-            aces += 1;
-            score += 11;
-        } else {
-            score += parseInt(card);
-        }
-    }
-    while (score > 21 && aces > 0) {
-        score -= 10;
-        aces -= 1;
-    }
-    return score;
 };
 
 // --- HELPER TO CHECK FOR AUTO-SETTLE ---
@@ -421,8 +400,8 @@ export const useBlackjackGame = () => {
             const hand = player.hands.find(h => h.id === prev.currentHandId);
             if (!hand || hand.status !== 'playing') return prev;
 
-            let nextPlayerId = prev.currentPlayerId;
-            let nextHandId = prev.currentHandId;
+            let nextPlayerId: number | null = prev.currentPlayerId;
+            let nextHandId: string | null = prev.currentHandId;
             let nextStage: GameStage = 'player-turn';
             let newDealerNet = prev.dealerNet; 
 
@@ -556,7 +535,7 @@ export const useBlackjackGame = () => {
         });
     };
     
-    const setHandStatus = (playerId: number, handId: string, status: HandStatus, dealerScore: number = 0) => {
+    const setHandStatus = (playerId: number, handId: string, status: HandStatus) => {
          setGameState(prev => {
             // --- RE-BUILT PAYOUT LOGIC ---
             let playerWonAmount: number | null = null; // This is the total amount to ADD to the stack
@@ -766,7 +745,7 @@ export const useBlackjackGame = () => {
                 return {
                     ...p,
                     stack: p.stack + refundedAmount,
-                    hands: Array(p.initialHandsCount).fill(null).map((_, i) => ({
+                    hands: Array(p.initialHandsCount).fill(null).map((_, i): PlayerHand => ({
                          id: `${p.id}-hand-${i}`,
                          cards: [],
                          bet: 0,

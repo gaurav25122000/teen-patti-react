@@ -23,6 +23,31 @@ const createInitialGameState = (): GameState => ({
   messages: ["Welcome! Load a game or set up a new one."],
 });
 
+// Also used by spectators, who get raw state over the stream.
+export const derivePlayers = (gameState: Pick<GameState, 'players' | 'foldedPlayerIds' | 'roundActive' | 'currentPlayerIndex'>) => {
+  const active = gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
+  const current = (gameState.roundActive && gameState.currentPlayerIndex >= 0) ? gameState.players[gameState.currentPlayerIndex] : null;
+
+  let preceding: Player | null = null;
+  if (current) {
+    const numPlayers = gameState.players.length;
+    if (numPlayers >= 2) {
+      let precedingIndex = gameState.currentPlayerIndex;
+      let attempts = 0;
+      do {
+        precedingIndex = (precedingIndex - 1 + numPlayers) % numPlayers;
+        const precedingCandidate = gameState.players[precedingIndex];
+        if (precedingCandidate.id !== current.id && !gameState.foldedPlayerIds.has(precedingCandidate.id)) {
+          preceding = precedingCandidate;
+          break;
+        }
+        attempts++;
+      } while (attempts < numPlayers);
+    }
+  }
+  return { activePlayers: active, currentPlayer: current, precedingPlayer: preceding };
+};
+
 export const useTeenPattiGame = () => {
   const [gameState, setGameState] = useState<GameState>(() => {
     return loadStateFromLocalStorage() || createInitialGameState();
@@ -42,29 +67,11 @@ export const useTeenPattiGame = () => {
   }, []);
 
   // --- DERIVED STATE ---
-  const { activePlayers, currentPlayer, precedingPlayer } = useMemo(() => {
-    const active = gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
-    const current = (gameState.roundActive && gameState.currentPlayerIndex >= 0) ? gameState.players[gameState.currentPlayerIndex] : null;
-
-    let preceding: Player | null = null;
-    if (current) {
-      const numPlayers = gameState.players.length;
-      if (numPlayers >= 2) {
-        let precedingIndex = gameState.currentPlayerIndex;
-        let attempts = 0;
-        do {
-          precedingIndex = (precedingIndex - 1 + numPlayers) % numPlayers;
-          const precedingCandidate = gameState.players[precedingIndex];
-          if (precedingCandidate.id !== current.id && !gameState.foldedPlayerIds.has(precedingCandidate.id)) {
-            preceding = precedingCandidate;
-            break;
-          }
-          attempts++;
-        } while (attempts < numPlayers);
-      }
-    }
-    return { activePlayers: active, currentPlayer: current, precedingPlayer: preceding };
-  }, [gameState.players, gameState.foldedPlayerIds, gameState.roundActive, gameState.currentPlayerIndex]);
+  const { players, foldedPlayerIds, roundActive, currentPlayerIndex } = gameState;
+  const { activePlayers, currentPlayer, precedingPlayer } = useMemo(
+    () => derivePlayers({ players, foldedPlayerIds, roundActive, currentPlayerIndex }),
+    [players, foldedPlayerIds, roundActive, currentPlayerIndex]
+  );
 
 
   // --- Core Game Logic ---

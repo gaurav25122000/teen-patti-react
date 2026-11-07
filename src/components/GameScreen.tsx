@@ -12,7 +12,7 @@ import InteractionModal from './InteractionModal';
 import EntityManager from './EntityManager';
 import { calculateOwings, type Transaction } from '../utils/owingsLogic';
 import { toTitleCase } from '../utils/formatters';
-import { useBroadcast } from '../hooks/useBroadcast';
+import StreamControls from './StreamControls';
 import ActionToast from './ActionToast';
 
 // --- SVG Icons ---
@@ -37,33 +37,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     const [showOwings, setShowOwings] = useState(false);
     const [showEntityManager, setShowEntityManager] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
-
-    // Streaming Hook
-    const { startStreaming, stopStreaming, broadcast, isStreaming, streamId, viewerCount } = useBroadcast(); // REMOVED ARG
-    const [showStreamModal, setShowStreamModal] = useState(false);
-
-    // Broadcast state changes
-    useEffect(() => {
-        if (isStreaming && !isReadOnly) {
-            broadcast({ ...gameState, gameType: 'teen-patti' });
-        }
-    }, [gameState, isStreaming, broadcast, isReadOnly]);
-
-    const handleStartStream = () => {
-        startStreaming();
-        setShowStreamModal(true);
-    };
-
-    const handleStopStream = () => {
-        stopStreaming();
-        setShowStreamModal(false);
-    };
-
-    const copyStreamLink = () => {
-        const link = `${window.location.origin}/watch/${streamId}`;
-        navigator.clipboard.writeText(link);
-        alert('Stream link copied to clipboard!');
-    };
 
     const [bootAmount, setBootAmount] = useState('10');
     const [startPlayerId, setStartPlayerId] = useState('');
@@ -160,52 +133,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     };
 
     const renderModal = () => {
-        if (interaction === 'idle' && !showStreamModal) return null;
-            
-        if (showStreamModal && streamId) {
-             return (
-                 <InteractionModal 
-                    isOpen={true} 
-                    onClose={() => setShowStreamModal(false)}
-                    title="Live Stream Started"
-                    theme="success"
-                    footerContent={<button className="btn-modal btn-modal-primary" onClick={() => setShowStreamModal(false)}>Close</button>}
-                >
-                    <div style={{ textAlign: 'center' }}>
-                        <p>Share this link with friends to let them watch:</p>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                            <input 
-                                type="text" 
-                                readOnly 
-                                value={`${window.location.origin}/watch/${streamId}`} 
-                                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #444', color: '#fff' }}
-                            />
-                            <button className="btn-secondary" onClick={copyStreamLink}>Copy</button>
-                        </div>
-                        <p style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '12px' }}>
-                            Keep this tab open. Stream ends if you leave.
-                        </p>
-                    </div>
-                </InteractionModal>
-             );
-        }
-
-        if (showStreamModal && !streamId) {
-             return (
-                 <InteractionModal 
-                    isOpen={true} 
-                    onClose={() => setShowStreamModal(false)}
-                    title="Starting Stream..."
-                    theme="default"
-                    footerContent={null}
-                >
-                    <div style={{ padding: '20px', textAlign: 'center' }}>Connecting to stream server...</div>
-                </InteractionModal>
-             );
-        }
-
         if (interaction === 'idle') return null;
-        
+
         // Spectre Mode Enforcement: Block all interaction modals
         if (isReadOnly) return null;
 
@@ -370,23 +299,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     <div className="game-controls-container">
                         {isReadOnly && <div className="badge badge-warning" style={{ alignSelf: 'center', marginBottom: '1rem' }}>SPECTATOR MODE</div>}
                         
-                         {!isReadOnly && !isStreaming && (
-                            <button 
-                                className="btn-sm btn-outline-info" 
-                                style={{ marginBottom: '1rem' }} 
-                                onClick={handleStartStream}
-                            >
-                                Start Live Stream
-                            </button>
-                        )}
-                        
-                        {!isReadOnly && isStreaming && (
-                            <div style={{ marginBottom: '1rem', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
-                                <span className="badge badge-success">LIVE ({viewerCount})</span>
-                                <button className="btn-sm btn-outline-secondary" onClick={() => setShowStreamModal(true)}>Link</button>
-                                <button className="btn-sm btn-outline-danger" onClick={handleStopStream}>Stop</button>
-                            </div>
-                        )}
+                        {!isReadOnly && <StreamControls gameState={gameState} gameType="teen-patti" style={{ marginBottom: '1rem' }} />}
 
                     <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
                         <GameControls

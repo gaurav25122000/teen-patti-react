@@ -2,6 +2,9 @@ export const sanitizeState = (state: any): any => {
     if (state instanceof Set) {
         return Array.from(state);
     }
+    if (state instanceof Map) {
+        return Array.from(state.entries());
+    }
     if (Array.isArray(state)) {
         return state.map(item => sanitizeState(item));
     }
@@ -24,6 +27,8 @@ export const sanitizeState = (state: any): any => {
 // We need to know which keys should be Sets. 
 // Known Set keys in our app: 'eligiblePlayers', 'blindPlayerIds', 'foldedPlayerIds'
 const SET_KEYS = new Set(['eligiblePlayers', 'blindPlayerIds', 'foldedPlayerIds']);
+// Map keys, sent as entry arrays.
+const MAP_KEYS = new Set(['roundContributions']);
 
 export const rehydrateState = (state: any): any => {
     if (Array.isArray(state)) {
@@ -37,6 +42,8 @@ export const rehydrateState = (state: any): any => {
                 
                 if (SET_KEYS.has(key) && Array.isArray(value)) {
                     newState[key] = new Set(value);
+                } else if (MAP_KEYS.has(key) && Array.isArray(value)) {
+                    newState[key] = new Map(value);
                 } else {
                     newState[key] = rehydrateState(value);
                 }
