@@ -11,14 +11,14 @@ interface BlackjackPlayerHandsProps {
     gameStage: 'betting' | 'player-turn' | 'dealer-turn' | 'round-over' | 'dealing';
     isBettingLocked: boolean; // ADDED
     onPlaceBet: (playerId: number, handIndex: number, amount: number) => void;
-    onPlayerAction: (action: 'hit' | 'stand' | 'double' | 'surrender' | 'split') => void;
+    onPlayerAction: (action: 'hit' | 'stand' | 'double' | 'surrender' | 'split' | 'insurance') => void;
     onSetHandStatus: (playerId: number, handId: string, status: HandStatus) => void;
     onUnlockBet: () => void; // RENAMED
 }
 
 const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({ 
     player, isCurrentPlayer, currentHandId, gameStage, isBettingLocked,
-    onPlaceBet, onPlayerAction, onSetHandStatus, onUnlockBet
+    onPlaceBet, onPlayerAction, onSetHandStatus
 }) => {
     // This local state is only for when betting is unlocked
     const [betAmounts, setBetAmounts] = useState<Record<number, string>>({});
@@ -75,6 +75,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                 <button className="btn-success" onClick={() => onPlayerAction('double')}>Double</button>
                 <button className="btn-accent" onClick={() => onPlayerAction('split')}>Split</button>
                 <button className="btn-error" onClick={() => onPlayerAction('surrender')}>Surrender</button>
+                <button className="btn-secondary" onClick={() => onPlayerAction('insurance')}>Insurance</button>
             </div>
         );
     };
@@ -114,6 +115,11 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                             {hand.wager > 0 && 
                                 <span style={{color: 'var(--color-text-muted)', display: 'block', fontSize: '0.9rem'}}>
                                     Bet: ₹{hand.wager} {hand.wager !== hand.bet && `(2x${hand.bet})`}
+                                </span>
+                            }
+                            {hand.insurance &&
+                                <span style={{color: 'var(--color-text-muted)', display: 'block', fontSize: '0.9rem'}}>
+                                    Insurance: ₹{hand.insurance}{hand.insuranceResult && ` (${hand.insuranceResult})`}
                                 </span>
                             }
                         </div>

@@ -1061,3 +1061,39 @@ h1 {
     font-size: 1.1em;
   }
 }
+/* --- Spectator player view --- */
+.viewer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.viewer-bar select {
+  margin-left: 0.25rem;
+}
+
+.viewer-balance {
+  color: var(--color-glow-lime);
+  font-family: var(--font-display);
+}
+
+.your-turn-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 150;
+  padding: 0.6rem 1.4rem;
+  border-radius: 999px;
+  border: 2px solid var(--color-glow-lime);
+  background: rgba(13, 13, 26, 0.95);
+  color: var(--color-glow-lime);
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  box-shadow: 0 0 18px var(--color-glow-lime);
+  animation: neon-flicker 1.5s infinite alternate;
+}

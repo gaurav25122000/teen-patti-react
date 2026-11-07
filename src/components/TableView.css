@@ -1,0 +1,94 @@
+.table-view {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  aspect-ratio: 4 / 3;
+  margin: 0.5rem auto 1rem;
+}
+
+.table-felt {
+  position: absolute;
+  inset: 16% 13%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, #0f3d2e 0%, #082419 75%);
+  border: 4px solid var(--color-glow-cyan);
+  box-shadow: 0 0 18px rgba(0, 255, 255, 0.45), inset 0 0 25px rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-center {
+  text-align: center;
+  color: var(--color-glow-gold);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.table-seat {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 96px;
+  padding: 0.35rem 0.4rem;
+  border-radius: 10px;
+  background: rgba(13, 13, 26, 0.9);
+  border: 1px solid rgba(0, 255, 255, 0.5);
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.seat-name {
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-amount {
+  color: var(--color-glow-lime);
+}
+
+.seat-status {
+  opacity: 0.8;
+}
+
+.table-seat.current-player {
+  border-color: var(--color-glow-lime);
+  box-shadow: 0 0 14px var(--color-glow-lime);
+}
+
+.table-seat.folded {
+  opacity: 0.45;
+}
+
+.table-seat.on-break {
+  opacity: 0.35;
+  border-style: dashed;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 0.75rem;
+  vertical-align: middle;
+}
+
+.view-toggle button {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+}
+
+.view-toggle button[aria-pressed="true"] {
+  border-color: var(--color-glow-cyan);
+  color: var(--color-glow-cyan);
+}
+
+@media (max-width: 480px) {
+  .table-seat {
+    width: 74px;
+    font-size: 0.62rem;
+  }
+}

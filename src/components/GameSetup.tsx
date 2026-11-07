@@ -37,7 +37,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
             if (!/^\d{10}$/.test(input.phoneNumber)) {
                 return alert(`Invalid phone number for Player ${index + 1}. Must be 10 digits.`);
             }
-            newPlayers.push({ id: index + 1, name: toTitleCase(input.name), balance, phoneNumber: input.phoneNumber });
+            newPlayers.push({ id: index + 1, name: toTitleCase(input.name), balance, phoneNumber: input.phoneNumber, isTakingBreak: false });
         }
         if (newPlayers.length < 2) return alert("Need at least 2 players.");
         onStartNewGame(newPlayers);

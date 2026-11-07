@@ -1,25 +1,25 @@
 // src/App.tsx
-import { useState, useCallback } from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import './App.css';
 
 // Teen Patti Imports
 import { useTeenPattiGame } from './hooks/useTeenPattiGame';
 import GameSetup from './components/GameSetup';
-import GameScreen from './components/GameScreen';
+const GameScreen = lazy(() => import('./components/GameScreen'));
 
 // Poker Imports
 import { usePokerGame } from './poker/hooks/usePokerGame';
-import PokerLobby from './poker/components/PokerLobby';
+const PokerLobby = lazy(() => import('./poker/components/PokerLobby'));
 
 // Blackjack Imports
 import { useBlackjackGame } from './blackjack/hooks/useBlackjackGame';
-import BlackjackLobby from './blackjack/components/BlackjackLobby';
+const BlackjackLobby = lazy(() => import('./blackjack/components/BlackjackLobby'));
 
 // General Components
 import ModeSelectionScreen from './components/ModeSelectionScreen';
-import LifetimeWinnings from './components/LifetimeWinnings';
-import SpectatorWrapper from './components/SpectatorWrapper';
+const LifetimeWinnings = lazy(() => import('./components/LifetimeWinnings'));
+const SpectatorWrapper = lazy(() => import('./components/SpectatorWrapper'));
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -30,31 +30,30 @@ function App() {
 
   const teenPattiHook = useTeenPattiGame();
   const pokerHook = usePokerGame();
-  const blackjackHook = useBlackjackGame(); 
+  const blackjackHook = useBlackjackGame();
 
-  const TeenPattiRoute = () => {
-    const showSetup = teenPattiHook.gameState.players.length < 2;
-    return showSetup ? (
-      <GameSetup
-        onStartNewGame={teenPattiHook.actions.startNewGame}
-        onLoadGame={teenPattiHook.actions.loadGame}
-      />
-    ) : (
-      <GameScreen
-        gameHook={teenPattiHook}
-        onShowSetup={() => teenPattiHook.actions.startNewGame([])}
-      />
-    );
-  };
+  // Plain element, not a component defined here: a new component type each render remounts GameScreen and kills its stream.
+  const teenPattiElement = teenPattiHook.gameState.players.length < 2 ? (
+    <GameSetup
+      onStartNewGame={teenPattiHook.actions.startNewGame}
+      onLoadGame={teenPattiHook.actions.loadGame}
+    />
+  ) : (
+    <GameScreen
+      gameHook={teenPattiHook}
+      onShowSetup={() => teenPattiHook.actions.startNewGame([])}
+    />
+  );
 
   return (
     <div className={`app-container ${isModalOpen ? 'modal-open' : ''}`}>
       <Link to="/" style={{ textDecoration: 'none' }}>
         <h1>Bets Manager</h1>
       </Link>
+      <Suspense fallback={<p>Loading...</p>}>
       <Routes>
         <Route path="/" element={<ModeSelectionScreen />} />
-        <Route path="/teen-patti" element={<TeenPattiRoute />} />
+        <Route path="/teen-patti" element={teenPattiElement} />
         <Route path="/poker" element={<PokerLobby pokerHook={pokerHook} onInteractionChange={handleInteractionChange} />} />
         {/* --- UPDATED ROUTE --- */}
         <Route path="/blackjack" element={<BlackjackLobby blackjackHook={blackjackHook} onInteractionChange={handleInteractionChange} />} />
@@ -62,6 +61,7 @@ function App() {
         <Route path="/lifetime-winnings" element={<LifetimeWinnings />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      </Suspense>
     </div>
   );
 }

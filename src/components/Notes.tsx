@@ -18,6 +18,7 @@ const Notes: React.FC<NotesProps> = ({ roundActive }) => {
 
     const handleNotesChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
         setNotes(event.target.value);
+        localStorage.setItem('poker-notes', event.target.value); // autosave on every edit
     };
 
     const handleSaveNotes = () => {

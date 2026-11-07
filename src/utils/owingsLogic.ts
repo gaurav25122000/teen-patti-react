@@ -17,16 +17,6 @@ export const calculateOwings = (
     players: { name: string; stack?: number; balance?: number; totalBuyIn?: number; entityId?: number }[],
     entities: Entity[] = []
 ): Transaction[] => {
-    // 1. Calculate Net Balance for each player
-    const playerBalances: PlayerBalance[] = players.map(p => {
-        const currentAmount = p.stack ?? p.balance ?? 0;
-        const investedAmount = p.totalBuyIn ?? (p.stack !== undefined ? p.totalBuyIn : 0);
-        return {
-            name: toTitleCase(p.name),
-            net: currentAmount - investedAmount,
-        };
-    });
-
     // Group players by entity
     const entityBalances: { [key: number]: PlayerBalance[] } = {};
     players.forEach(p => {
@@ -36,7 +26,7 @@ export const calculateOwings = (
             }
             entityBalances[p.entityId].push({
                 name: toTitleCase(p.name),
-                net: (p.stack ?? p.balance ?? 0) - (p.totalBuyIn ?? (p.stack !== undefined ? p.totalBuyIn : 0)),
+                net: (p.stack ?? p.balance ?? 0) - (p.totalBuyIn ?? 0),
             });
         }
     });
@@ -48,7 +38,7 @@ export const calculateOwings = (
         if (!p.entityId) {
             aggregatedBalances.push({
                 name: toTitleCase(p.name),
-                net: (p.stack ?? p.balance ?? 0) - (p.totalBuyIn ?? (p.stack !== undefined ? p.totalBuyIn : 0)),
+                net: (p.stack ?? p.balance ?? 0) - (p.totalBuyIn ?? 0),
             });
         }
     });

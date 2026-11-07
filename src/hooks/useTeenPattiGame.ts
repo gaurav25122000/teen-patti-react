@@ -1,11 +1,14 @@
 // src/hooks/useTeenPattiGame.ts
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import type { GameState, Player, Entity } from '../types/gameTypes';
 import { loadStateFromLocalStorage, saveStateToLocalStorage } from '../utils/localStorage';
 import { toTitleCase } from '../utils/formatters';
 import { bulkUpdateWinnings, type WinningsRecord } from '../utils/winningsService';
+import { splitEvenly } from '../utils/money';
 import { SHA256 } from 'crypto-js';
+import { useUndo } from './useUndo';
+import { useGameState } from './useGameState';
 
 const createInitialGameState = (): GameState => ({
   players: [],
@@ -23,10 +26,37 @@ const createInitialGameState = (): GameState => ({
   messages: ["Welcome! Load a game or set up a new one."],
 });
 
+// Also used by spectators, who get raw state over the stream.
+export const derivePlayers = (gameState: Pick<GameState, 'players' | 'foldedPlayerIds' | 'roundActive' | 'currentPlayerIndex'>) => {
+  const active = gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
+  const current = (gameState.roundActive && gameState.currentPlayerIndex >= 0) ? gameState.players[gameState.currentPlayerIndex] : null;
+
+  let preceding: Player | null = null;
+  if (current) {
+    const numPlayers = gameState.players.length;
+    if (numPlayers >= 2) {
+      let precedingIndex = gameState.currentPlayerIndex;
+      let attempts = 0;
+      do {
+        precedingIndex = (precedingIndex - 1 + numPlayers) % numPlayers;
+        const precedingCandidate = gameState.players[precedingIndex];
+        if (precedingCandidate.id !== current.id && !gameState.foldedPlayerIds.has(precedingCandidate.id)) {
+          preceding = precedingCandidate;
+          break;
+        }
+        attempts++;
+      } while (attempts < numPlayers);
+    }
+  }
+  return { activePlayers: active, currentPlayer: current, precedingPlayer: preceding };
+};
+
 export const useTeenPattiGame = () => {
-  const [gameState, setGameState] = useState<GameState>(() => {
+  const [gameState, setGameState, log, afterCommit] = useGameState<GameState>(() => {
     return loadStateFromLocalStorage() || createInitialGameState();
   });
+
+  const { record, undo, canUndo } = useUndo(gameState, setGameState, gameState.roundActive);
 
   // --- Persistence ---
   useEffect(() => {
@@ -35,36 +65,15 @@ export const useTeenPattiGame = () => {
 
   // --- Utility Functions ---
   const addMessage = useCallback((message: string, isError: boolean = false) => {
-    setGameState(prev => ({
-      ...prev,
-      messages: [...prev.messages.slice(-100), `${isError ? "ERROR: " : ""}${message}`]
-    }));
-  }, []);
+    log(`${isError ? "ERROR: " : ""}${message}`);
+  }, [log]);
 
   // --- DERIVED STATE ---
-  const { activePlayers, currentPlayer, precedingPlayer } = useMemo(() => {
-    const active = gameState.players.filter(p => !gameState.foldedPlayerIds.has(p.id));
-    const current = (gameState.roundActive && gameState.currentPlayerIndex >= 0) ? gameState.players[gameState.currentPlayerIndex] : null;
-
-    let preceding: Player | null = null;
-    if (current) {
-      const numPlayers = gameState.players.length;
-      if (numPlayers >= 2) {
-        let precedingIndex = gameState.currentPlayerIndex;
-        let attempts = 0;
-        do {
-          precedingIndex = (precedingIndex - 1 + numPlayers) % numPlayers;
-          const precedingCandidate = gameState.players[precedingIndex];
-          if (precedingCandidate.id !== current.id && !gameState.foldedPlayerIds.has(precedingCandidate.id)) {
-            preceding = precedingCandidate;
-            break;
-          }
-          attempts++;
-        } while (attempts < numPlayers);
-      }
-    }
-    return { activePlayers: active, currentPlayer: current, precedingPlayer: preceding };
-  }, [gameState.players, gameState.foldedPlayerIds, gameState.roundActive, gameState.currentPlayerIndex]);
+  const { players, foldedPlayerIds, roundActive, currentPlayerIndex } = gameState;
+  const { activePlayers, currentPlayer, precedingPlayer } = useMemo(
+    () => derivePlayers({ players, foldedPlayerIds, roundActive, currentPlayerIndex }),
+    [players, foldedPlayerIds, roundActive, currentPlayerIndex]
+  );
 
 
   // --- Core Game Logic ---
@@ -84,7 +93,7 @@ export const useTeenPattiGame = () => {
 
       return { ...prev, currentPlayerIndex: nextIndex, messages: newMessages };
     });
-  }, []);
+  }, [setGameState]);
 
   const checkForWinner = useCallback((currentPlayers: Player[], foldedIds: Set<number>): Player | null => {
     const active = currentPlayers.filter(p => !foldedIds.has(p.id));
@@ -122,7 +131,7 @@ export const useTeenPattiGame = () => {
           }
         });
 
-        bulkUpdateWinnings(recordsToUpdate);
+        afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
 
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
@@ -149,7 +158,7 @@ export const useTeenPattiGame = () => {
         messages: finalMessages,
       };
     });
-  }, []);
+  }, [setGameState, afterCommit]);
 
   // --- Player Actions ---
   const startNewGame = (newPlayers: Player[]) => {
@@ -424,15 +433,18 @@ export const useTeenPattiGame = () => {
         return prev;
       }
       const amountToDistribute = Math.floor(amount / (players.length - 1));
+      const shares = splitEvenly(amount, players.length - 1);
+      let shareIndex = 0;
       const updatedPlayers = players.map(p => {
         if (p.id === playerId) {
           return { ...p, balance: p.balance - amount };
         } else {
-          return { ...p, balance: p.balance + amountToDistribute };
+          return { ...p, balance: p.balance + shares[shareIndex++] };
         }
       });
 
-      addMessage(`Deducted ₹${amount} from ${toTitleCase(playerToDeduct.name)} and distributed ₹${amountToDistribute} to everyone else.`);
+      const leftoverNote = shares.some(s => s !== amountToDistribute) ? ' (leftover to the first players in order)' : '';
+      addMessage(`Deducted ₹${amount} from ${toTitleCase(playerToDeduct.name)} and distributed ₹${amountToDistribute} to everyone else${leftoverNote}.`);
       return { ...prev, players: updatedPlayers };
     });
   };
@@ -453,7 +465,7 @@ export const useTeenPattiGame = () => {
         }
         return { ...prev, players: newPlayers };
     });
-  }, [addMessage]);
+  }, [addMessage, setGameState]);
 
   return {
     gameState,
@@ -461,7 +473,9 @@ export const useTeenPattiGame = () => {
     activePlayers,
     currentPlayer,
     precedingPlayer,
-    actions: {
+    undo,
+    canUndo,
+    actions: record({
       startNewGame,
       loadGame,
       startRound,
@@ -479,6 +493,6 @@ export const useTeenPattiGame = () => {
       updateEntities,
       updatePlayers,
       togglePlayerBreak, // ADDED
-    }
+    })
   };
 };

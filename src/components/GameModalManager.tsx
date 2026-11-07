@@ -144,7 +144,7 @@ const GameModalManager: React.FC<GameModalManagerProps> = ({ interaction, setInt
             primaryAction = () => {
                 const balance = parseInt(addPlayerBalance, 10);
                 if (!addPlayerName || isNaN(balance)) return alert('Invalid name or balance.');
-                actions.addPlayer(addPlayerName, balance);
+                actions.addPlayer(addPlayerName, balance, '');
                 closeModal();
             };
             break;

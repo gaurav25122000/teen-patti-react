@@ -1,0 +1,49 @@
+.celebration {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0.9;
+  animation: confetti-fall 2.6s linear forwards;
+}
+
+.celebration-banner {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 2px solid var(--color-glow-gold);
+  background: rgba(13, 13, 26, 0.92);
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.5);
+  color: var(--color-glow-gold);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  text-align: center;
+  animation: celebration-pop 0.4s ease-out;
+}
+
+@keyframes confetti-fall {
+  to { transform: translateY(110vh) rotate(720deg); }
+}
+
+@keyframes celebration-pop {
+  from { transform: translateX(-50%) scale(0.6); opacity: 0; }
+  to { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti-piece { display: none; }
+  .celebration-banner { animation: none; }
+}

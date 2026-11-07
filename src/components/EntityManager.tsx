@@ -40,6 +40,7 @@ const EntityManager: React.FC<EntityManagerProps> = ({ isOpen, onClose, players,
             isOpen={isOpen}
             onClose={onClose}
             title="Manage Entities"
+            footerContent={null}
             theme="default"
         >
             <div className="entity-manager">

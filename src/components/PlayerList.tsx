@@ -3,6 +3,8 @@
 import React from 'react';
 import type { Player, GameState } from '../types/gameTypes';
 import { toTitleCase } from '../utils/formatters';
+import TableView, { ViewToggle } from './TableView';
+import { useStoredState } from '../hooks/useStoredState';
 
 interface PlayerListProps {
     players: Player[];
@@ -12,10 +14,40 @@ interface PlayerListProps {
 
 const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlayer }) => {
     const netBalance = players.reduce((acc, player) => acc + player.balance, 0);
+    const [view, setView] = useStoredState('seatView', 'list');
+
+    const rows = players.map(p => {
+        const isFolded = gameState.foldedPlayerIds.has(p.id);
+        const isCurrent = gameState.roundActive && currentPlayer?.id === p.id;
+        const contribution = gameState.roundContributions.get(p.id) || 0;
+        let status = "Waiting";
+
+        // MODIFIED LOGIC
+        if (p.isTakingBreak) {
+            status = "On Break";
+        } else if (gameState.roundActive) {
+            if (isFolded) {
+                status = "Folded";
+            } else {
+                status = gameState.blindPlayerIds.has(p.id) ? "Blind" : "Seen (Chaal)";
+                if (isCurrent) status += " (Current Turn)";
+            }
+        }
+
+        // MODIFIED CLASSNAME
+        const className = `${isFolded ? 'folded' : ''} ${isCurrent ? 'current-player' : ''} ${p.isTakingBreak ? 'on-break' : ''}`;
+        return { p, contribution, status, className };
+    });
 
     return (
         <div className="player-list">
-            <h3>Players ({players.length})</h3>
+            <h3>Players ({players.length}) <ViewToggle view={view} onChange={setView} /></h3>
+            {view === 'table' ? (
+                <TableView
+                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), amount: `₹ ${p.balance}`, status, className }))}
+                    center={<>Pot ₹{gameState.potAmount}<br />Stake ₹{gameState.currentStake}</>}
+                />
+            ) : (
             <table>
                 <thead>
                     <tr>
@@ -27,29 +59,9 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
                     </tr>
                 </thead>
                 <tbody>
-                    {players.map(p => {
-                        const isFolded = gameState.foldedPlayerIds.has(p.id);
-                        const isCurrent = gameState.roundActive && currentPlayer?.id === p.id;
-                        const contribution = gameState.roundContributions.get(p.id) || 0;
-                        let status = "Waiting";
-
-                        // MODIFIED LOGIC
-                        if (p.isTakingBreak) {
-                            status = "On Break";
-                        } else if (gameState.roundActive) {
-                            if (isFolded) {
-                                status = "Folded";
-                            } else {
-                                status = gameState.blindPlayerIds.has(p.id) ? "Blind" : "Seen (Chaal)";
-                                if (isCurrent) status += " (Current Turn)";
-                            }
-                        }
-
-                        // MODIFIED CLASSNAME
-                        const className = `${isFolded ? 'folded' : ''} ${isCurrent ? 'current-player' : ''} ${p.isTakingBreak ? 'on-break' : ''}`;
-
+                    {rows.map(({ p, contribution, status, className }) => {
                         return (
-                            <tr key={p.id} className={className}>
+                            <tr key={p.id} className={className} data-player-id={p.id}>
                                 <td data-label="ID">{p.id}</td>
                                 <td data-label="Name">{toTitleCase(p.name)}</td>
                                 <td data-label="Balance">₹ {p.balance}</td>
@@ -68,6 +80,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
                     </tr>
                 </tfoot>
             </table>
+            )}
         </div>
     );
 };
