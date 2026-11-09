@@ -49,7 +49,7 @@ test('hand nets: dealt-in players only, winnings minus chips in the pot, keyed b
         seat('Dev'),
         seat('Esha', { isTakingBreak: true }),
         seat('Kiran', { stack: 0 }),
-    ]), { '9000000001': 150, 'name:Ravi': -150, 'name:Dev': 0 });
+    ]), { '9000000001|Asha': 150, 'name:Ravi': -150, 'name:Dev': 0 });
 });
 
 test('biggest pot is the contested pot, named for the largest net', () => {

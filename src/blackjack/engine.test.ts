@@ -56,16 +56,14 @@ test('blackjack chips plus the house are conserved over 50 seeded random games o
         const players = Array.from({ length: 1 + Math.floor(r() * 4) }, (_, i) => ({ name: `P${i + 1}`, stack: 200 + Math.floor(r() * 800), phoneNumber: String(9000000001 + i), numHands: 1 + Math.floor(r() * 2) }));
         let s = E.newBlackjackGame(players);
         if (r() < 0.5) s = { ...s, blackjackPayout: '6to5' };
-        let removedNet = 0; // a removed player's result leaves the table with them
         for (let step = 0; step < 200; step++) {
-            const before = s;
             s = randomAction(s, r);
-            before.players.filter(p => !s.players.some(q => q.id === p.id)).forEach(p => { removedNet += chipsWithBets(p) - p.totalBuyIn; });
             const where = `seed ${seed}, step ${step}`;
-            assert.ok(Math.abs(sum(s.players.map(chipsWithBets)) + s.dealerNet + removedNet - sum(s.players.map(p => p.totalBuyIn))) < 1e-9, `${where}: chips not conserved`);
+            const leftWith = sum((s.departed ?? []).map(d => d.net)); // players who left stay settled
+            assert.ok(Math.abs(sum(s.players.map(chipsWithBets)) + s.dealerNet + leftWith - sum(s.players.map(p => p.totalBuyIn))) < 1e-9, `${where}: chips not conserved`);
             const settled = blackjackSettlement(s);
             assert.equal(settlementProblem(settled.parties, settled.transactions, settled.offBy), null, where);
-            assert.ok(Math.abs(settled.offBy + removedNet) < 0.005, `${where}: off by ${settled.offBy}`);
+            assert.ok(Math.abs(settled.offBy) < 0.005, `${where}: off by ${settled.offBy}`);
         }
     }
 });
@@ -92,4 +90,18 @@ test('betting on a later hand leaves no gap before it', () => {
     s = go(s, (x, io) => E.updatePlayerHandCount(x, 1, 3, io));
     s = go(s, (x, io) => E.placeBet(x, 1, 2, 20, io));
     assert.deepEqual(s.players[0].hands.map(h => h.bet), [0, 0, 20]);
+});
+
+test('bets of a player on a break go back at the deal, whether the bet or the break came first', () => {
+    const two = [{ name: 'Asha', stack: 500, phoneNumber: '9000000001', numHands: 1 }, { name: 'Raj', stack: 500, phoneNumber: '9000000002', numHands: 1 }];
+    const unlocked = go(E.newBlackjackGame(two), (x, io) => E.unlockAllBets(x, io));
+    const withBets = (s: BlackjackGameState) => go(go(s, (x, io) => E.placeBet(x, 1, 0, 50, io)), (x, io) => E.placeBet(x, 2, 0, 80, io));
+    const betThenBreak = go(withBets(unlocked), (x, io) => E.togglePlayerBreak(x, 2, io));
+    const breakThenBet = withBets(go(unlocked, (x, io) => E.togglePlayerBreak(x, 2, io)));
+    for (const s of [betThenBreak, breakThenBet]) {
+        const dealt = go(s, (x, io) => E.startRound(x, io));
+        assert.equal(dealt.gameStage, 'player-turn');
+        assert.equal(dealt.players[1].stack, 500);
+        assert.deepEqual(dealt.players[1].hands, []);
+    }
 });

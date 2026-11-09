@@ -31,8 +31,13 @@ export interface Person {
 
 export const HOUSE_KEY = 'house';
 
-// A person is their phone when known (blank counts as none), else their name; only identical keys merge.
-export const partyKey = (name: string, phone?: string | null) => phone?.trim() || `name:${toTitleCase(name)}`;
+// A person is their phone plus name when the phone is known (blank counts as none), else their name.
+// Only identical keys merge, so two people sharing one phone in an old save stay apart.
+export const partyKey = (name: string, phone?: string | null) =>
+    phone?.trim() ? `${phone.trim()}|${toTitleCase(name)}` : `name:${toTitleCase(name)}`;
+
+// The phone in a party key, or null for a name key, a group or the house.
+export const phoneOfKey = (key: string) => (key.includes('|') ? key.split('|')[0] : null);
 
 // A label still shared after the other rules gets " (2)", " (3)", … in first-seen order.
 const numberRepeats = (labels: string[]) => {

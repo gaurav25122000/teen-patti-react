@@ -18,7 +18,8 @@ const rng = (seed: number) => () => {
 
 const player = (id: number, balance: number): Player => ({ id, name: `P${id}`, balance, phoneNumber: String(9000000000 + id), isTakingBreak: false });
 const go = (s: GameState, fn: (s: GameState, io: Io) => GameState) => runStep(s, fn).state;
-const money = (s: GameState) => s.players.reduce((sum, p) => sum + p.balance, 0) + s.potAmount;
+// Money at the table, counting players who left (their balance stays in the settlement).
+const money = (s: GameState) => s.players.reduce((sum, p) => sum + p.balance, 0) + s.potAmount + (s.departed ?? []).reduce((sum, d) => sum + d.net, 0);
 
 // One random legal action, as the screens allow it; returns the change to the money at the table.
 const randomAction = (s: GameState, r: () => number): { next: GameState; added: number } => {
@@ -37,8 +38,7 @@ const randomAction = (s: GameState, r: () => number): { next: GameState; added: 
             return { next: go(s, (x, io) => E.addPlayer(x, `P${id}`, balance, String(9000000000 + id), io)), added: balance };
         }
         if (choice < 0.72 && s.players.length > 2) {
-            const p = pick(s.players);
-            return { next: go(s, (x, io) => E.removePlayer(x, p.id, io)), added: -p.balance };
+            return { next: go(s, (x, io) => E.removePlayer(x, pick(s.players).id, io)), added: 0 };
         }
         if (choice < 0.8) return { next: go(s, (x, io) => E.deductAndDistribute(x, pick(s.players).id, amount(60), io)), added: 0 };
         if (choice < 0.9) return { next: go(s, (x, io) => E.togglePlayerBreak(x, pick(s.players).id, io)), added: 0 };
@@ -110,15 +110,15 @@ test('round stats are keyed by party, so a namesake joining later changes nothin
     let s = E.newGame([player(1, 0), player(2, 0)]);
     s = go(s, (x, io) => E.startRound(x, 0, 10, io));
     s = go(s, (x, io) => E.endRound(x, 1, io));
-    assert.deepEqual(s.stats?.wins, { '9000000001': 1 });
-    assert.deepEqual(s.stats?.biggest, { key: '9000000001', amount: 20 });
-    assert.equal(s.stats?.names['9000000001'], 'P1');
+    assert.deepEqual(s.stats?.wins, { '9000000001|P1': 1 });
+    assert.deepEqual(s.stats?.biggest, { key: '9000000001|P1', amount: 20 });
+    assert.equal(s.stats?.names['9000000001|P1'], 'P1');
 });
 
 test('joining with a balance marks the game carried in; joining at zero does not', () => {
     const s = E.newGame([player(1, 0), player(2, 0)]);
-    assert.equal(s.carriedIn, undefined);
-    assert.equal(go(s, (x, io) => E.addPlayer(x, 'Raj', 0, '9000000009', io)).carriedIn, undefined);
+    assert.equal(s.carriedIn, false);
+    assert.equal(go(s, (x, io) => E.addPlayer(x, 'Raj', 0, '9000000009', io)).carriedIn, false);
     assert.equal(go(s, (x, io) => E.addPlayer(x, 'Raj', 25, '9000000009', io)).carriedIn, true);
 });
 

@@ -6,9 +6,10 @@ import { splitEvenly, toPaise } from '../utils/money.ts';
 import { emptyStats, recordRound, statsNames } from '../utils/nightStats.ts';
 import { partyKey } from '../utils/owingsLogic.ts';
 import { potLimitLines, roundCarryOver, tableRulesLine, type TableRules } from '../utils/teenPattiRules.ts';
+import { depart, departureNote, tooFewToRemove } from '../utils/departures.ts';
 
 // A non-zero starting balance marks the game as carried in; the summary then says so.
-const carry = (balances: number[]) => (balances.some(b => Math.abs(b) >= 0.005) ? { carriedIn: true } : {});
+const carried = (balances: number[]) => balances.some(b => Math.abs(b) >= 0.005);
 
 export const createInitialGameState = (): GameState => ({
   players: [],
@@ -124,7 +125,7 @@ export const endRound = (prev: GameState, winnerId: number | null, io: Io): Game
 export const newGame = (newPlayers: Player[], rules: TableRules = {}): GameState => ({
   ...createInitialGameState(),
   ...rules,
-  ...carry(newPlayers.map(p => p.balance)),
+  carriedIn: carried(newPlayers.map(p => p.balance)),
   players: newPlayers.map(p => ({ ...p, isTakingBreak: false })),
   messages: newPlayers.length > 0 ? [`New game started with ${newPlayers.length} players. Please set the boot amount.`] : ["Returning to setup..."],
 });
@@ -277,15 +278,28 @@ export const addPlayer = (prev: GameState, name: string, balance: number, phoneN
   return {
     ...prev,
     players: [...prev.players, { id: newId, name: toTitleCase(name), balance, phoneNumber, isTakingBreak: false }],
-    ...carry([balance]),
+    ...(carried([balance]) ? { carriedIn: true } : {}),
   };
 };
 
+// Between rounds only; the leaver's balance stays in the settlement as a departure.
 export const removePlayer = (prev: GameState, playerId: number, io: Io): GameState => {
   const player = prev.players.find(p => p.id === playerId);
   if (!player) return prev;
-  io.log(`Player ${toTitleCase(player.name)} removed from the game.`);
-  return { ...prev, players: prev.players.filter(p => p.id !== playerId) };
+  if (prev.roundActive) {
+    io.log("ERROR: Can only remove players between hands.");
+    return prev;
+  }
+  if (prev.players.length <= 2) {
+    io.log(`ERROR: ${tooFewToRemove(2)}`);
+    return prev;
+  }
+  io.log(`Player ${toTitleCase(player.name)} removed from the game.${departureNote(player.balance)}`);
+  return {
+    ...prev,
+    players: prev.players.filter(p => p.id !== playerId),
+    departed: depart(prev.departed, { name: player.name, phone: player.phoneNumber, entityId: player.entityId, net: player.balance }),
+  };
 };
 
 export const reorderPlayers = (prev: GameState, reordered: Player[]): GameState => ({

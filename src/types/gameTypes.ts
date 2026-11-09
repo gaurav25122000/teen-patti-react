@@ -1,6 +1,7 @@
 // src/types/gameTypes.ts
 import type { NightStats } from '../utils/nightStats';
 import type { TableRules } from '../utils/teenPattiRules';
+import type { Departure } from '../utils/departures';
 
 export interface Player {
   id: number;
@@ -31,7 +32,8 @@ export interface GameState extends TableRules {
   roundContributions: Map<number, number>;
   blindTurns?: Record<number, number>; // blind bets per player this round
   stats?: NightStats; // absent in saves from before the night summary
-  carriedIn?: boolean; // a player started or joined with a non-zero balance
+  carriedIn?: boolean; // a player started or joined with a non-zero balance; absent in older saves (unknown)
+  departed?: Departure[]; // removed players, still settled
   messages: string[];
 }
 

@@ -4,9 +4,9 @@ import { addEntry, archiveGame, buildEntry, hasUnreadableHistory, historyShareTe
 import { emptyStats, partialStats, recordRound } from './nightStats.ts';
 import type { Person } from './owingsLogic.ts';
 
-const A = '9000000001', R = '9000000002';
+const A = '9000000001|Asha', R = '9000000002|Raj';
 const NAMES = { [A]: 'Asha', [R]: 'Raj' };
-const person = (key: string, title: string, net: number): Person => ({ key, label: title, title, phone: key === 'house' ? null : key, net });
+const person = (key: string, title: string, net: number): Person => ({ key, label: title, title, phone: key.includes('|') ? key.split('|')[0] : null, net });
 
 // In-memory Storage with the methods history uses.
 const memoryStorage = (initial: Record<string, string> = {}) => {
@@ -69,7 +69,7 @@ test('no unreadable notice for a clean store', () => {
 
 test('an entry carries nets, unpaid transactions and the summary', () => {
     const stats = recordRound(emptyStats(), { [A]: 300, [R]: -300 }, { key: A, amount: 600 }, NAMES);
-    const built = buildEntry('teen-patti', stats, { people: [person(A, 'Asha', 300), person(R, 'Raj', -300)], transactions: [{ from: 'Raj', to: 'Asha', amount: 300, toPhone: '9000000001' }] }, new Date('2026-11-10T16:15:00.000Z'));
+    const built = buildEntry('teen-patti', stats, { people: [person(A, 'Asha', 300), person(R, 'Raj', -300)], transactions: [{ from: 'Raj', to: 'Asha', amount: 300, toPhone: '9000000001' }], carried: false }, new Date('2026-11-10T16:15:00.000Z'));
     assert.equal(built.endedAt, '2026-11-10T16:15:00.000Z');
     assert.equal(built.game, 'teen-patti');
     assert.deepEqual(built.nets, [{ name: 'Asha', net: 300 }, { name: 'Raj', net: -300 }]);
@@ -104,7 +104,7 @@ test('an entry whose inner items are malformed makes the history unreadable', ()
 
 test('archiving keeps a game that had a round or moved money, the house included', () => {
     const storage = memoryStorage();
-    const even = { people: [person(A, 'Asha', 0.004), person(R, 'Raj', -0.004)], transactions: [] };
+    const even = { people: [person(A, 'Asha', 0.004), person(R, 'Raj', -0.004)], transactions: [], carried: false };
     assert.equal(archiveGame('blackjack', emptyStats(), even, storage), null);
     assert.equal(archiveGame('blackjack', emptyStats(), { ...even, people: [...even.people, person('house', 'Dealer (House)', 0.004)] }, storage), null);
     assert.equal(storage.items.has(HISTORY_KEY), false);
@@ -116,7 +116,7 @@ test('archiving keeps a game that had a round or moved money, the house included
 
 test('a save from before stats existed is kept with the partial-stats line first', () => {
     const storage = memoryStorage();
-    archiveGame('teen-patti', undefined, { people: [person(A, 'Asha', 50), person(R, 'Raj', -50)], transactions: [] }, storage);
+    archiveGame('teen-patti', undefined, { people: [person(A, 'Asha', 50), person(R, 'Raj', -50)], transactions: [], carried: false }, storage);
     const [kept] = readHistory(storage);
     assert.equal(kept.summary[0], "Stats start from the app update; earlier rounds aren't counted.");
     assert.deepEqual(partialStats().partial, true);
@@ -126,7 +126,7 @@ test('a failed archive returns its message', () => {
     const storage = memoryStorage();
     storage.setItem = () => { throw new Error('quota exceeded'); };
     const played = recordRound(emptyStats(), { [A]: 50 }, null, NAMES);
-    const failed = archiveGame('poker', played, { people: [], transactions: [] }, storage);
+    const failed = archiveGame('poker', played, { people: [], transactions: [], carried: false }, storage);
     assert.equal(failed?.message, "Couldn't save: quota exceeded");
     assert.equal(failed?.entry.summary[0], 'Most rounds won: Asha (1)');
 });
@@ -146,15 +146,28 @@ test('re-share sends only unpaid transfers; all paid reads "All settled up" and 
 test("a carried-in game says so last in its summary", () => {
     const stats = recordRound(emptyStats(), { [A]: 50 }, null, NAMES);
     const built = buildEntry('teen-patti', stats, { people: [person(A, 'Asha', 50), person(R, 'Raj', -50)], transactions: [], carried: true });
-    assert.equal(built.summary.at(-1), 'Includes balances carried in at setup.');
+    assert.equal(built.summary.at(-1), 'Includes balances carried into this game.');
 });
 
 test('a blackjack entry lists players only; the house stays out of its nets', () => {
-    const built = buildEntry('blackjack', emptyStats(), { people: [person(A, 'Asha', -300), person('house', 'Dealer (House)', 300)], transactions: [] });
+    const built = buildEntry('blackjack', emptyStats(), { people: [person(A, 'Asha', -300), person('house', 'Dealer (House)', 300)], transactions: [], carried: false });
     assert.deepEqual(built.nets, [{ name: 'Asha', net: -300 }]);
 });
 
 test('an entry whose nets do not add up says so last', () => {
     const built = buildEntry('teen-patti', emptyStats(), { people: [person(A, 'Asha', 500)], transactions: [], carried: true, offBy: 500 });
     assert.equal(built.summary.at(-1), 'Balances are off by +₹500: settle the difference by hand.');
+});
+
+test('history keeps the newest 50, plus older games with an unpaid transfer, up to 200', () => {
+    const unpaid = (id: string): HistoryEntry => ({ ...entry(id), transactions: [{ from: 'A', to: 'B', amount: 1, toPhone: null, paid: false }] });
+    let list: HistoryEntry[] = [];
+    for (let i = 1; i <= 260; i++) list = addEntry(list, i <= 210 ? unpaid(`u${i}`) : entry(`p${i}`));
+    assert.equal(list.length, 200);
+    assert.equal(list[0].id, 'p260');
+    assert.equal(list[49].id, 'p211');
+    assert.equal(list[50].id, 'u210');
+    const settledOld = addEntry([...Array.from({ length: 50 }, (_, i) => entry(`n${i}`)), entry('old-paid')], entry('new'));
+    assert.equal(settledOld.length, 50);
+    assert.equal(settledOld.some(e => e.id === 'old-paid'), false);
 });

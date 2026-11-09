@@ -5,6 +5,11 @@ import { toTitleCase } from '../utils/formatters.ts';
 import { biggestWin, emptyStats, partialStats, recordRound, statsNames } from '../utils/nightStats.ts';
 import { partyKey } from '../utils/owingsLogic.ts';
 import { cleanPhone } from '../utils/savedPlayers.ts';
+import { depart, departureNote, tooFewToRemove } from '../utils/departures.ts';
+
+// A player's chips counting bets still on the table (open wagers and unresolved insurance).
+export const chipsWithBets = (p: BlackjackPlayer) => p.stack + p.hands.reduce((sum, h) =>
+    sum + (h.status === 'playing' || h.status === 'stand' ? h.wager : 0) + (h.insurance && !h.insuranceResult ? h.insurance : 0), 0);
 
 export type HandAction = 'hit' | 'stand' | 'double' | 'split' | 'surrender' | 'insurance';
 
@@ -461,9 +466,19 @@ export const removePlayer = (prev: BlackjackGameState, playerId: number, io: Io)
         io.log("Can only remove players between rounds.");
         return prev;
     }
-    const playerToRemove = prev.players.find(p => p.id === playerId);
-    if (playerToRemove) io.log(`Player ${toTitleCase(playerToRemove.name)} has been removed.`);
-    return { ...prev, players: prev.players.filter(p => p.id !== playerId) };
+    const leaver = prev.players.find(p => p.id === playerId);
+    if (!leaver) return prev;
+    if (prev.players.length <= 1) {
+        io.log(tooFewToRemove(1));
+        return prev;
+    }
+    const net = chipsWithBets(leaver) - leaver.totalBuyIn;
+    io.log(`Player ${toTitleCase(leaver.name)} has been removed.${departureNote(net)}`);
+    return {
+        ...prev,
+        players: prev.players.filter(p => p.id !== playerId),
+        departed: depart(prev.departed, { name: leaver.name, phone: leaver.phoneNumber, net }),
+    };
 };
 
 export const addChipsToPlayer = (prev: BlackjackGameState, playerId: number, amount: number, io: Io): BlackjackGameState => {

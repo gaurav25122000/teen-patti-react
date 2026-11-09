@@ -8,7 +8,7 @@ import type { SavedPlayer } from './savedPlayers.ts';
 interface SettlementParts {
     people: Person[]; // the house included
     transactions: Transaction[];
-    carried?: boolean; // someone started or joined with a balance; the summary says so
+    carried: boolean | undefined; // someone started or joined with a balance (undefined: an older save can't tell)
     offBy?: number; // nets that no transfer covers; the summary says so
 }
 
@@ -24,6 +24,7 @@ export interface HistoryEntry {
 export const HISTORY_KEY = 'bets-history';
 const UNREADABLE_PREFIX = 'bets-history-unreadable-';
 export const MAX_HISTORY = 50;
+const MAX_WITH_UNPAID = 200;
 
 type HistoryStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'>;
 
@@ -66,8 +67,11 @@ export const writeHistory = (list: HistoryEntry[], storage: HistoryStorage = loc
     storage.setItem(HISTORY_KEY, JSON.stringify(list));
 };
 
-// Newest first; the oldest past the cap is dropped.
-export const addEntry = (list: HistoryEntry[], entry: HistoryEntry) => [entry, ...list].slice(0, MAX_HISTORY);
+// Newest first: the newest 50, plus older games that still have an unpaid transfer, up to 200 in all.
+export const addEntry = (list: HistoryEntry[], entry: HistoryEntry) => {
+    const all = [entry, ...list];
+    return [...all.slice(0, MAX_HISTORY), ...all.slice(MAX_HISTORY).filter(e => e.transactions.some(t => !t.paid))].slice(0, MAX_WITH_UNPAID);
+};
 
 export const buildEntry = (game: GameKind, stats: NightStats, s: SettlementParts, now = new Date()): HistoryEntry => ({
     id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,

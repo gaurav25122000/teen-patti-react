@@ -10,7 +10,7 @@ const tp = (players: ReturnType<typeof tpPlayer>[], more = {}) =>
 const nets = (s: { people: Parameters<typeof playerNets>[0] }) => playerNets(s.people);
 
 test('a person is their phone when known (blank is none), else their name', () => {
-    assert.equal(partyKey('raj', ' 9000000002 '), '9000000002');
+    assert.equal(partyKey('raj', ' 9000000002 '), '9000000002|Raj');
     assert.equal(partyKey(' raj ', '   '), 'name:Raj');
     assert.equal(partyKey('raj', null), 'name:Raj');
 });
@@ -55,13 +55,17 @@ test('teen patti mid-round: the unfinished round is voided, so nets still sum to
     assert.deepEqual(s.transactions, [{ from: 'Raj', to: 'Asha', amount: 10, toPhone: null }, { from: 'Dev', to: 'Asha', amount: 10, toPhone: null }]);
 });
 
-test('namesakes with different phones never net out; the same phone twice is one person', () => {
+test('namesakes with different phones never net out; one phone and one name is one person, a different name is not', () => {
     const split = teenPattiSettlement(tp([tpPlayer(1, 'Raj', 500, '9000000001'), tpPlayer(2, 'raj', -500, '9000000002')]));
     assert.deepEqual(nets(split), [{ name: 'Raj (…0001)', net: 500 }, { name: 'Raj (…0002)', net: -500 }]);
     assert.deepEqual(split.transactions, [{ from: 'Raj (…0002)', to: 'Raj (…0001)', amount: 500, toPhone: '9000000001' }]);
-    const same = teenPattiSettlement(tp([tpPlayer(1, 'Raj', -30, '9000000002'), tpPlayer(2, 'Asha', 50, '9000000001'), tpPlayer(3, 'rajesh', -20, '9000000002')]));
+    const same = teenPattiSettlement(tp([tpPlayer(1, 'Raj', -30, '9000000002'), tpPlayer(2, 'Asha', 50, '9000000001'), tpPlayer(3, 'raj', -20, '9000000002')]));
     assert.deepEqual(nets(same), [{ name: 'Raj', net: -50 }, { name: 'Asha', net: 50 }]);
     assert.deepEqual(same.transactions, [{ from: 'Raj', to: 'Asha', amount: 50, toPhone: '9000000001' }]);
+    // Two people on one phone in an old save stay apart.
+    const shared = teenPattiSettlement(tp([tpPlayer(1, 'Raj', -30, '9000000002'), tpPlayer(2, 'Asha', 50, '9000000001'), tpPlayer(3, 'Rajesh', -20, '9000000002')]));
+    assert.deepEqual(nets(shared), [{ name: 'Raj', net: -30 }, { name: 'Asha', net: 50 }, { name: 'Rajesh', net: -20 }]);
+    assert.deepEqual(shared.transactions, [{ from: 'Rajesh', to: 'Asha', amount: 20, toPhone: '9000000001' }, { from: 'Raj', to: 'Asha', amount: 30, toPhone: '9000000001' }]);
 });
 
 test('transfers: each side by amount ascending, ties in first-seen order', () => {
@@ -120,7 +124,7 @@ test('blackjack: the house is in the transactions and people, not in the player 
     const s = blackjackSettlement({ players: [{ name: 'Raj', stack: 700, totalBuyIn: 1000, phoneNumber: '9000000002', hands: [] }] as never, dealerNet: 300 });
     assert.deepEqual(nets(s), [{ name: 'Raj', net: -300 }]);
     assert.deepEqual(s.transactions, [{ from: 'Raj', to: 'Dealer (house)', amount: 300, toPhone: null }]);
-    assert.deepEqual(s.people.map(p => [p.key, p.net]), [['9000000002', -300], ['house', 300]]);
+    assert.deepEqual(s.people.map(p => [p.key, p.net]), [['9000000002|Raj', -300], ['house', 300]]);
 });
 
 test('blackjack: a player named like the house stays a separate party', () => {

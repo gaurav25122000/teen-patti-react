@@ -5,10 +5,10 @@ import { formatAmount, toTitleCase } from './formatters.ts';
 import type { Person } from './owingsLogic.ts';
 
 // Party keys: phones for Asha/Raj/Dev, a name key for a phoneless Esha.
-const A = '9000000001', R = '9000000002', D = '9000000003', E = 'name:Esha';
+const A = '9000000001|Asha', R = '9000000002|Raj', D = '9000000003|Dev', E = 'name:Esha';
 const NAMES = { [A]: 'Asha', [R]: 'Raj', [D]: 'Dev', [E]: 'Esha' };
 const person = (key: string, title: string, net: number): Person =>
-    ({ key, label: title, title, phone: key.startsWith('name:') || key === 'house' ? null : key, net });
+    ({ key, label: title, title, phone: key.includes('|') ? key.split('|')[0] : null, net });
 
 test('formatAmount: whole amounts bare, up to 2 decimals, tiny amounts are 0', () => {
     assert.equal(formatAmount(500), '500');
@@ -67,39 +67,39 @@ test('recordRound does not change the stats it is given', () => {
 test('summary lines in order, matching the share text sample', () => {
     const stats = { ...emptyStats(), rounds: 9, wins: { [A]: 7, [R]: 2 }, bestStreak: { key: R, count: 4 }, biggest: { key: A, amount: 2400 }, names: NAMES };
     const people = [person(R, 'Raj', -800), person(A, 'Asha', 1200), person(D, 'Dev', -400)];
-    assert.deepEqual(summaryLines(stats, people, 'teen-patti'), [
+    assert.deepEqual(summaryLines(stats, people, 'teen-patti', false), [
         'Biggest pot: ₹2400 (Asha)',
         'Most rounds won: Asha (7)',
         'Best streak: Raj (4 in a row)',
         'Biggest winner: Asha +₹1200',
         'Biggest loser: Raj -₹800',
     ]);
-    assert.equal(summaryLines(stats, people, 'blackjack')[0], 'Biggest win: ₹2400 (Asha)');
+    assert.equal(summaryLines(stats, people, 'blackjack', false)[0], 'Biggest win: ₹2400 (Asha)');
 });
 
 test('a name at the table wins over the stats name; someone who left is named from stats', () => {
     const stats = { ...emptyStats(), wins: { [A]: 2, [E]: 2 }, names: { [A]: 'Ash', [E]: 'Esha' } };
-    assert.deepEqual(summaryLines(stats, [person(A, 'Asha', 0)], 'poker'), ['Most rounds won: Asha, Esha (2)']);
+    assert.deepEqual(summaryLines(stats, [person(A, 'Asha', 0)], 'poker', false), ['Most rounds won: Asha, Esha (2)']);
 });
 
 test('namesakes in stats are told apart, never merged', () => {
-    const stats = { ...emptyStats(), wins: { [R]: 3, '9000001234': 3 }, names: { [R]: 'Raj', '9000001234': 'Raj' } };
-    assert.deepEqual(summaryLines(stats, [], 'poker'), ['Most rounds won: Raj (…0002), Raj (…1234) (3)']);
+    const stats = { ...emptyStats(), wins: { [R]: 3, '9000001234|Raj': 3 }, names: { [R]: 'Raj', '9000001234|Raj': 'Raj' } };
+    assert.deepEqual(summaryLines(stats, [], 'poker', false), ['Most rounds won: Raj (…0002), Raj (…1234) (3)']);
 });
 
 test('most rounds won lists tied labels alphabetically', () => {
     const stats = { ...emptyStats(), wins: { [R]: 3, [A]: 3, [D]: 1 }, names: NAMES };
-    assert.deepEqual(summaryLines(stats, [], 'poker'), ['Most rounds won: Asha, Raj (3)']);
+    assert.deepEqual(summaryLines(stats, [], 'poker', false), ['Most rounds won: Asha, Raj (3)']);
 });
 
 test('lines are left out below their thresholds; the house is never winner or loser', () => {
     const stats = { ...emptyStats(), wins: { [A]: 0 }, bestStreak: { key: A, count: 1 }, names: NAMES };
-    assert.deepEqual(summaryLines(stats, [person(A, 'Asha', 0.004), person(R, 'Raj', -0.004), person('house', 'Dealer (House)', 500)], 'blackjack'), []);
+    assert.deepEqual(summaryLines(stats, [person(A, 'Asha', 0.004), person(R, 'Raj', -0.004), person('house', 'Dealer (House)', 500)], 'blackjack', false), []);
 });
 
 test('biggest winner and loser ties go to the first player in order', () => {
     const people = [person(R, 'Raj', 50), person(A, 'Asha', 50), person(D, 'Dev', -50), person(E, 'Esha', -50)];
-    assert.deepEqual(summaryLines(emptyStats(), people, 'poker'), ['Biggest winner: Raj +₹50', 'Biggest loser: Dev -₹50']);
+    assert.deepEqual(summaryLines(emptyStats(), people, 'poker', false), ['Biggest winner: Raj +₹50', 'Biggest loser: Dev -₹50']);
 });
 
 test('blackjack candidate is the largest positive net, first on a tie, none when nobody is up', () => {
@@ -110,23 +110,24 @@ test('blackjack candidate is the largest positive net, first on a tie, none when
 test('partial stats: the note comes first and survives recorded rounds', () => {
     const stats = recordRound(partialStats(), { [A]: 10 }, null, NAMES);
     assert.equal(stats.partial, true);
-    assert.deepEqual(summaryLines(stats, [], 'poker'), ["Stats start from the app update; earlier rounds aren't counted.", 'Most rounds won: Asha (1)']);
+    assert.deepEqual(summaryLines(stats, [], 'poker', false), ["Stats start from the app update; earlier rounds aren't counted.", 'Most rounds won: Asha (1)']);
     assert.equal(recordRound(emptyStats(), { [A]: 10 }, null, NAMES).partial, undefined);
 });
 
 test('the carried-in note comes last', () => {
     const lines = summaryLines(recordRound(partialStats(), { [A]: 10 }, null, NAMES), [person(A, 'Asha', 10)], 'teen-patti', true);
     assert.equal(lines[0], "Stats start from the app update; earlier rounds aren't counted.");
-    assert.equal(lines.at(-1), 'Includes balances carried in at setup.');
+    assert.equal(lines.at(-1), 'Includes balances carried into this game.');
+    assert.equal(summaryLines(emptyStats(), [], 'teen-patti', undefined).at(-1), 'May include balances carried into this game.');
     assert.equal(summaryLines(emptyStats(), [], 'teen-patti', false).length, 0);
 });
 
 test('stats names: the latest title-cased name per party key', () => {
-    assert.deepEqual(statsNames([{ name: 'asha', phoneNumber: A }, { name: ' esha ' }]), { [A]: 'Asha', [E]: 'Esha' });
+    assert.deepEqual(statsNames([{ name: 'asha', phoneNumber: '9000000001' }, { name: ' esha ' }]), { [A]: 'Asha', [E]: 'Esha' });
 });
 
 test('the imbalance line comes last, signed, only when a paisa or more is uncovered', () => {
-    assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', true, 500), ['Includes balances carried in at setup.', 'Balances are off by +₹500: settle the difference by hand.']);
+    assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', true, 500), ['Includes balances carried into this game.', 'Balances are off by +₹500: settle the difference by hand.']);
     assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', false, -12.5), ['Balances are off by -₹12.5: settle the difference by hand.']);
     assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', false, 0.004), []);
 });

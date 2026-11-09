@@ -44,7 +44,7 @@ test('a round reset keeps entities, table rules and the carried-in flag', () => 
     const entities = [{ id: 1, name: 'Team A' }];
     assert.deepEqual(
         roundCarryOver({ entities, potLimit: 500, maxBlindTurns: 3, maxChaal: 100, carriedIn: true }),
-        { entities, carriedIn: true, potLimit: 500, maxBlindTurns: 3, maxChaal: 100 }
+        { entities, departed: undefined, carriedIn: true, potLimit: 500, maxBlindTurns: 3, maxChaal: 100 }
     );
 });
 

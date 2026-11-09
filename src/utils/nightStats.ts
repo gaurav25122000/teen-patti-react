@@ -1,5 +1,5 @@
 import { formatAmount, toTitleCase } from './formatters.ts';
-import { HOUSE_KEY, partyKey, partyLabels, type Person } from './owingsLogic.ts';
+import { HOUSE_KEY, partyKey, partyLabels, phoneOfKey, type Person } from './owingsLogic.ts';
 
 export type GameKind = 'teen-patti' | 'poker' | 'blackjack';
 
@@ -53,10 +53,11 @@ export const recordRound = (
 
 // people: the settlement's people (the house is ignored for winner and loser). Labels come from
 // partyLabels over the people first, then stats names for anyone no longer at the table.
-export const summaryLines = (stats: NightStats, people: Person[], game: GameKind, carried = false, offBy = 0): string[] => {
+// carried: true, false, or undefined for an older Teen Patti save that can't tell.
+export const summaryLines = (stats: NightStats, people: Person[], game: GameKind, carried: boolean | undefined, offBy = 0): string[] => {
     const labels = partyLabels([
         ...people.map(p => ({ key: p.key, name: p.title, phone: p.phone })),
-        ...Object.entries(stats.names ?? {}).map(([key, name]) => ({ key, name, phone: key.startsWith('name:') ? null : key })),
+        ...Object.entries(stats.names ?? {}).map(([key, name]) => ({ key, name, phone: phoneOfKey(key) })),
     ]);
     const lines: string[] = [];
     if (stats.partial) lines.push("Stats start from the app update; earlier rounds aren't counted.");
@@ -79,7 +80,8 @@ export const summaryLines = (stats: NightStats, people: Person[], game: GameKind
     }
     if (winner) lines.push(`Biggest winner: ${labels[winner.key]} +₹${formatAmount(winner.net)}`);
     if (loser) lines.push(`Biggest loser: ${labels[loser.key]} -₹${formatAmount(-loser.net)}`);
-    if (carried) lines.push('Includes balances carried in at setup.');
+    if (carried) lines.push('Includes balances carried into this game.');
+    if (carried === undefined) lines.push('May include balances carried into this game.');
     if (Math.abs(offBy) >= 0.005) lines.push(`Balances are off by ${offBy > 0 ? '+' : '-'}₹${formatAmount(Math.abs(offBy))}: settle the difference by hand.`);
     return lines;
 };

@@ -1,6 +1,7 @@
 // src/poker/types/pokerGameTypes.ts
 import type { NightStats } from '../../utils/nightStats';
 import type { BlindClock } from '../utils/blindLevels';
+import type { Departure } from '../../utils/departures';
 
 export interface PokerPlayer {
     hasActed: boolean;
@@ -40,5 +41,6 @@ export interface PokerGameState extends BlindClock {
     smallBlindAmount: number;
     bigBlindAmount: number;
     stats?: NightStats; // absent in saves from before the night summary
+    departed?: Departure[]; // removed players, still settled
     messages: string[];
 }

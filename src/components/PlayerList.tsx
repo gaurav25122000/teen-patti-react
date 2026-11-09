@@ -13,7 +13,8 @@ interface PlayerListProps {
 }
 
 const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlayer }) => {
-    const netBalance = players.reduce((acc, player) => acc + player.balance, 0);
+    // Players who left still count, so the net shows whether the table balances.
+    const netBalance = players.reduce((acc, player) => acc + player.balance, 0) + (gameState.departed ?? []).reduce((acc, d) => acc + d.net, 0);
     const [view, setView] = useStoredState('seatView', 'list');
 
     const rows = players.map(p => {

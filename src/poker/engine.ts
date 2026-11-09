@@ -8,6 +8,7 @@ import { foldOutLine, foldOutStreak, handCandidate, handNets, nextStreak, potLin
 import { pauseClock, resumeClock, startClock, tickLevel } from './utils/blindLevels.ts';
 import { emptyStats, partialStats, recordRound, statsNames } from '../utils/nightStats.ts';
 import { cleanPhone } from '../utils/savedPlayers.ts';
+import { depart, departureNote, tooFewToRemove } from '../utils/departures.ts';
 
 export type PlayerAction = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
 
@@ -126,6 +127,7 @@ const endOfHand = (winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameS
         blindLevel: prevGameState.blindLevel,
         levelEndsAt: prevGameState.levelEndsAt,
         pausedRemainingMs: prevGameState.pausedRemainingMs,
+        departed: prevGameState.departed,
         stats: recordRound(prevGameState.stats ?? emptyStats(), nets, handCandidate(updatedPlayers, updatedPlayers.find(p => p.id === winner.id)), statsNames(updatedPlayers)),
         messages: [...prevGameState.messages, `--- HAND OVER ---`, foldOutLine(toTitleCase(winner.name), totalPot, winner.totalPotContribution, finalWinner.stack)],
     };
@@ -404,9 +406,19 @@ export const removePlayer = (prev: PokerGameState, playerId: number, io: Io): Po
         io.log("Can only remove players between hands.");
         return prev;
     }
-    const playerToRemove = prev.players.find(p => p.id === playerId);
-    if (playerToRemove) io.log(`Player ${toTitleCase(playerToRemove.name)} has been removed from the game.`);
-    return { ...prev, players: prev.players.filter(p => p.id !== playerId) };
+    const leaver = prev.players.find(p => p.id === playerId);
+    if (!leaver) return prev;
+    if (prev.players.length <= 1) {
+        io.log(tooFewToRemove(1));
+        return prev;
+    }
+    const net = leaver.stack - leaver.totalBuyIn;
+    io.log(`Player ${toTitleCase(leaver.name)} has been removed from the game.${departureNote(net)}`);
+    return {
+        ...prev,
+        players: prev.players.filter(p => p.id !== playerId),
+        departed: depart(prev.departed, { name: leaver.name, phone: leaver.phoneNumber, net }),
+    };
 };
 
 export const addChipsToPlayer = (prev: PokerGameState, playerId: number, amount: number, io: Io): PokerGameState => {

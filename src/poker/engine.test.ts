@@ -55,22 +55,20 @@ test('poker chips are conserved over 50 seeded random games of 200 actions, and 
         const r = rng(seed);
         const players = Array.from({ length: 2 + Math.floor(r() * 5) }, (_, i) => ({ name: `P${i + 1}`, stack: 200 + Math.floor(r() * 800), phoneNumber: String(9000000001 + i) }));
         let s = E.newPokerGame(players, { sb: 5, bb: 10 }, undefined, 0);
-        let removedNet = 0; // a removed player's result leaves the table with them
         for (let step = 0; step < 200; step++) {
-            const before = s;
             s = randomAction(s, r);
-            before.players.filter(p => !s.players.some(q => q.id === p.id)).forEach(p => { removedNet += p.stack - p.totalBuyIn; });
             const where = `seed ${seed}, step ${step}`;
             const stacks = sum(s.players.map(p => p.stack));
             const inPot = sum(s.players.map(p => p.totalPotContribution - p.roundWinnings));
-            assert.equal(stacks + inPot + removedNet, sum(s.players.map(p => p.totalBuyIn)), `${where}: chips not conserved`);
+            const leftWith = sum((s.departed ?? []).map(d => d.net)); // players who left stay settled
+            assert.equal(stacks + inPot + leftWith, sum(s.players.map(p => p.totalBuyIn)), `${where}: chips not conserved`);
             if (s.gameStage === 'showdown') {
                 assert.equal(sum(s.pot.map(p => p.amount)) + sum(s.players.map(p => p.roundWinnings)), sum(s.players.map(p => p.totalPotContribution)), `${where}: pots`);
             }
             assert.ok(s.players.every(p => p.totalPotContribution >= 0), `${where}: negative contribution`);
             const settled = pokerSettlement(s);
             assert.equal(settlementProblem(settled.parties, settled.transactions, settled.offBy), null, where);
-            assert.equal(settled.offBy + removedNet, 0, where);
+            assert.ok(Math.abs(settled.offBy) < 0.005, `${where}: off by ${settled.offBy}`);
         }
     }
 });
