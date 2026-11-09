@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clockLabel, pauseClock, resumeClock, startClock, tickLevel } from './blindLevels.ts';
+import { clockLabel, pauseClock, resumeClock, startClock, tickLevel, withClock } from './blindLevels.ts';
 
 const T0 = 1_700_000_000_000;
 const MIN = 60_000;
@@ -58,4 +58,15 @@ test('display: running, time up, and seconds truncated', () => {
     assert.equal(clockLabel(game(15), T0 + 15 * MIN - 999), 'Level 1 · ₹10/₹20 · 00:00');
     assert.equal(clockLabel(game(15), T0 + 15 * MIN), 'Blinds go up next hand');
     assert.equal(clockLabel(game(240), T0), 'Level 1 · ₹10/₹20 · 240:00');
+});
+
+test('undo keeps the live clock: a restored step does not un-pause or rewind it', () => {
+    const before = { ...game(15), gameStage: 'flop', smallBlindAmount: 10 };
+    const live = pauseClock({ ...before, blindLevel: 2, levelEndsAt: T0 + 30 * MIN }, T0 + 20 * MIN);
+    const restored = withClock(before, live);
+    assert.equal(restored.gameStage, 'flop');
+    assert.equal(restored.pausedRemainingMs, 10 * MIN);
+    assert.equal(restored.levelEndsAt, T0 + 30 * MIN);
+    assert.equal(restored.blindLevel, 2);
+    assert.equal(withClock(live, before).pausedRemainingMs, undefined);
 });

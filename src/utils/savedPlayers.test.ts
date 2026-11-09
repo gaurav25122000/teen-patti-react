@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fillRow, readSavedPlayers, saveEntry, upsertPlayers, type SavedPlayer } from './savedPlayers.ts';
+import { chipPlayers, duplicatePhone, fillRow, phoneInUse, readSavedPlayers, saveEntry, upsertPlayers, type SavedPlayer } from './savedPlayers.ts';
 
 const asha: SavedPlayer = { name: 'Asha', phone: '9000000001', upi: 'asha@okhdfc' };
 
@@ -14,6 +14,11 @@ test('upsert by phone: latest trimmed name wins, an existing UPI ID stays, new p
         { name: 'Asha Rao', phone: '9000000001', upi: 'asha@okhdfc' },
         { name: 'Raj', phone: '9000000002' },
     ]);
+});
+
+test('upsert trims the phone before matching and saving', () => {
+    const { list } = upsertPlayers([asha], [{ name: 'Asha', phone: ' 9000000001 ' }, { name: 'Raj', phone: '9000000002 ' }]);
+    assert.deepEqual(list, [asha, { name: 'Raj', phone: '9000000002' }]);
 });
 
 test('upsert skips players without a valid phone or name', () => {
@@ -74,4 +79,18 @@ test('a chip adds a row when no row is empty; a row with only a name or phone is
     assert.equal(next.length, 3);
     assert.deepEqual(next[2], { name: 'Asha', phoneNumber: '9000000001' });
     assert.deepEqual(fillRow([], asha, { name: '', phoneNumber: '', stack: '1000' }), [{ name: 'Asha', phoneNumber: '9000000001', stack: '1000' }]);
+});
+
+test('a phone typed into the form hides its chip, spaces and all', () => {
+    const raj = { name: 'Raj', phone: '9000000002' };
+    assert.deepEqual(chipPlayers([asha, raj], [' 9000000001 ', '']), [raj]);
+    assert.deepEqual(chipPlayers([asha, raj], ['900000000']), [asha, raj]);
+});
+
+test('setup refuses two rows with one phone; adding a phone already at the table is refused', () => {
+    assert.equal(duplicatePhone(['9000000001', ' 9000000002', '', '9000000002 ']), '9000000002');
+    assert.equal(duplicatePhone(['9000000001', '9000000002', '', '']), null);
+    const table = [{ name: 'raj', phoneNumber: '9000000002' }];
+    assert.equal(phoneInUse(table, ' 9000000002'), '9000000002 is already playing as Raj.');
+    assert.equal(phoneInUse(table, '9000000003'), null);
 });

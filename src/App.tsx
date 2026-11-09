@@ -18,6 +18,7 @@ const BlackjackLobby = lazy(() => import('./blackjack/components/BlackjackLobby'
 
 // General Components
 import ModeSelectionScreen from './components/ModeSelectionScreen';
+import Toaster from './components/Toaster';
 const LifetimeWinnings = lazy(() => import('./components/LifetimeWinnings'));
 const SavedPlayersScreen = lazy(() => import('./components/SavedPlayersScreen'));
 const HistoryScreen = lazy(() => import('./components/HistoryScreen'));
@@ -66,6 +67,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
       </Suspense>
+      <Toaster />
     </div>
   );
 }

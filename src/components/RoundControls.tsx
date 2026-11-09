@@ -72,7 +72,9 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
     };
 
     const limitReached = potLimitReached(gameState);
-    const mustSee = blindTurnsRefusal(gameState, toTitleCase(currentPlayer.name), gameState.blindTurns?.[currentPlayer.id] ?? 0);
+    const mustSee = blindPlayerIds.has(currentPlayer.id)
+        ? blindTurnsRefusal(gameState, toTitleCase(currentPlayer.name), gameState.blindTurns?.[currentPlayer.id] ?? 0)
+        : null;
 
     // This logic is now simpler as precedingPlayer is passed in
     const isShowDisabled = !precedingPlayer || activePlayers.length < 2 || (blindPlayerIds.has(precedingPlayer.id) && !blindPlayerIds.has(currentPlayer.id) && activePlayers.length !== 2);
@@ -132,8 +134,8 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
             )}
 
             {/* --- Common Actions for ALL players --- */}
-            <button onClick={actions.fold} className="btn btn-error">Fold</button>
-            {!limitReached && (
+            {!limitReached && <button onClick={actions.fold} className="btn btn-error">Fold</button>}
+            {!limitReached && !mustSee && (
                 <button onClick={actions.onShowClick} className="btn btn-accent" disabled={isShowDisabled} title={showTitle}>
                     Show (Cost: ₹ {calculateShowCost()})
                 </button>

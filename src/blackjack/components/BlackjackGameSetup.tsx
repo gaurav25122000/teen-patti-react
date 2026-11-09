@@ -1,7 +1,7 @@
 // src/blackjack/components/BlackjackGameSetup.tsx
 import React, { useState } from 'react';
 import { toTitleCase } from '../../utils/formatters';
-import { fillRow } from '../../utils/savedPlayers';
+import { duplicatePhone, fillRow } from '../../utils/savedPlayers';
 import SavedPlayerChips from '../../components/SavedPlayerChips';
 
 interface BlackjackGameSetupProps {
@@ -27,7 +27,7 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
             .map(p => ({ 
                 name: toTitleCase(p.name), 
                 stack: parseInt(p.stack) || 0, 
-                phoneNumber: p.phoneNumber,
+                phoneNumber: p.phoneNumber.trim(),
                 numHands: parseInt(p.numHands) || 1,
                 isTakingBreak: false // Ensure this is initialized
             }));
@@ -46,6 +46,8 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
                  return;
             }
         }
+        const dup = duplicatePhone(finalPlayers.map(p => p.phoneNumber));
+        if (dup) return alert(`Two players have the phone ${dup}.`);
 
         onStartGame(finalPlayers);
     };

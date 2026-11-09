@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { biggestWin, emptyStats, recordRound, summaryLines } from './nightStats.ts';
-import { formatAmount } from './formatters.ts';
+import { biggestWin, emptyStats, partialStats, recordRound, summaryLines } from './nightStats.ts';
+import { formatAmount, toTitleCase } from './formatters.ts';
 
 test('formatAmount: whole amounts bare, up to 2 decimals, tiny amounts are 0', () => {
     assert.equal(formatAmount(500), '500');
@@ -86,4 +86,24 @@ test('biggest winner and loser ties go to the first player in order', () => {
 test('blackjack candidate is the largest positive net, first on a tie, none when nobody is up', () => {
     assert.deepEqual(biggestWin({ Raj: 50, Asha: 80, Dev: 80 }), { name: 'Asha', amount: 80 });
     assert.equal(biggestWin({ Raj: -50, Asha: 0 }), null);
+});
+
+test('partial stats: the note comes first and survives recorded rounds', () => {
+    const stats = recordRound(partialStats(), { Asha: 10 }, null);
+    assert.equal(stats.partial, true);
+    assert.deepEqual(summaryLines(stats, [], 'poker'), ["Stats start from the app update; earlier rounds aren't counted.", 'Most rounds won: Asha (1)']);
+    assert.equal(recordRound(emptyStats(), { Asha: 10 }, null).partial, undefined);
+});
+
+test('the carried-in note comes last', () => {
+    const lines = summaryLines(recordRound(partialStats(), { Asha: 10 }, null), [{ name: 'Asha', net: 10 }], 'teen-patti', true);
+    assert.equal(lines[0], "Stats start from the app update; earlier rounds aren't counted.");
+    assert.equal(lines.at(-1), "Carried-in balances aren't included.");
+    assert.equal(summaryLines(emptyStats(), [], 'teen-patti', false).length, 0);
+});
+
+
+test('names are trimmed when title-cased, so "Raj " and "raj" are one person', () => {
+    assert.equal(toTitleCase('  raj kumar '), 'Raj Kumar');
+    assert.equal(toTitleCase('Raj '), toTitleCase('raj'));
 });

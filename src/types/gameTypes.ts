@@ -9,6 +9,7 @@ export interface Player {
   entityId?: number;
   phoneNumber?: string; 
   isTakingBreak: boolean; // ADDED
+  carriedIn?: number; // balance brought in at setup or on joining; set only when non-zero
 }
 
 export interface Entity {

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import type { Player } from '../types/gameTypes';
 import { toTitleCase } from '../utils/formatters';
-import { fillRow } from '../utils/savedPlayers';
+import { duplicatePhone, fillRow } from '../utils/savedPlayers';
 import { parseTableRules, type TableRules } from '../utils/teenPattiRules';
 import SavedPlayerChips from './SavedPlayerChips';
 import TableRulesFields from './TableRulesFields';
@@ -39,12 +39,15 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
             if (!input.name.trim() || isNaN(balance)) {
                 return alert(`Invalid name or balance for Player ${index + 1}.`);
             }
-            if (!/^\d{10}$/.test(input.phoneNumber)) {
+            const phoneNumber = input.phoneNumber.trim();
+            if (!/^\d{10}$/.test(phoneNumber)) {
                 return alert(`Invalid phone number for Player ${index + 1}. Must be 10 digits.`);
             }
-            newPlayers.push({ id: index + 1, name: toTitleCase(input.name), balance, phoneNumber: input.phoneNumber, isTakingBreak: false });
+            newPlayers.push({ id: index + 1, name: toTitleCase(input.name), balance, phoneNumber, isTakingBreak: false });
         }
         if (newPlayers.length < 2) return alert("Need at least 2 players.");
+        const dup = duplicatePhone(newPlayers.map(p => p.phoneNumber ?? ''));
+        if (dup) return alert(`Two players have the phone ${dup}.`);
         const rules = parseTableRules(rulesInput);
         if (typeof rules === 'string') return alert(rules);
         onStartNewGame(newPlayers, rules);

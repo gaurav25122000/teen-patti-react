@@ -34,6 +34,15 @@ export const pauseClock = <S extends BlindClock>(s: S, now: number): S =>
 export const resumeClock = <S extends BlindClock>(s: S, now: number): S =>
     ({ ...s, levelEndsAt: now + (s.pausedRemainingMs ?? 0), pausedRemainingMs: undefined });
 
+// Undo restores an earlier state of the hand but keeps the live blind clock.
+export const withClock = <S extends BlindClock>(restored: S, live: BlindClock): S => ({
+    ...restored,
+    levelMinutes: live.levelMinutes,
+    blindLevel: live.blindLevel,
+    levelEndsAt: live.levelEndsAt,
+    pausedRemainingMs: live.pausedRemainingMs,
+});
+
 const mmss = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
     return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;

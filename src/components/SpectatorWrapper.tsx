@@ -8,7 +8,7 @@ import { BLACKJACK_STORAGE_KEY } from '../blackjack/hooks/useBlackjackGame';
 import { LOCAL_STORAGE_KEY } from '../constants/gameConstants';
 import { toTitleCase } from '../utils/formatters';
 import { rehydrateState } from '../utils/serialization';
-import { archiveGame } from '../utils/history';
+import { archiveOrWarn } from '../utils/archive';
 import { blackjackSettlement, pokerSettlement, teenPattiSettlement } from '../utils/gameSettlement';
 import type { GameKind } from '../utils/nightStats';
 import PokerGameScreen from '../poker/components/PokerGameScreen';
@@ -23,7 +23,12 @@ const GAMES: Record<string, { route: string; storageKey: string; label: string }
     blackjack: { route: '/blackjack', storageKey: BLACKJACK_STORAGE_KEY, label: 'Blackjack' },
 };
 
-const SETTLEMENTS = { 'teen-patti': teenPattiSettlement, poker: pokerSettlement, blackjack: blackjackSettlement };
+const SETTLEMENTS = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a parsed save is untyped
+    'teen-patti': (s: any) => teenPattiSettlement(s, 'tonight'),
+    poker: pokerSettlement,
+    blackjack: blackjackSettlement,
+};
 
 // Taking a game over replaces this phone's own saved game of that type, so that one goes to History first.
 const archiveReplaced = (kind: GameKind, previous: string | null) => {
@@ -31,8 +36,7 @@ const archiveReplaced = (kind: GameKind, previous: string | null) => {
     try {
         const old = rehydrateState(JSON.parse(previous));
         if (!Array.isArray(old?.players)) return;
-        const { nets, transactions } = SETTLEMENTS[kind](old);
-        archiveGame(kind, old.stats, nets, transactions);
+        archiveOrWarn(kind, old.stats, SETTLEMENTS[kind](old));
     } catch (err) {
         console.error('Could not archive the replaced game:', err);
     }

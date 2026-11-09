@@ -11,9 +11,13 @@ import { useUndo } from './useUndo';
 import { useGameState } from './useGameState';
 import { emptyStats, recordRound } from '../utils/nightStats';
 import { teenPattiSettlement } from '../utils/gameSettlement';
-import { archiveGame } from '../utils/history';
+import { archiveOrWarn } from '../utils/archive';
+import { playerLabels } from '../utils/owingsLogic';
 import { rememberPlayers } from '../utils/savedPlayers';
-import { betRefusal, bootRefusal, potLimitLines, tableRulesLine, type TableRules } from '../utils/teenPattiRules';
+import { betRefusal, bootRefusal, potLimitLines, roundCarryOver, tableRulesLine, type TableRules } from '../utils/teenPattiRules';
+
+// A starting balance is carried in (left out of tonight's result) when it is not zero.
+const carry = (balance: number) => (Math.abs(balance) >= 0.005 ? { carriedIn: balance } : {});
 
 const createInitialGameState = (): GameState => ({
   players: [],
@@ -141,13 +145,14 @@ export const useTeenPattiGame = () => {
 
         afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
 
+        const label = playerLabels(prev.players);
         const nets: Record<string, number> = {};
         prev.players.forEach(p => {
           const contribution = prev.roundContributions.get(p.id) || 0;
-          if (p.id === winner.id) nets[toTitleCase(p.name)] = prev.potAmount - contribution;
-          else if (contribution > 0) nets[toTitleCase(p.name)] = -contribution;
+          if (p.id === winner.id) nets[label(p)] = prev.potAmount - contribution;
+          else if (contribution > 0) nets[label(p)] = -contribution;
         });
-        stats = recordRound(stats, nets, { name: toTitleCase(winner.name), amount: prev.potAmount });
+        stats = recordRound(stats, nets, { name: label(prev.players.find(p => p.id === winner.id) ?? winner), amount: prev.potAmount });
 
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
@@ -171,10 +176,8 @@ export const useTeenPattiGame = () => {
         players: finalPlayersWithBreakStatus, // Use players with break status
         lastWinnerId: newLastWinnerId,
         roundInitialBootAmount: lastBootFromRound,
+        ...roundCarryOver(prev),
         stats,
-        potLimit: prev.potLimit,
-        maxBlindTurns: prev.maxBlindTurns,
-        maxChaal: prev.maxChaal,
         messages: finalMessages,
       };
     });
@@ -183,15 +186,11 @@ export const useTeenPattiGame = () => {
   // --- Player Actions ---
   const startNewGame = (newPlayers: Player[], rules: TableRules = {}) => {
     setGameState(prev => {
-      afterCommit(() => {
-        const { nets, transactions } = teenPattiSettlement(prev);
-        const failed = archiveGame('teen-patti', prev.stats, nets, transactions);
-        if (failed) addMessage(failed, true);
-      });
+      afterCommit(() => archiveOrWarn('teen-patti', prev.stats, teenPattiSettlement(prev, 'tonight')));
       return {
         ...createInitialGameState(),
         ...rules,
-        players: newPlayers.map(p => ({ ...p, isTakingBreak: false })), // Ensure break status is reset
+        players: newPlayers.map(p => ({ ...p, isTakingBreak: false, ...carry(p.balance) })), // Ensure break status is reset
         messages: newPlayers.length > 0 ? [`New game started with ${newPlayers.length} players. Please set the boot amount.`] : ["Returning to setup..."],
       };
     });
@@ -300,7 +299,7 @@ export const useTeenPattiGame = () => {
 
   // Bet actions return the table-rule refusal, or null.
   const refuse = (kind: 'blind' | 'chaal' | 'show', amount: number, player: Player) => {
-    const refusal = betRefusal(gameState, kind, amount, toTitleCase(player.name), gameState.blindTurns?.[player.id] ?? 0);
+    const refusal = betRefusal(gameState, kind, amount, toTitleCase(player.name), gameState.blindTurns?.[player.id] ?? 0, gameState.blindPlayerIds.has(player.id));
     if (refusal) addMessage(refusal, true);
     return refusal;
   };
@@ -449,7 +448,8 @@ export const useTeenPattiGame = () => {
       name: toTitleCase(name), 
       balance, 
       phoneNumber,
-      isTakingBreak: false // ADDED
+      isTakingBreak: false, // ADDED
+      ...carry(balance),
     };
     setGameState(prev => ({
       ...prev,

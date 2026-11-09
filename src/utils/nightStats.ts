@@ -14,9 +14,13 @@ export interface NightStats {
     streaks: Record<string, number>;
     bestStreak: { name: string; count: number } | null;
     biggest: { name: string; amount: number } | null;
+    partial?: boolean; // the game was saved before stats existed, so earlier rounds are missing
 }
 
 export const emptyStats = (): NightStats => ({ rounds: 0, wins: {}, streaks: {}, bestStreak: null, biggest: null });
+
+// For a save without stats.
+export const partialStats = (): NightStats => ({ ...emptyStats(), partial: true });
 
 // nets: display name -> round net for the players dealt in; anyone else keeps their streak.
 export const recordRound = (
@@ -37,12 +41,13 @@ export const recordRound = (
         }
     }
     const biggest = candidate && (!stats.biggest || candidate.amount > stats.biggest.amount) ? candidate : stats.biggest;
-    return { rounds: stats.rounds + 1, wins, streaks, bestStreak, biggest };
+    return { ...stats, rounds: stats.rounds + 1, wins, streaks, bestStreak, biggest };
 };
 
 // playerNets are per player in player order (not per entity, no dealer).
-export const summaryLines = (stats: NightStats, playerNets: PlayerNet[], game: GameKind): string[] => {
+export const summaryLines = (stats: NightStats, playerNets: PlayerNet[], game: GameKind, carried = false): string[] => {
     const lines: string[] = [];
+    if (stats.partial) lines.push("Stats start from the app update; earlier rounds aren't counted.");
     if (stats.biggest) {
         lines.push(`${game === 'blackjack' ? 'Biggest win' : 'Biggest pot'}: ₹${formatAmount(stats.biggest.amount)} (${stats.biggest.name})`);
     }
@@ -62,6 +67,7 @@ export const summaryLines = (stats: NightStats, playerNets: PlayerNet[], game: G
     }
     if (winner) lines.push(`Biggest winner: ${winner.name} +₹${formatAmount(winner.net)}`);
     if (loser) lines.push(`Biggest loser: ${loser.name} -₹${formatAmount(-loser.net)}`);
+    if (carried) lines.push("Carried-in balances aren't included.");
     return lines;
 };
 

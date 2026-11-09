@@ -1,4 +1,4 @@
-import { couldNot } from './formatters.ts';
+import { couldNot, toTitleCase } from './formatters.ts';
 
 // Players remembered on this device only, keyed by phone.
 export interface SavedPlayer {
@@ -45,11 +45,12 @@ export const upsertPlayers = (list: SavedPlayer[], players: { name: string; phon
     let refused = 0;
     for (const p of players) {
         const name = p.name.trim();
-        if (!name || !p.phone || !PHONE_PATTERN.test(p.phone)) continue;
-        const index = next.findIndex(s => s.phone === p.phone);
+        const phone = p.phone?.trim() ?? '';
+        if (!name || !PHONE_PATTERN.test(phone)) continue;
+        const index = next.findIndex(s => s.phone === phone);
         if (index >= 0) next[index] = { ...next[index], name };
         else if (next.length >= MAX_SAVED_PLAYERS) refused++;
-        else next.push({ name, phone: p.phone });
+        else next.push({ name, phone });
     }
     return { list: next, refused };
 };
@@ -87,9 +88,33 @@ export const saveEntry = (
     return list.map(s => (s.phone === originalPhone ? saved : s));
 };
 
+// Chips for a setup form: saved players whose phone is not in the form yet (typed phones count once trimmed).
+export const chipPlayers = (saved: SavedPlayer[], formPhones: string[]) => {
+    const inForm = new Set(formPhones.map(phone => phone.trim()));
+    return saved.filter(p => !inForm.has(p.phone));
+};
+
 // Chip tap: fills the first row whose name and phone are empty, else adds a row; other fields are left alone.
 export const fillRow = <R extends { name: string; phoneNumber: string }>(rows: R[], picked: SavedPlayer, blankRow: R): R[] => {
     const filled = { name: picked.name, phoneNumber: picked.phone };
     const index = rows.findIndex(r => !r.name.trim() && !r.phoneNumber.trim());
     return index === -1 ? [...rows, { ...blankRow, ...filled }] : rows.map((r, i) => (i === index ? { ...r, ...filled } : r));
+};
+
+// The first phone that two setup rows share, or null.
+export const duplicatePhone = (phones: string[]): string | null => {
+    const seen = new Set<string>();
+    for (const raw of phones) {
+        const phone = raw.trim();
+        if (!phone) continue;
+        if (seen.has(phone)) return phone;
+        seen.add(phone);
+    }
+    return null;
+};
+
+// Refusal for adding a phone that is already at the table, or null.
+export const phoneInUse = (players: { name: string; phoneNumber?: string }[], phone: string): string | null => {
+    const holder = players.find(p => p.phoneNumber?.trim() === phone.trim());
+    return holder ? `${phone.trim()} is already playing as ${toTitleCase(holder.name)}.` : null;
 };

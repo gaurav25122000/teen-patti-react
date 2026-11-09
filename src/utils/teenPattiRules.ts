@@ -1,4 +1,5 @@
 import { formatAmount } from './formatters.ts';
+import type { GameState } from '../types/gameTypes.ts';
 
 // Optional table rules; absent means no rule.
 export interface TableRules {
@@ -21,17 +22,25 @@ export const blindTurnsRefusal = (rules: TableRules, name: string, turns: number
         ? `${name} has played ${rules.maxBlindTurns} blind turns and must see.`
         : null;
 
-// Why a blind, chaal or show bet is refused, or null when it is allowed.
-export const betRefusal = (s: RoundState, kind: 'blind' | 'chaal' | 'show', amount: number, name: string, blindTurns: number) => {
+// Why a blind, chaal or show bet is refused, or null when it is allowed. isBlind: the bettor has not seen.
+export const betRefusal = (s: RoundState, kind: 'blind' | 'chaal' | 'show', amount: number, name: string, blindTurns: number, isBlind: boolean) => {
     if (potLimitReached(s)) return potLimitLine(s.potLimit!);
-    if (kind === 'blind') {
+    if (isBlind && kind !== 'chaal') {
         const turns = blindTurnsRefusal(s, name, blindTurns);
         if (turns) return turns;
-        if (s.maxChaal !== undefined && amount > s.maxChaal / 2) return `Max blind bet is ₹${formatAmount(s.maxChaal / 2)}.`;
     }
+    if (kind === 'blind' && s.maxChaal !== undefined && amount > s.maxChaal / 2) return `Max blind bet is ₹${formatAmount(s.maxChaal / 2)}.`;
     if (kind === 'chaal' && s.maxChaal !== undefined && amount > s.maxChaal) return `Max chaal is ₹${formatAmount(s.maxChaal)}.`;
     return null;
 };
+
+// Entities and table rules survive a round reset; endRound sets players, winner, boot, stats and log itself.
+export const roundCarryOver = (prev: Pick<GameState, 'entities' | 'potLimit' | 'maxBlindTurns' | 'maxChaal'>) => ({
+    entities: prev.entities,
+    potLimit: prev.potLimit,
+    maxBlindTurns: prev.maxBlindTurns,
+    maxChaal: prev.maxChaal,
+});
 
 export const bootRefusal = (rules: TableRules, boot: number) =>
     rules.maxChaal !== undefined && boot > rules.maxChaal / 2

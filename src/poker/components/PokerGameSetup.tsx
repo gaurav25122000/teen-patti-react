@@ -1,7 +1,7 @@
 // src/poker/components/PokerGameSetup.tsx
 import React, { useState } from 'react';
 import { toTitleCase } from '../../utils/formatters';
-import { fillRow } from '../../utils/savedPlayers';
+import { duplicatePhone, fillRow } from '../../utils/savedPlayers';
 import SavedPlayerChips from '../../components/SavedPlayerChips';
 
 interface PokerGameSetupProps {
@@ -27,7 +27,7 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
     const handleStart = () => {
         const finalPlayers = players
             .filter(p => p.name.trim() !== '')
-            .map(p => ({ name: toTitleCase(p.name), stack: parseInt(p.stack) || 0, phoneNumber: p.phoneNumber }));
+            .map(p => ({ name: toTitleCase(p.name), stack: parseInt(p.stack) || 0, phoneNumber: p.phoneNumber.trim() }));
 
         if (finalPlayers.length < 2) {
             alert("Please add at least 2 players.");
@@ -39,6 +39,8 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
                 return alert(`Invalid phone number for Player ${player.name}. Must be 10 digits.`);
             }
         }
+        const dup = duplicatePhone(finalPlayers.map(p => p.phoneNumber));
+        if (dup) return alert(`Two players have the phone ${dup}.`);
 
         const blinds = { sb: parseInt(sb), bb: parseInt(bb) };
         if (isNaN(blinds.sb) || isNaN(blinds.bb) || blinds.sb <= 0 || blinds.bb <= 0) {

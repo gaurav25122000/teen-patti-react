@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { hasUnreadableHistory, readHistory, setPaid, writeHistory, type HistoryEntry } from '../utils/history';
+import { hasUnreadableHistory, historyShareText, readHistory, setPaid, writeHistory, type HistoryEntry } from '../utils/history';
 import type { GameKind } from '../utils/nightStats';
 import { couldNot, formatAmount } from '../utils/formatters';
 import { readSavedPlayers } from '../utils/savedPlayers';
-import { shareText } from '../utils/settlement';
+import { upiFor } from '../utils/settlement';
 import ShareButtons from './ShareButtons';
+import PayLink from './PayLink';
 
 const GAME_LABEL: Record<GameKind, string> = { 'teen-patti': 'Teen Patti', poker: 'Poker', blackjack: 'Blackjack' };
 
@@ -28,6 +29,7 @@ const HistoryScreen: React.FC = () => {
     const [openId, setOpenId] = useState<string | null>(null);
     const [saved] = useState(() => readSavedPlayers());
     const [error, setError] = useState<string | null>(null);
+    const [payNote, setPayNote] = useState<string | null>(null);
 
     const persist = (next: HistoryEntry[], verb: 'save' | 'delete') => {
         try {
@@ -49,7 +51,7 @@ const HistoryScreen: React.FC = () => {
         };
         return (
             <div className="setup-screen">
-                <button className="btn-secondary" onClick={() => setOpenId(null)}>← History</button>
+                <button className="btn-secondary" onClick={() => { setOpenId(null); setPayNote(null); }}>← History</button>
                 <h2>{GAME_LABEL[open.game]}</h2>
                 <p>{when(open.endedAt)}</p>
                 <ul className="owings-list">
@@ -60,23 +62,28 @@ const HistoryScreen: React.FC = () => {
                 <h4>Settlement</h4>
                 {open.transactions.length === 0 ? <p>All settled up</p> : (
                     <ul className="history-transactions">
-                        {open.transactions.map((t, i) => (
-                            <li key={i}>
-                                <label>
-                                    <input type="checkbox" checked={t.paid} onChange={e => persist(setPaid(entries, open.id, i, e.target.checked), 'save')} />
-                                    {' '}{t.from} → {t.to} ₹{formatAmount(t.amount)}
-                                </label>
-                            </li>
-                        ))}
+                        {open.transactions.map((t, i) => {
+                            const upi = t.paid ? undefined : upiFor(t.toPhone, saved);
+                            return (
+                                <li key={i}>
+                                    <label>
+                                        <input type="checkbox" checked={t.paid} onChange={e => persist(setPaid(entries, open.id, i, e.target.checked), 'save')} />
+                                        {' '}{t.from} → {t.to} ₹{formatAmount(t.amount)}
+                                    </label>
+                                    {upi && <PayLink upi={upi} payee={t.to} amount={t.amount} onNoApp={setPayNote} />}
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
+                {payNote && <p className="share-note">{payNote}</p>}
                 {open.summary.length > 0 && (
                     <>
                         <h4>Night summary</h4>
                         <ul className="summary-list">{open.summary.map(line => <li key={line}>{line}</li>)}</ul>
                     </>
                 )}
-                {(open.transactions.length > 0 || open.summary.length > 0) && <ShareButtons text={shareText(open.transactions, open.summary, saved)} />}
+                {(open.transactions.length > 0 || open.summary.length > 0) && <ShareButtons text={historyShareText(open, saved)} />}
                 {error && <p className="form-error">{error}</p>}
                 <button className="btn btn-danger" onClick={remove}>Delete</button>
             </div>

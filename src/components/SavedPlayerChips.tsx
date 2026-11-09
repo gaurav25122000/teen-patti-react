@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { readSavedPlayers, type SavedPlayer } from '../utils/savedPlayers';
+import { chipPlayers, readSavedPlayers, type SavedPlayer } from '../utils/savedPlayers';
 
 interface SavedPlayerChipsProps {
     formPhones: string[]; // phones already in the form are hidden
@@ -8,7 +8,7 @@ interface SavedPlayerChipsProps {
 
 const SavedPlayerChips: React.FC<SavedPlayerChipsProps> = ({ formPhones, onPick }) => {
     const [saved] = useState(() => readSavedPlayers());
-    const chips = saved.filter(p => !formPhones.includes(p.phone));
+    const chips = chipPlayers(saved, formPhones);
     if (chips.length === 0) return null;
     return (
         <div className="saved-chips">

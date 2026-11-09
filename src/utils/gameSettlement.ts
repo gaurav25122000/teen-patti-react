@@ -1,35 +1,42 @@
-import { calculateOwings } from './owingsLogic.ts';
-import { toTitleCase } from './formatters.ts';
-import type { GameState } from '../types/gameTypes.ts';
+import { settleParties, type OwingsPlayer } from './owingsLogic.ts';
+import type { Entity, GameState } from '../types/gameTypes.ts';
 import type { PokerGameState } from '../poker/types/pokerGameTypes.ts';
 import type { BlackjackGameState } from '../blackjack/types/blackjackGameTypes.ts';
 
-// Final Owings and history entries start from these per-player nets. An unfinished round is voided:
-// chips in the pot go back to their owners (Final Owings only runs between rounds, where this changes nothing).
+// Final Owings and history entries start from these nets. Chips still in play go back to their owners:
+// Teen Patti's pot, a Poker hand's pot (less pots already paid), Blackjack's unsettled bets.
 
-export const teenPattiSettlement = (state: Pick<GameState, 'players' | 'entities' | 'roundActive' | 'roundContributions'>) => {
+const HOUSE_KEY = 'house';
+
+const settle = (players: OwingsPlayer[], entities: Entity[] = [], houseNet = 0, carried = false) => {
+    const { transactions, people } = settleParties(players, entities);
+    return { nets: people.filter(p => p.key !== HOUSE_KEY).map(({ name, net }) => ({ name, net })), transactions, houseNet, carried };
+};
+
+// 'tonight' leaves out balances carried in at setup or on joining: History and the night summary use it.
+export const teenPattiSettlement = (
+    state: Pick<GameState, 'players' | 'entities' | 'roundActive' | 'roundContributions'>,
+    mode: 'live' | 'tonight' = 'live'
+) => {
+    const tonight = mode === 'tonight';
     const players = state.players.map(p => ({
         ...p,
-        balance: p.balance + (state.roundActive ? state.roundContributions.get(p.id) ?? 0 : 0),
+        balance: p.balance + (state.roundActive ? state.roundContributions.get(p.id) ?? 0 : 0) - (tonight ? p.carriedIn ?? 0 : 0),
         totalBuyIn: 0,
     }));
-    return {
-        nets: players.map(p => ({ name: toTitleCase(p.name), net: p.balance })),
-        transactions: calculateOwings(players, state.entities),
-    };
+    return settle(players, state.entities, 0, tonight && state.players.some(p => p.carriedIn !== undefined));
 };
 
 // Mid-hand, pots already paid out this hand are taken back too.
-export const pokerSettlement = (state: Pick<PokerGameState, 'players'>) => {
-    const players = state.players.map(p => ({ ...p, stack: p.stack + p.totalPotContribution - (p.roundWinnings ?? 0) }));
-    return {
-        nets: players.map(p => ({ name: toTitleCase(p.name), net: p.stack - p.totalBuyIn })),
-        transactions: calculateOwings(players),
-    };
-};
+export const pokerSettlement = (state: Pick<PokerGameState, 'players'>) =>
+    settle(state.players.map(p => ({ ...p, stack: p.stack + p.totalPotContribution - (p.roundWinnings ?? 0) })));
 
 // The house is in the transactions, not in the player nets.
-export const blackjackSettlement = (state: Pick<BlackjackGameState, 'players' | 'dealerNet'>) => ({
-    nets: state.players.map(p => ({ name: toTitleCase(p.name), net: p.stack - p.totalBuyIn })),
-    transactions: calculateOwings([...state.players, { name: 'Dealer (House)', stack: state.dealerNet, totalBuyIn: 0 }]),
-});
+export const blackjackSettlement = (state: Pick<BlackjackGameState, 'players' | 'dealerNet'>) => {
+    const players = state.players.map(p => ({
+        ...p,
+        stack: p.stack + p.hands.reduce((sum, h) => sum + (h.status === 'playing' || h.status === 'stand' ? h.wager : 0)
+            + (h.insurance && !h.insuranceResult ? h.insurance : 0), 0),
+    }));
+    return settle([...players, { key: HOUSE_KEY, name: 'Dealer (House)', stack: state.dealerNet, totalBuyIn: 0 }], [], state.dealerNet);
+};

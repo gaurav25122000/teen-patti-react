@@ -4,17 +4,16 @@ import { shareText, upiFor, upiLink, whatsappLink } from './settlement.ts';
 
 const saved = [
     { name: 'asha', phone: '9000000001', upi: 'asha@okhdfc' },
-    { name: 'Dev', phone: '9000000002' },
+    { name: 'Raj', phone: '9000000002' },
+    { name: 'Raj', phone: '9000000003', upi: 'raj@okaxis' },
 ];
 
-test('upiFor matches the title-cased name when exactly one match has a UPI ID', () => {
-    assert.equal(upiFor('Asha', saved), 'asha@okhdfc');
-    assert.equal(upiFor('Dev', saved), undefined);
-    assert.equal(upiFor('Dealer (House)', saved), undefined);
-    const twoIds = [...saved, { name: 'Asha', phone: '9000000003', upi: 'asha2@okaxis' }];
-    assert.equal(upiFor('Asha', twoIds), undefined);
-    const oneIdOfTwo = [...saved, { name: 'ASHA', phone: '9000000003' }];
-    assert.equal(upiFor('Asha', oneIdOfTwo), 'asha@okhdfc');
+test('upiFor looks up by exact phone, never by name', () => {
+    assert.equal(upiFor('9000000001', saved), 'asha@okhdfc');
+    assert.equal(upiFor('9000000002', saved), undefined);
+    assert.equal(upiFor('9000000003', saved), 'raj@okaxis');
+    assert.equal(upiFor(null, saved), undefined);
+    assert.equal(upiFor('9999999999', saved), undefined);
 });
 
 test('UPI link encodes each value, amount with 2 decimals', () => {
@@ -22,16 +21,16 @@ test('UPI link encodes each value, amount with 2 decimals', () => {
     assert.equal(upiLink('a.b@ok', 'Asha Rao', 120.5), 'upi://pay?pa=a.b%40ok&pn=Asha%20Rao&am=120.50&cu=INR&tn=Bets%20Manager');
 });
 
-test('share text: transactions with UPI where known, then the night summary', () => {
+test('share text: UPI where the payee phone has one, then the night summary', () => {
     const text = shareText(
-        [{ from: 'Raj', to: 'Asha', amount: 500 }, { from: 'Dev', to: 'Esha', amount: 120.5 }],
+        [{ from: 'Dev', to: 'Asha', amount: 500, toPhone: '9000000001' }, { from: 'Dev', to: 'Raj', amount: 120.5, toPhone: '9000000002' }],
         ['Biggest pot: ₹2400 (Asha)', 'Most rounds won: Asha (7)'],
-        [{ name: 'Asha', phone: '9000000001', upi: 'asha@okhdfc' }, { name: 'Esha', phone: '9000000004' }]
+        saved
     );
     assert.equal(text, [
         'Bets Manager settlement',
-        'Raj pays Asha ₹500 (UPI: asha@okhdfc)',
-        'Dev pays Esha ₹120.5',
+        'Dev pays Asha ₹500 (UPI: asha@okhdfc)',
+        'Dev pays Raj ₹120.5',
         '',
         'Night summary',
         'Biggest pot: ₹2400 (Asha)',
@@ -39,9 +38,9 @@ test('share text: transactions with UPI where known, then the night summary', ()
     ].join('\n'));
 });
 
-test('share text with no transactions and no summary', () => {
+test('share text with no transactions and no summary; a payee without a phone gets no UPI', () => {
     assert.equal(shareText([], [], saved), 'Bets Manager settlement\nAll settled up');
-    assert.equal(shareText([{ from: 'Raj', to: 'Dev', amount: 10 }], [], saved), 'Bets Manager settlement\nRaj pays Dev ₹10');
+    assert.equal(shareText([{ from: 'Raj', to: 'Asha', amount: 10, toPhone: null }], [], saved), 'Bets Manager settlement\nRaj pays Asha ₹10');
 });
 
 test('WhatsApp link carries the encoded text', () => {

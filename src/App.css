@@ -1183,3 +1183,19 @@ h1 {
   color: var(--color-glow-yellow);
   font-family: var(--font-display);
 }
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 90vw;
+  padding: 12px 18px;
+  border-radius: 10px;
+  background: rgba(20, 20, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  z-index: 10000;
+}

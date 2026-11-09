@@ -3,9 +3,9 @@ import React, { useState } from 'react';
 import type { Transaction } from '../utils/owingsLogic';
 import InteractionModal from './InteractionModal';
 import ShareButtons from './ShareButtons';
+import PayLink from './PayLink';
 import { readSavedPlayers } from '../utils/savedPlayers';
-import { shareText, upiFor, upiLink } from '../utils/settlement';
-import { watchForApp } from '../utils/appLinks';
+import { shareText, upiFor } from '../utils/settlement';
 
 interface OwingsModalProps {
     isOpen: boolean;
@@ -33,17 +33,14 @@ const OwingsContent: React.FC<Omit<OwingsModalProps, 'isOpen'>> = ({ onClose, tr
             {transactions.length > 0 ? (
                 <ul className="owings-list">
                     {transactions.map((t, index) => {
-                        const upi = upiFor(t.to, saved);
+                        const upi = upiFor(t.toPhone, saved);
                         return (
                             <li key={index}>
                                 <span className="from">{t.from}</span>
                                 <span className="arrow">→</span>
                                 <span className="to">{t.to}</span>
                                 <span className="amount">₹ {t.amount.toFixed(2)}</span>
-                                {upi && (
-                                    <a className="btn btn-success owings-pay" href={upiLink(upi, t.to, t.amount)}
-                                        onClick={() => watchForApp(() => setPayNote(`No UPI app found. Pay ${upi} manually.`))}>PAY</a>
-                                )}
+                                {upi && <PayLink upi={upi} payee={t.to} amount={t.amount} onNoApp={setPayNote} />}
                             </li>
                         );
                     })}

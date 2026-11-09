@@ -7,9 +7,10 @@ import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsSer
 import { SHA256 } from 'crypto-js';
 import { useUndo } from '../../hooks/useUndo';
 import { useGameState } from '../../hooks/useGameState';
-import { biggestWin, emptyStats, recordRound } from '../../utils/nightStats';
+import { biggestWin, emptyStats, partialStats, recordRound } from '../../utils/nightStats';
 import { blackjackSettlement } from '../../utils/gameSettlement';
-import { archiveGame } from '../../utils/history';
+import { archiveOrWarn } from '../../utils/archive';
+import { playerLabels } from '../../utils/owingsLogic';
 import { rememberPlayers } from '../../utils/savedPlayers';
 
 export const BLACKJACK_STORAGE_KEY = 'blackjackGameState';
@@ -30,11 +31,10 @@ const createInitialBlackjackState = (): BlackjackGameState => ({
     stats: emptyStats(),
 });
 
-// Returns the failure message, if any.
-const archiveBlackjack = (state: BlackjackGameState) => {
-    const { nets, transactions } = blackjackSettlement(state);
-    return archiveGame('blackjack', state.stats, nets, transactions);
-};
+const archiveBlackjack = (state: BlackjackGameState) => archiveOrWarn('blackjack', state.stats, blackjackSettlement(state));
+
+// Night-stats keys: the settlement labels, which count the house among the names.
+const statsLabels = (players: BlackjackPlayer[]) => playerLabels([...players, { name: 'Dealer (House)', key: 'house' }]);
 
 // --- HELPER FUNCTION ---
 const loadStateFromStorage = (): BlackjackGameState | null => {
@@ -66,6 +66,7 @@ const loadStateFromStorage = (): BlackjackGameState | null => {
                 }))
             })),
             dealerNet: parsed.dealerNet || 0,
+            stats: parsed.stats ?? partialStats(),
             isBettingLocked: parsed.isBettingLocked !== undefined ? parsed.isBettingLocked : true,
         };
     } catch {
@@ -117,13 +118,10 @@ export const useBlackjackGame = () => {
     // --- ADDED: Action to reset game ---
     const setupNewGame = useCallback(() => {
         setGameState(prev => {
-            afterCommit(() => {
-                const failed = archiveBlackjack(prev);
-                if (failed) addMessage(failed);
-            });
+            afterCommit(() => archiveBlackjack(prev));
             return createInitialBlackjackState();
         });
-    }, [setGameState, afterCommit, addMessage]);
+    }, [setGameState, afterCommit]);
 
     // Empties the game without saving it to history (used after handing the game to another phone).
     const clearGame = useCallback(() => {
@@ -143,10 +141,7 @@ export const useBlackjackGame = () => {
             lastBets: Array(p.numHands).fill(createInitialBlackjackState().minBet), // UPDATED
         }));
         setGameState(prev => {
-            afterCommit(() => {
-                const failed = archiveBlackjack(prev);
-                if (failed) addMessage(failed);
-            });
+            afterCommit(() => archiveBlackjack(prev));
             return {
                 ...createInitialBlackjackState(),
                 players: initialPlayers,
@@ -362,6 +357,7 @@ export const useBlackjackGame = () => {
         const recordsToUpdate: WinningsRecord[] = [];
         const timestamp = new Date().toISOString();
         const nets: Record<string, number> = {}; // players who bet this round
+        const label = statsLabels(endState.players);
         
         const finalPlayers = endState.players.map(p => {
             let roundNet = 0;
@@ -386,7 +382,7 @@ export const useBlackjackGame = () => {
                 // Push is net 0
             });
 
-            if (p.hands.some(h => h.bet > 0)) nets[toTitleCase(p.name)] = roundNet;
+            if (p.hands.some(h => h.bet > 0)) nets[label(p)] = roundNet;
 
             if (p.phoneNumber && roundNet !== 0) {
                 recordsToUpdate.push({

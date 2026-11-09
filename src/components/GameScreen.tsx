@@ -16,6 +16,7 @@ import { emptyStats, summaryLines } from '../utils/nightStats';
 import { teenPattiSettlement } from '../utils/gameSettlement';
 import { bootRefusal, parseTableRules, potLimitReached } from '../utils/teenPattiRules';
 import TableRulesFields from './TableRulesFields';
+import { phoneInUse } from '../utils/savedPlayers';
 import StreamControls from './StreamControls';
 import ActionToast from './ActionToast';
 import Celebration from './Celebration';
@@ -105,9 +106,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
 
     const handleShowOwings = () => {
-        const { nets, transactions } = teenPattiSettlement(gameState);
-        setTransactions(transactions);
-        setSummary(summaryLines(gameState.stats ?? emptyStats(), nets, 'teen-patti'));
+        // Transfers include balances carried in; the summary is tonight's result only.
+        setTransactions(teenPattiSettlement(gameState).transactions);
+        const tonight = teenPattiSettlement(gameState, 'tonight');
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), tonight.nets, 'teen-patti', tonight.carried));
         setShowOwings(true);
     };
 
@@ -252,10 +254,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 );
                 primaryAction = () => {
                     if (!addPlayerName.trim()) return alert('Player name cannot be empty.');
-                    if (!/^\d{10}$/.test(addPlayerPhone)) {
+                    if (!/^\d{10}$/.test(addPlayerPhone.trim())) {
                         return alert('Please enter a valid 10-digit phone number.');
                     }
-                    actions.addPlayer(addPlayerName, parseInt(addPlayerBalance, 10) || 0, addPlayerPhone);
+                    const taken = phoneInUse(gameState.players, addPlayerPhone);
+                    if (taken) return alert(taken);
+                    actions.addPlayer(addPlayerName, parseInt(addPlayerBalance, 10) || 0, addPlayerPhone.trim());
                     closeModal();
                 };
                 break;

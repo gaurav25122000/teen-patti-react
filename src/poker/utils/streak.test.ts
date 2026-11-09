@@ -39,19 +39,44 @@ test('a contested pot is a win line, a one-player pot is not', () => {
     assert.doesNotMatch(potLine(['Ravi'], 700, 1, 700, ''), WIN_PATTERN);
 });
 
-test('hand nets: dealt-in players only, winnings minus chips in the pot, title-cased', () => {
-    const seat = (name: string, over: Partial<{ stack: number; totalPotContribution: number; roundWinnings: number; isTakingBreak: boolean }>) =>
-        ({ name, winningStreak: 0, isTakingBreak: false, stack: 500, totalPotContribution: 0, roundWinnings: 0, ...over });
+const label = (p: { name: string }) => p.name.toUpperCase();
+const seat = (name: string, over: Partial<{ stack: number; totalPotContribution: number; roundWinnings: number; isTakingBreak: boolean }> = {}) =>
+    ({ name, winningStreak: 0, isTakingBreak: false, stack: 500, totalPotContribution: 0, roundWinnings: 0, ...over });
+
+test('hand nets: dealt-in players only, winnings minus chips in the pot, keyed by label', () => {
     assert.deepEqual(handNets([
         seat('asha', { totalPotContribution: 100, roundWinnings: 250 }),
         seat('Ravi', { stack: 0, totalPotContribution: 150 }),
-        seat('Dev', {}),
+        seat('Dev'),
         seat('Esha', { isTakingBreak: true }),
         seat('Kiran', { stack: 0 }),
-    ]), { Asha: 150, Ravi: -150, Dev: 0 });
+    ], label), { ASHA: 150, RAVI: -150, DEV: 0 });
 });
 
-test('hand candidate: the player who won the most, with the whole pot; first on a tie', () => {
-    assert.deepEqual(handCandidate([{ name: 'ravi', roundWinnings: 100 }, { name: 'Asha', roundWinnings: 100 }, { name: 'Dev', roundWinnings: 0 }], 200), { name: 'Ravi', amount: 200 });
-    assert.equal(handCandidate([], 0), null);
+test('biggest pot is the contested pot, named for the largest net', () => {
+    // P1 300 all-in, P2 1000 all-in, P3 10; P1 wins 610 and P2 gets 700 uncalled back.
+    const hand = [
+        seat('p1', { stack: 0, totalPotContribution: 300, roundWinnings: 610 }),
+        seat('P2', { stack: 700, totalPotContribution: 1000, roundWinnings: 700 }),
+        seat('P3', { totalPotContribution: 10 }),
+    ];
+    assert.deepEqual(handCandidate(hand, label), { name: 'P1', amount: 610 });
+});
+
+test('biggest pot on a fold-out is named for the winner', () => {
+    const foldOut = [seat('Asha', { totalPotContribution: 100 }), seat('Ravi', { totalPotContribution: 20 })];
+    assert.deepEqual(handCandidate(foldOut, label, foldOut[0]), { name: 'ASHA', amount: 40 });
+    assert.equal(handCandidate([], label), null);
+});
+
+test('a chopped pot goes to the dealt-in player with the biggest net, then the most chips back, never to a sitter-out', () => {
+    const chop = [
+        seat('Dev', { isTakingBreak: true }),
+        seat('Kiran', { stack: 0 }),
+        seat('Asha', { totalPotContribution: 20, roundWinnings: 20 }),
+        seat('Ravi', { totalPotContribution: 40, roundWinnings: 40 }),
+    ];
+    assert.deepEqual(handCandidate(chop, label), { name: 'RAVI', amount: 40 });
+    const even = [seat('Asha', { totalPotContribution: 20, roundWinnings: 20 }), seat('Ravi', { totalPotContribution: 20, roundWinnings: 20 })];
+    assert.deepEqual(handCandidate(even, label), { name: 'ASHA', amount: 40 });
 });

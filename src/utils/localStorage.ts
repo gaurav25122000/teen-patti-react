@@ -1,7 +1,8 @@
 // src/utils/localStorage.ts
 
-import { LOCAL_STORAGE_KEY } from '../constants/gameConstants';
+import { LOCAL_STORAGE_KEY } from '../constants/gameConstants.ts';
 import type { GameState } from '../types/gameTypes';
+import { partialStats } from './nightStats.ts';
 
 export const saveStateToLocalStorage = (state: GameState) => {
   const stateToSave = {
@@ -25,11 +26,15 @@ export const loadStateFromLocalStorage = (): GameState | null => {
       return null;
     }
 
+    // Rounds used to wipe entities; a player left pointing at a missing one is unassigned again.
+    const entityIds = new Set((parsed.entities ?? []).map((e: { id: number }) => e.id));
     return {
       ...parsed,
+      players: parsed.players.map((p: { entityId?: number }) => (p.entityId === undefined || entityIds.has(p.entityId) ? p : { ...p, entityId: undefined })),
       foldedPlayerIds: new Set(parsed.foldedPlayerIds || []),
       blindPlayerIds: new Set(parsed.blindPlayerIds || []),
       roundContributions: new Map(parsed.roundContributions || []),
+      stats: parsed.stats ?? partialStats(),
     };
   } catch (error) {
     console.error("Failed to parse saved state from localStorage:", error);

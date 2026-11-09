@@ -6,13 +6,14 @@ import { toTitleCase } from '../../utils/formatters';
 import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsService';
 import { splitEvenly } from '../../utils/money';
 import { foldOutLine, foldOutStreak, handCandidate, handNets, nextStreak, potLine } from '../utils/streak';
-import { pauseClock, resumeClock, startClock, tickLevel } from '../utils/blindLevels';
+import { pauseClock, resumeClock, startClock, tickLevel, withClock } from '../utils/blindLevels';
 import { SHA256 } from 'crypto-js';
 import { useUndo } from '../../hooks/useUndo';
 import { useGameState } from '../../hooks/useGameState';
-import { emptyStats, recordRound } from '../../utils/nightStats';
+import { emptyStats, partialStats, recordRound } from '../../utils/nightStats';
 import { pokerSettlement } from '../../utils/gameSettlement';
-import { archiveGame } from '../../utils/history';
+import { archiveOrWarn } from '../../utils/archive';
+import { playerLabels } from '../../utils/owingsLogic';
 import { rememberPlayers } from '../../utils/savedPlayers';
 
 export const POKER_STORAGE_KEY = 'pokerGameState';
@@ -51,7 +52,7 @@ const restorePoker = (parsed: PokerGameState): PokerGameState => {
             roundWinnings: p.roundWinnings ?? 0 // pots already won this hand count toward its result
         }));
     }
-    return { ...parsed, blindLevel: parsed.blindLevel ?? 1 };
+    return { ...parsed, blindLevel: parsed.blindLevel ?? 1, stats: parsed.stats ?? partialStats() };
 };
 
 // Poker does not load its save on launch, so a new game set up over it archives the saved copy.
@@ -66,7 +67,14 @@ const storedPoker = (): PokerGameState | null => {
 
 export const usePokerGame = () => {
     const [gameState, setGameState, addMessage, afterCommit] = useGameState<PokerGameState>(createInitialPokerState);
-    const { record, undo, canUndo } = useUndo(gameState, setGameState, gameState.gameStage !== 'pre-deal');
+    const { record, unrecorded, undo: undoStep, canUndo } = useUndo(gameState, setGameState, gameState.gameStage !== 'pre-deal');
+
+    // The blind clock is outside undo: restoring a step keeps the live clock.
+    const undo = useCallback(() => {
+        const live = gameState;
+        undoStep();
+        setGameState(restored => withClock(restored, live));
+    }, [gameState, undoStep, setGameState]);
 
     const loadGame = useCallback(() => {
         const savedState = localStorage.getItem(POKER_STORAGE_KEY);
@@ -151,7 +159,8 @@ export const usePokerGame = () => {
 
         const finalWinner = finalPlayers.find(p => p.id === winner.id)!;
         const newMessages = [...prevGameState.messages, `--- HAND OVER ---`, foldOutLine(toTitleCase(winner.name), totalPot, winner.totalPotContribution, finalWinner.stack)];
-        const nets = handNets(updatedPlayers.map(p => ({ ...p, roundWinnings: p.id === winner.id ? totalPot : 0 })));
+        const label = playerLabels(updatedPlayers);
+        const nets = handNets(updatedPlayers.map(p => ({ ...p, roundWinnings: p.id === winner.id ? totalPot : 0 })), label);
 
         return {
             ...createInitialPokerState(),
@@ -163,7 +172,7 @@ export const usePokerGame = () => {
             blindLevel: prevGameState.blindLevel,
             levelEndsAt: prevGameState.levelEndsAt,
             pausedRemainingMs: prevGameState.pausedRemainingMs,
-            stats: recordRound(prevGameState.stats ?? emptyStats(), nets, { name: toTitleCase(winner.name), amount: totalPot }),
+            stats: recordRound(prevGameState.stats ?? emptyStats(), nets, handCandidate(updatedPlayers, label, updatedPlayers.find(p => p.id === winner.id))),
             messages: newMessages,
         };
     }, [afterCommit]);
@@ -326,12 +335,7 @@ export const usePokerGame = () => {
 
         setGameState(prev => {
             const previous = prev.players.length > 0 ? prev : storedPoker();
-            afterCommit(() => {
-                if (!previous) return;
-                const { nets, transactions } = pokerSettlement(previous);
-                const failed = archiveGame('poker', previous.stats, nets, transactions);
-                if (failed) addMessage(failed);
-            });
+            afterCommit(() => { if (previous) archiveOrWarn('poker', previous.stats, pokerSettlement(previous)); });
             return {
                 ...createInitialPokerState(),
                 ...startClock(levelMinutes, Date.now()),
@@ -475,7 +479,6 @@ export const usePokerGame = () => {
                 });
 
                 afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
-                const totalPot = prev.players.reduce((sum, p) => sum + p.totalPotContribution, 0);
 
                 // Reset hand state for everyone, apply streak logic
                 const finalPlayersWithStreak = newPlayers.map(p => ({ 
@@ -497,7 +500,7 @@ export const usePokerGame = () => {
                     pot: [],
                     gameStage: 'pre-deal',
                     activePlayerIndex: -1,
-                    stats: recordRound(prev.stats ?? emptyStats(), handNets(newPlayers), handCandidate(newPlayers, totalPot)),
+                    stats: recordRound(prev.stats ?? emptyStats(), handNets(newPlayers, playerLabels(newPlayers)), handCandidate(newPlayers, playerLabels(newPlayers))),
                 };
             }
 
@@ -645,11 +648,16 @@ export const usePokerGame = () => {
     }, [setGameState]);
 
     const actions = useMemo(() => ({
-        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame, pauseBlindClock, resumeBlindClock
-    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame, pauseBlindClock, resumeBlindClock]);
+        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame
+    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame]);
 
-    const recordedActions = useMemo(() => record(actions), [record, actions]);
+    // PAUSE and RESUME are not undo steps.
+    const recordedActions = useMemo(
+        () => ({ ...record(actions), pauseBlindClock: unrecorded(pauseBlindClock), resumeBlindClock: unrecorded(resumeBlindClock) }),
+        [record, unrecorded, actions, pauseBlindClock, resumeBlindClock]
+    );
+    const autoAwardPot = useMemo(() => unrecorded(awardPot), [unrecorded, awardPot]);
 
     // autoAwardPot is unrecorded: the showdown effect calls it, and undo must not land on a state it re-fires from.
-    return { gameState, actions: recordedActions, autoAwardPot: awardPot, undo, canUndo };
+    return { gameState, actions: recordedActions, autoAwardPot, undo, canUndo };
 };

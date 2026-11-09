@@ -11,6 +11,7 @@ import { toTitleCase } from '../../utils/formatters';
 import { emptyStats, summaryLines } from '../../utils/nightStats';
 import { pokerSettlement } from '../../utils/gameSettlement';
 import { clockLabel } from '../utils/blindLevels';
+import { phoneInUse } from '../../utils/savedPlayers';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
 import Celebration from '../../components/Celebration';
@@ -129,13 +130,16 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
 
     const handleManagePlayers = () => {
         switch (modalMode) {
-            case 'addPlayer':
+            case 'addPlayer': {
                 if (!addPlayerName || !addPlayerStack) return alert("Please enter name and stack.");
-                if (!/^\d{10}$/.test(addPlayerPhone)) {
+                if (!/^\d{10}$/.test(addPlayerPhone.trim())) {
                     return alert('Please enter a valid 10-digit phone number.');
                 }
-                actions.addPlayer(addPlayerName, parseInt(addPlayerStack, 10), addPlayerPhone);
+                const taken = phoneInUse(players, addPlayerPhone);
+                if (taken) return alert(taken);
+                actions.addPlayer(addPlayerName, parseInt(addPlayerStack, 10), addPlayerPhone.trim());
                 break;
+            }
             case 'removePlayer':
                 if (!managePlayerId) return alert("Please select a player to remove.");
                 actions.removePlayer(parseInt(managePlayerId, 10));

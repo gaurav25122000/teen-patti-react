@@ -1,6 +1,15 @@
-import { summaryLines, type GameKind, type NightStats, type PlayerNet } from './nightStats.ts';
+import { partialStats, summaryLines, type GameKind, type NightStats, type PlayerNet } from './nightStats.ts';
 import { couldNot } from './formatters.ts';
 import type { Transaction } from './owingsLogic.ts';
+import { shareText } from './settlement.ts';
+import type { SavedPlayer } from './savedPlayers.ts';
+
+interface SettlementParts {
+    nets: PlayerNet[];
+    transactions: Transaction[];
+    houseNet?: number;
+    carried?: boolean; // someone carried a balance in; the summary says it isn't included
+}
 
 export interface HistoryEntry {
     id: string;
@@ -21,7 +30,8 @@ const GAMES: GameKind[] = ['teen-patti', 'poker', 'blackjack'];
 
 const isNet = (n: PlayerNet | null) => typeof n?.name === 'string' && typeof n.net === 'number';
 const isTransfer = (t: HistoryEntry['transactions'][number] | null) =>
-    typeof t?.from === 'string' && typeof t.to === 'string' && typeof t.amount === 'number' && typeof t.paid === 'boolean';
+    typeof t?.from === 'string' && typeof t.to === 'string' && typeof t.amount === 'number' && typeof t.paid === 'boolean'
+    && (t.toPhone === null || typeof t.toPhone === 'string');
 
 const isEntry = (value: unknown): value is HistoryEntry => {
     const e = value as HistoryEntry;
@@ -58,38 +68,40 @@ export const writeHistory = (list: HistoryEntry[], storage: HistoryStorage = loc
 // Newest first; the oldest past the cap is dropped.
 export const addEntry = (list: HistoryEntry[], entry: HistoryEntry) => [entry, ...list].slice(0, MAX_HISTORY);
 
-export const buildEntry = (
-    game: GameKind,
-    stats: NightStats,
-    nets: PlayerNet[],
-    transactions: Transaction[],
-    now = new Date()
-): HistoryEntry => ({
+export const buildEntry = (game: GameKind, stats: NightStats, s: SettlementParts, now = new Date()): HistoryEntry => ({
     id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
     endedAt: now.toISOString(),
     game,
-    nets,
-    transactions: transactions.map(t => ({ ...t, paid: false })),
-    summary: summaryLines(stats, nets, game),
+    nets: s.nets,
+    transactions: s.transactions.map(t => ({ ...t, paid: false })),
+    summary: summaryLines(stats, s.nets, game, s.carried),
 });
 
-// Saves a game that is being replaced or ended (not one with no rounds); returns the failure message, if any.
+const moved = (net: number) => Math.abs(net) >= 0.005;
+
+// Saves a game being replaced or ended if it had a round or moved money (the house included).
+// A failed save returns its message and the entry, so the settlement can still be copied.
 export const archiveGame = (
     game: GameKind,
     stats: NightStats | undefined,
-    nets: PlayerNet[],
-    transactions: Transaction[],
+    s: SettlementParts,
     storage: HistoryStorage = localStorage
-): string | null => {
-    if (!stats || stats.rounds < 1) return null;
+): { message: string; entry: HistoryEntry } | null => {
+    const known = stats ?? partialStats();
+    if (known.rounds < 1 && !s.nets.some(n => moved(n.net)) && !moved(s.houseNet ?? 0)) return null;
+    const entry = buildEntry(game, known, s);
     try {
-        writeHistory(addEntry(readHistory(storage), buildEntry(game, stats, nets, transactions)), storage);
+        writeHistory(addEntry(readHistory(storage), entry), storage);
         return null;
     } catch (error) {
         console.error('Could not save game history:', error);
-        return couldNot('save', error);
+        return { message: couldNot('save', error), entry };
     }
 };
+
+// Re-share sends only what is still owed; with everything paid it reads "All settled up".
+export const historyShareText = (e: HistoryEntry, saved: SavedPlayer[]) =>
+    shareText(e.transactions.filter(t => !t.paid), e.summary, saved);
 
 export const setPaid = (list: HistoryEntry[], id: string, index: number, paid: boolean) =>
     list.map(e => (e.id !== id ? e : { ...e, transactions: e.transactions.map((t, i) => (i === index ? { ...t, paid } : t)) }));

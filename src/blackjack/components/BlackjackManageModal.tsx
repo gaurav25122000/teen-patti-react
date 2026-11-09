@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import type { BlackjackPlayer } from '../types/blackjackGameTypes';
 import InteractionModal from '../../components/InteractionModal';
 import { toTitleCase } from '../../utils/formatters';
+import { phoneInUse } from '../../utils/savedPlayers';
 
 export type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'toggleBreak' | 'updateHands';
 
@@ -69,10 +70,12 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
             </>;
             confirmAction = () => {
                  if (!addPlayerName || !addPlayerStack) return alert("Please enter name and stack.");
-                if (!/^\d{10}$/.test(addPlayerPhone)) {
+                if (!/^\d{10}$/.test(addPlayerPhone.trim())) {
                     return alert('Please enter a valid 10-digit phone number.');
                 }
-                onAddPlayer(addPlayerName, parseInt(addPlayerStack, 10), addPlayerPhone, parseInt(addPlayerNumHands, 10));
+                const taken = phoneInUse(players, addPlayerPhone);
+                if (taken) return alert(taken);
+                onAddPlayer(addPlayerName, parseInt(addPlayerStack, 10), addPlayerPhone.trim(), parseInt(addPlayerNumHands, 10));
                 onClose();
             };
             break;
