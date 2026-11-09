@@ -20,20 +20,29 @@ const isSavedPlayer = (value: unknown): value is SavedPlayer => {
         && PHONE_PATTERN.test(p.phone) && (p.upi === undefined || (typeof p.upi === 'string' && UPI_PATTERN.test(p.upi)));
 };
 
-export const readSavedPlayers = (storage: Pick<Storage, 'getItem'> = localStorage): SavedPlayer[] => {
+// failed: the stored list could not be read, so callers can say so instead of showing nobody.
+export const loadSavedPlayers = (storage: Pick<Storage, 'getItem'> = localStorage): { list: SavedPlayer[]; failed: boolean } => {
     try {
         const parsed = JSON.parse(storage.getItem(SAVED_PLAYERS_KEY) ?? '[]');
-        if (!Array.isArray(parsed)) return [];
+        if (!Array.isArray(parsed)) return { list: [], failed: true };
         const phones = new Set<string>();
-        return parsed.filter(isSavedPlayer).filter(p => {
-            if (phones.has(p.phone)) return false; // the first entry per phone wins
-            phones.add(p.phone);
-            return true;
-        });
+        return {
+            list: parsed.filter(isSavedPlayer).filter(p => {
+                if (phones.has(p.phone)) return false; // the first entry per phone wins
+                phones.add(p.phone);
+                return true;
+            }),
+            failed: false,
+        };
     } catch {
-        return [];
+        return { list: [], failed: true };
     }
 };
+
+export const readSavedPlayers = (storage: Pick<Storage, 'getItem'> = localStorage) => loadSavedPlayers(storage).list;
+
+// A stored phone, trimmed; blank counts as no phone.
+export const cleanPhone = (phone: unknown) => (typeof phone === 'string' && phone.trim() ? phone.trim() : undefined);
 
 export const writeSavedPlayers = (list: SavedPlayer[], storage: Pick<Storage, 'setItem'> = localStorage) => {
     storage.setItem(SAVED_PLAYERS_KEY, JSON.stringify(list));
@@ -115,6 +124,7 @@ export const duplicatePhone = (phones: string[]): string | null => {
 
 // Refusal for adding a phone that is already at the table, or null.
 export const phoneInUse = (players: { name: string; phoneNumber?: string }[], phone: string): string | null => {
+    if (!phone.trim()) return null;
     const holder = players.find(p => p.phoneNumber?.trim() === phone.trim());
     return holder ? `${phone.trim()} is already playing as ${toTitleCase(holder.name)}.` : null;
 };

@@ -43,9 +43,9 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     };
 
     const handleShowOwings = () => {
-        const { nets, transactions } = blackjackSettlement(gameState);
+        const { people, transactions } = blackjackSettlement(gameState);
         setTransactions(transactions);
-        setSummary(summaryLines(gameState.stats ?? emptyStats(), nets, 'blackjack'));
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'blackjack'));
         setShowOwings(true);
         onInteractionChange(true);
     };

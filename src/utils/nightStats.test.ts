@@ -1,7 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { biggestWin, emptyStats, partialStats, recordRound, summaryLines } from './nightStats.ts';
+import { biggestWin, emptyStats, partialStats, recordRound, statsNames, summaryLines } from './nightStats.ts';
 import { formatAmount, toTitleCase } from './formatters.ts';
+import type { Person } from './owingsLogic.ts';
+
+// Party keys: phones for Asha/Raj/Dev, a name key for a phoneless Esha.
+const A = '9000000001', R = '9000000002', D = '9000000003', E = 'name:Esha';
+const NAMES = { [A]: 'Asha', [R]: 'Raj', [D]: 'Dev', [E]: 'Esha' };
+const person = (key: string, title: string, net: number): Person =>
+    ({ key, label: title, title, phone: key.startsWith('name:') || key === 'house' ? null : key, net });
 
 test('formatAmount: whole amounts bare, up to 2 decimals, tiny amounts are 0', () => {
     assert.equal(formatAmount(500), '500');
@@ -12,98 +19,108 @@ test('formatAmount: whole amounts bare, up to 2 decimals, tiny amounts are 0', (
     assert.equal(formatAmount(0.1 + 0.2), '0.3');
 });
 
-test('a winning round adds a win and extends the streak; a losing one resets it', () => {
-    let stats = recordRound(emptyStats(), { Asha: 300, Raj: -150, Dev: -150 }, { name: 'Asha', amount: 450 });
-    stats = recordRound(stats, { Asha: 200, Raj: -200 }, { name: 'Asha', amount: 400 });
-    stats = recordRound(stats, { Asha: -100, Raj: 100 }, { name: 'Raj', amount: 200 });
-    assert.equal(stats.rounds, 3);
-    assert.deepEqual(stats.wins, { Asha: 2, Raj: 1 });
-    assert.deepEqual(stats.streaks, { Asha: 0, Raj: 1, Dev: 0 });
-    assert.deepEqual(stats.bestStreak, { name: 'Asha', count: 2 });
-    assert.deepEqual(stats.biggest, { name: 'Asha', amount: 450 });
+test('names are trimmed when title-cased, so "Raj " and "raj" are one name', () => {
+    assert.equal(toTitleCase('  raj kumar '), 'Raj Kumar');
+    assert.equal(toTitleCase('Raj '), toTitleCase('raj'));
 });
 
-test('names not in nets keep their streak; a net of 0.005 or less is not a win', () => {
-    let stats = recordRound(emptyStats(), { Asha: 100, Raj: -100 }, null);
-    stats = recordRound(stats, { Raj: 0.005, Dev: -0.005 }, null);
-    assert.equal(stats.streaks.Asha, 1);
-    assert.equal(stats.streaks.Raj, 0);
-    assert.equal(stats.wins.Raj, undefined);
+test('a winning round adds a win and extends the streak; a losing one resets it; names are kept per key', () => {
+    let stats = recordRound(emptyStats(), { [A]: 300, [R]: -150, [D]: -150 }, { key: A, amount: 450 }, NAMES);
+    stats = recordRound(stats, { [A]: 200, [R]: -200 }, { key: A, amount: 400 }, NAMES);
+    stats = recordRound(stats, { [A]: -100, [R]: 100 }, { key: R, amount: 200 }, { [R]: 'Rajesh' });
+    assert.equal(stats.rounds, 3);
+    assert.deepEqual(stats.wins, { [A]: 2, [R]: 1 });
+    assert.deepEqual(stats.streaks, { [A]: 0, [R]: 1, [D]: 0 });
+    assert.deepEqual(stats.bestStreak, { key: A, count: 2 });
+    assert.deepEqual(stats.biggest, { key: A, amount: 450 });
+    assert.equal(stats.names[R], 'Rajesh');
+    assert.equal(stats.names[A], 'Asha');
+});
+
+test('keys not in nets keep their streak; a net of 0.005 or less is not a win', () => {
+    let stats = recordRound(emptyStats(), { [A]: 100, [R]: -100 }, null, NAMES);
+    stats = recordRound(stats, { [R]: 0.005, [D]: -0.005 }, null, NAMES);
+    assert.equal(stats.streaks[A], 1);
+    assert.equal(stats.streaks[R], 0);
+    assert.equal(stats.wins[R], undefined);
 });
 
 test('best streak and biggest change only when strictly greater', () => {
-    let stats = recordRound(emptyStats(), { Asha: 10, Raj: 10 }, { name: 'Asha', amount: 500 });
-    assert.deepEqual(stats.bestStreak, { name: 'Asha', count: 1 });
-    stats = recordRound(stats, { Raj: 10 }, { name: 'Raj', amount: 500 });
-    assert.deepEqual(stats.bestStreak, { name: 'Raj', count: 2 });
-    assert.deepEqual(stats.biggest, { name: 'Asha', amount: 500 });
-    stats = recordRound(stats, { Asha: 10 }, { name: 'Dev', amount: 501 });
-    assert.deepEqual(stats.bestStreak, { name: 'Raj', count: 2 });
-    assert.deepEqual(stats.biggest, { name: 'Dev', amount: 501 });
+    let stats = recordRound(emptyStats(), { [A]: 10, [R]: 10 }, { key: A, amount: 500 }, NAMES);
+    assert.deepEqual(stats.bestStreak, { key: A, count: 1 });
+    stats = recordRound(stats, { [R]: 10 }, { key: R, amount: 500 }, NAMES);
+    assert.deepEqual(stats.bestStreak, { key: R, count: 2 });
+    assert.deepEqual(stats.biggest, { key: A, amount: 500 });
+    stats = recordRound(stats, { [A]: 10 }, { key: D, amount: 501 }, NAMES);
+    assert.deepEqual(stats.bestStreak, { key: R, count: 2 });
+    assert.deepEqual(stats.biggest, { key: D, amount: 501 });
 });
 
 test('recordRound does not change the stats it is given', () => {
-    const before = recordRound(emptyStats(), { Asha: 10 }, null);
-    recordRound(before, { Asha: 10 }, null);
-    assert.deepEqual(before.wins, { Asha: 1 });
+    const before = recordRound(emptyStats(), { [A]: 10 }, null, NAMES);
+    recordRound(before, { [A]: 10 }, null, { [A]: 'Ash' });
+    assert.deepEqual(before.wins, { [A]: 1 });
     assert.equal(before.rounds, 1);
+    assert.equal(before.names[A], 'Asha');
 });
 
 test('summary lines in order, matching the share text sample', () => {
-    const stats = {
-        rounds: 9,
-        wins: { Asha: 7, Raj: 2 },
-        streaks: { Asha: 0, Raj: 0 },
-        bestStreak: { name: 'Raj', count: 4 },
-        biggest: { name: 'Asha', amount: 2400 },
-    };
-    const nets = [{ name: 'Raj', net: -800 }, { name: 'Asha', net: 1200 }, { name: 'Dev', net: -400 }];
-    assert.deepEqual(summaryLines(stats, nets, 'teen-patti'), [
+    const stats = { ...emptyStats(), rounds: 9, wins: { [A]: 7, [R]: 2 }, bestStreak: { key: R, count: 4 }, biggest: { key: A, amount: 2400 }, names: NAMES };
+    const people = [person(R, 'Raj', -800), person(A, 'Asha', 1200), person(D, 'Dev', -400)];
+    assert.deepEqual(summaryLines(stats, people, 'teen-patti'), [
         'Biggest pot: ₹2400 (Asha)',
         'Most rounds won: Asha (7)',
         'Best streak: Raj (4 in a row)',
         'Biggest winner: Asha +₹1200',
         'Biggest loser: Raj -₹800',
     ]);
-    assert.equal(summaryLines(stats, nets, 'blackjack')[0], 'Biggest win: ₹2400 (Asha)');
+    assert.equal(summaryLines(stats, people, 'blackjack')[0], 'Biggest win: ₹2400 (Asha)');
 });
 
-test('most rounds won lists tied names alphabetically', () => {
-    const stats = { ...emptyStats(), wins: { Raj: 3, Asha: 3, Dev: 1 } };
+test('a name at the table wins over the stats name; someone who left is named from stats', () => {
+    const stats = { ...emptyStats(), wins: { [A]: 2, [E]: 2 }, names: { [A]: 'Ash', [E]: 'Esha' } };
+    assert.deepEqual(summaryLines(stats, [person(A, 'Asha', 0)], 'poker'), ['Most rounds won: Asha, Esha (2)']);
+});
+
+test('namesakes in stats are told apart, never merged', () => {
+    const stats = { ...emptyStats(), wins: { [R]: 3, '9000001234': 3 }, names: { [R]: 'Raj', '9000001234': 'Raj' } };
+    assert.deepEqual(summaryLines(stats, [], 'poker'), ['Most rounds won: Raj (…0002), Raj (…1234) (3)']);
+});
+
+test('most rounds won lists tied labels alphabetically', () => {
+    const stats = { ...emptyStats(), wins: { [R]: 3, [A]: 3, [D]: 1 }, names: NAMES };
     assert.deepEqual(summaryLines(stats, [], 'poker'), ['Most rounds won: Asha, Raj (3)']);
 });
 
-test('lines are left out below their thresholds', () => {
-    const stats = { ...emptyStats(), wins: { Asha: 0 }, bestStreak: { name: 'Asha', count: 1 } };
-    assert.deepEqual(summaryLines(stats, [{ name: 'Asha', net: 0.004 }, { name: 'Raj', net: -0.004 }], 'poker'), []);
+test('lines are left out below their thresholds; the house is never winner or loser', () => {
+    const stats = { ...emptyStats(), wins: { [A]: 0 }, bestStreak: { key: A, count: 1 }, names: NAMES };
+    assert.deepEqual(summaryLines(stats, [person(A, 'Asha', 0.004), person(R, 'Raj', -0.004), person('house', 'Dealer (House)', 500)], 'blackjack'), []);
 });
 
 test('biggest winner and loser ties go to the first player in order', () => {
-    const nets = [{ name: 'Raj', net: 50 }, { name: 'Asha', net: 50 }, { name: 'Dev', net: -50 }, { name: 'Esha', net: -50 }];
-    assert.deepEqual(summaryLines(emptyStats(), nets, 'poker'), ['Biggest winner: Raj +₹50', 'Biggest loser: Dev -₹50']);
+    const people = [person(R, 'Raj', 50), person(A, 'Asha', 50), person(D, 'Dev', -50), person(E, 'Esha', -50)];
+    assert.deepEqual(summaryLines(emptyStats(), people, 'poker'), ['Biggest winner: Raj +₹50', 'Biggest loser: Dev -₹50']);
 });
 
 test('blackjack candidate is the largest positive net, first on a tie, none when nobody is up', () => {
-    assert.deepEqual(biggestWin({ Raj: 50, Asha: 80, Dev: 80 }), { name: 'Asha', amount: 80 });
-    assert.equal(biggestWin({ Raj: -50, Asha: 0 }), null);
+    assert.deepEqual(biggestWin({ [R]: 50, [A]: 80, [D]: 80 }), { key: A, amount: 80 });
+    assert.equal(biggestWin({ [R]: -50, [A]: 0 }), null);
 });
 
 test('partial stats: the note comes first and survives recorded rounds', () => {
-    const stats = recordRound(partialStats(), { Asha: 10 }, null);
+    const stats = recordRound(partialStats(), { [A]: 10 }, null, NAMES);
     assert.equal(stats.partial, true);
     assert.deepEqual(summaryLines(stats, [], 'poker'), ["Stats start from the app update; earlier rounds aren't counted.", 'Most rounds won: Asha (1)']);
-    assert.equal(recordRound(emptyStats(), { Asha: 10 }, null).partial, undefined);
+    assert.equal(recordRound(emptyStats(), { [A]: 10 }, null, NAMES).partial, undefined);
 });
 
 test('the carried-in note comes last', () => {
-    const lines = summaryLines(recordRound(partialStats(), { Asha: 10 }, null), [{ name: 'Asha', net: 10 }], 'teen-patti', true);
+    const lines = summaryLines(recordRound(partialStats(), { [A]: 10 }, null, NAMES), [person(A, 'Asha', 10)], 'teen-patti', true);
     assert.equal(lines[0], "Stats start from the app update; earlier rounds aren't counted.");
-    assert.equal(lines.at(-1), "Carried-in balances aren't included.");
+    assert.equal(lines.at(-1), 'Includes balances carried in at setup.');
     assert.equal(summaryLines(emptyStats(), [], 'teen-patti', false).length, 0);
 });
 
-
-test('names are trimmed when title-cased, so "Raj " and "raj" are one person', () => {
-    assert.equal(toTitleCase('  raj kumar '), 'Raj Kumar');
-    assert.equal(toTitleCase('Raj '), toTitleCase('raj'));
+test('stats names: the latest title-cased name per party key', () => {
+    assert.deepEqual(statsNames([{ name: 'asha', phoneNumber: A }, { name: ' esha ' }]), { [A]: 'Asha', [E]: 'Esha' });
 });

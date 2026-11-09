@@ -1,14 +1,14 @@
 import { partialStats, summaryLines, type GameKind, type NightStats, type PlayerNet } from './nightStats.ts';
 import { couldNot } from './formatters.ts';
-import type { Transaction } from './owingsLogic.ts';
+import type { Person, Transaction } from './owingsLogic.ts';
+import { playerNets } from './gameSettlement.ts';
 import { shareText } from './settlement.ts';
 import type { SavedPlayer } from './savedPlayers.ts';
 
 interface SettlementParts {
-    nets: PlayerNet[];
+    people: Person[]; // the house included
     transactions: Transaction[];
-    houseNet?: number;
-    carried?: boolean; // someone carried a balance in; the summary says it isn't included
+    carried?: boolean; // someone started or joined with a balance; the summary says so
 }
 
 export interface HistoryEntry {
@@ -72,9 +72,9 @@ export const buildEntry = (game: GameKind, stats: NightStats, s: SettlementParts
     id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
     endedAt: now.toISOString(),
     game,
-    nets: s.nets,
+    nets: playerNets(s.people),
     transactions: s.transactions.map(t => ({ ...t, paid: false })),
-    summary: summaryLines(stats, s.nets, game, s.carried),
+    summary: summaryLines(stats, s.people, game, s.carried),
 });
 
 const moved = (net: number) => Math.abs(net) >= 0.005;
@@ -88,7 +88,7 @@ export const archiveGame = (
     storage: HistoryStorage = localStorage
 ): { message: string; entry: HistoryEntry } | null => {
     const known = stats ?? partialStats();
-    if (known.rounds < 1 && !s.nets.some(n => moved(n.net)) && !moved(s.houseNet ?? 0)) return null;
+    if (known.rounds < 1 && !s.people.some(p => moved(p.net))) return null;
     const entry = buildEntry(game, known, s);
     try {
         writeHistory(addEntry(readHistory(storage), entry), storage);

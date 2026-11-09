@@ -4,7 +4,7 @@ import type { Transaction } from '../utils/owingsLogic';
 import InteractionModal from './InteractionModal';
 import ShareButtons from './ShareButtons';
 import PayLink from './PayLink';
-import { readSavedPlayers } from '../utils/savedPlayers';
+import { loadSavedPlayers } from '../utils/savedPlayers';
 import { shareText, upiFor } from '../utils/settlement';
 
 interface OwingsModalProps {
@@ -18,7 +18,7 @@ const IconCash = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewB
 
 // Mounted only while open, so saved players are re-read and notes clear each time.
 const OwingsContent: React.FC<Omit<OwingsModalProps, 'isOpen'>> = ({ onClose, transactions, summary = [] }) => {
-    const [saved] = useState(() => readSavedPlayers());
+    const [{ list: saved, failed: savedFailed }] = useState(() => loadSavedPlayers());
     const [payNote, setPayNote] = useState<string | null>(null);
 
     return (
@@ -48,6 +48,7 @@ const OwingsContent: React.FC<Omit<OwingsModalProps, 'isOpen'>> = ({ onClose, tr
             ) : (
                 <p>All settled up! No transfers needed.</p>
             )}
+            {savedFailed && <p className="share-note">Couldn't load saved players, so PAY is unavailable.</p>}
             {payNote && <p className="share-note">{payNote}</p>}
             {summary.length > 0 && (
                 <>

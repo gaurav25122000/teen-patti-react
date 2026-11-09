@@ -3,6 +3,7 @@
 import { LOCAL_STORAGE_KEY } from '../constants/gameConstants.ts';
 import type { GameState } from '../types/gameTypes';
 import { partialStats } from './nightStats.ts';
+import { cleanPhone } from './savedPlayers.ts';
 
 export const saveStateToLocalStorage = (state: GameState) => {
   const stateToSave = {
@@ -30,7 +31,11 @@ export const loadStateFromLocalStorage = (): GameState | null => {
     const entityIds = new Set((parsed.entities ?? []).map((e: { id: number }) => e.id));
     return {
       ...parsed,
-      players: parsed.players.map((p: { entityId?: number }) => (p.entityId === undefined || entityIds.has(p.entityId) ? p : { ...p, entityId: undefined })),
+      players: parsed.players.map((p: { entityId?: number; phoneNumber?: string }) => ({
+        ...p,
+        phoneNumber: cleanPhone(p.phoneNumber),
+        entityId: p.entityId !== undefined && entityIds.has(p.entityId) ? p.entityId : undefined,
+      })),
       foldedPlayerIds: new Set(parsed.foldedPlayerIds || []),
       blindPlayerIds: new Set(parsed.blindPlayerIds || []),
       roundContributions: new Map(parsed.roundContributions || []),

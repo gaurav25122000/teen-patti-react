@@ -9,7 +9,6 @@ export interface Player {
   entityId?: number;
   phoneNumber?: string; 
   isTakingBreak: boolean; // ADDED
-  carriedIn?: number; // balance brought in at setup or on joining; set only when non-zero
 }
 
 export interface Entity {
@@ -32,6 +31,7 @@ export interface GameState extends TableRules {
   roundContributions: Map<number, number>;
   blindTurns?: Record<number, number>; // blind bets per player this round
   stats?: NightStats; // absent in saves from before the night summary
+  carriedIn?: boolean; // a player started or joined with a non-zero balance
   messages: string[];
 }
 

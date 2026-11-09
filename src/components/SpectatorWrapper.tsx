@@ -23,12 +23,7 @@ const GAMES: Record<string, { route: string; storageKey: string; label: string }
     blackjack: { route: '/blackjack', storageKey: BLACKJACK_STORAGE_KEY, label: 'Blackjack' },
 };
 
-const SETTLEMENTS = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a parsed save is untyped
-    'teen-patti': (s: any) => teenPattiSettlement(s, 'tonight'),
-    poker: pokerSettlement,
-    blackjack: blackjackSettlement,
-};
+const SETTLEMENTS = { 'teen-patti': teenPattiSettlement, poker: pokerSettlement, blackjack: blackjackSettlement };
 
 // Taking a game over replaces this phone's own saved game of that type, so that one goes to History first.
 const archiveReplaced = (kind: GameKind, previous: string | null) => {

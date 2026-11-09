@@ -7,11 +7,11 @@ import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsSer
 import { SHA256 } from 'crypto-js';
 import { useUndo } from '../../hooks/useUndo';
 import { useGameState } from '../../hooks/useGameState';
-import { biggestWin, emptyStats, partialStats, recordRound } from '../../utils/nightStats';
+import { biggestWin, emptyStats, partialStats, recordRound, statsNames } from '../../utils/nightStats';
 import { blackjackSettlement } from '../../utils/gameSettlement';
 import { archiveOrWarn } from '../../utils/archive';
-import { playerLabels } from '../../utils/owingsLogic';
-import { rememberPlayers } from '../../utils/savedPlayers';
+import { partyKey } from '../../utils/owingsLogic';
+import { cleanPhone, rememberPlayers } from '../../utils/savedPlayers';
 
 export const BLACKJACK_STORAGE_KEY = 'blackjackGameState';
 
@@ -33,9 +33,6 @@ const createInitialBlackjackState = (): BlackjackGameState => ({
 
 const archiveBlackjack = (state: BlackjackGameState) => archiveOrWarn('blackjack', state.stats, blackjackSettlement(state));
 
-// Night-stats keys: the settlement labels, which count the house among the names.
-const statsLabels = (players: BlackjackPlayer[]) => playerLabels([...players, { name: 'Dealer (House)', key: 'house' }]);
-
 // --- HELPER FUNCTION ---
 const loadStateFromStorage = (): BlackjackGameState | null => {
     try {
@@ -55,6 +52,7 @@ const loadStateFromStorage = (): BlackjackGameState | null => {
             ...parsed,
             players: parsed.players.map((p: any) => ({ 
                 ...p, 
+                phoneNumber: cleanPhone(p.phoneNumber) ?? '',
                 isTakingBreak: p.isTakingBreak || false,
                 // --- FIX: Handle loading old state vs new state ---
                 lastBets: p.lastBets || (p.lastBet ? [p.lastBet] : [initialState.minBet]),
@@ -357,7 +355,6 @@ export const useBlackjackGame = () => {
         const recordsToUpdate: WinningsRecord[] = [];
         const timestamp = new Date().toISOString();
         const nets: Record<string, number> = {}; // players who bet this round
-        const label = statsLabels(endState.players);
         
         const finalPlayers = endState.players.map(p => {
             let roundNet = 0;
@@ -382,7 +379,7 @@ export const useBlackjackGame = () => {
                 // Push is net 0
             });
 
-            if (p.hands.some(h => h.bet > 0)) nets[label(p)] = roundNet;
+            if (p.hands.some(h => h.bet > 0)) nets[partyKey(p.name, p.phoneNumber)] = roundNet;
 
             if (p.phoneNumber && roundNet !== 0) {
                 recordsToUpdate.push({
@@ -413,7 +410,7 @@ export const useBlackjackGame = () => {
             currentHandId: null,
             dealerHand: { cards: [], status: 'playing', score: 0 },
             isBettingLocked: true, // Lock betting for next round
-            stats: recordRound(endState.stats ?? emptyStats(), nets, biggestWin(nets)),
+            stats: recordRound(endState.stats ?? emptyStats(), nets, biggestWin(nets), statsNames(endState.players)),
             messages: [...endState.messages, "--- ROUND OVER ---", `Bets locked to last amount. Click 'Change Bets' to unlock.`]
         };
     }, [gameState, afterCommit]);

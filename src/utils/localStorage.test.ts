@@ -27,3 +27,10 @@ test('a player pointing at an entity that no longer exists is unassigned on load
     assert.equal(loaded.players[0].entityId, undefined);
     assert.equal(loaded.players[1].entityId, 9);
 });
+
+test('stored phones are trimmed and a blank one becomes no phone', () => {
+    withSaved({ players: [{ id: 1, name: 'Asha', balance: 0, phoneNumber: ' 9000000001 ' }, { id: 2, name: 'Raj', balance: 0, phoneNumber: '   ' }], entities: [] });
+    const loaded = loadStateFromLocalStorage()!;
+    assert.equal(loaded.players[0].phoneNumber, '9000000001');
+    assert.equal(loaded.players[1].phoneNumber, undefined);
+});

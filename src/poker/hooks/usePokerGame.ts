@@ -10,11 +10,11 @@ import { pauseClock, resumeClock, startClock, tickLevel, withClock } from '../ut
 import { SHA256 } from 'crypto-js';
 import { useUndo } from '../../hooks/useUndo';
 import { useGameState } from '../../hooks/useGameState';
-import { emptyStats, partialStats, recordRound } from '../../utils/nightStats';
+import { emptyStats, partialStats, recordRound, statsNames } from '../../utils/nightStats';
 import { pokerSettlement } from '../../utils/gameSettlement';
 import { archiveOrWarn } from '../../utils/archive';
-import { playerLabels } from '../../utils/owingsLogic';
-import { rememberPlayers } from '../../utils/savedPlayers';
+
+import { cleanPhone, rememberPlayers } from '../../utils/savedPlayers';
 
 export const POKER_STORAGE_KEY = 'pokerGameState';
 
@@ -48,6 +48,7 @@ const restorePoker = (parsed: PokerGameState): PokerGameState => {
     if (parsed.players) {
         parsed.players = parsed.players.map((p: any) => ({
             ...p,
+            phoneNumber: cleanPhone(p.phoneNumber),
             winningStreak: p.winningStreak ?? 0,
             roundWinnings: p.roundWinnings ?? 0 // pots already won this hand count toward its result
         }));
@@ -159,8 +160,7 @@ export const usePokerGame = () => {
 
         const finalWinner = finalPlayers.find(p => p.id === winner.id)!;
         const newMessages = [...prevGameState.messages, `--- HAND OVER ---`, foldOutLine(toTitleCase(winner.name), totalPot, winner.totalPotContribution, finalWinner.stack)];
-        const label = playerLabels(updatedPlayers);
-        const nets = handNets(updatedPlayers.map(p => ({ ...p, roundWinnings: p.id === winner.id ? totalPot : 0 })), label);
+        const nets = handNets(updatedPlayers.map(p => ({ ...p, roundWinnings: p.id === winner.id ? totalPot : 0 })));
 
         return {
             ...createInitialPokerState(),
@@ -172,7 +172,7 @@ export const usePokerGame = () => {
             blindLevel: prevGameState.blindLevel,
             levelEndsAt: prevGameState.levelEndsAt,
             pausedRemainingMs: prevGameState.pausedRemainingMs,
-            stats: recordRound(prevGameState.stats ?? emptyStats(), nets, handCandidate(updatedPlayers, label, updatedPlayers.find(p => p.id === winner.id))),
+            stats: recordRound(prevGameState.stats ?? emptyStats(), nets, handCandidate(updatedPlayers, updatedPlayers.find(p => p.id === winner.id)), statsNames(updatedPlayers)),
             messages: newMessages,
         };
     }, [afterCommit]);
@@ -500,7 +500,7 @@ export const usePokerGame = () => {
                     pot: [],
                     gameStage: 'pre-deal',
                     activePlayerIndex: -1,
-                    stats: recordRound(prev.stats ?? emptyStats(), handNets(newPlayers, playerLabels(newPlayers)), handCandidate(newPlayers, playerLabels(newPlayers))),
+                    stats: recordRound(prev.stats ?? emptyStats(), handNets(newPlayers), handCandidate(newPlayers), statsNames(newPlayers)),
                 };
             }
 

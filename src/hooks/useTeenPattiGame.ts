@@ -9,15 +9,15 @@ import { splitEvenly } from '../utils/money';
 import { SHA256 } from 'crypto-js';
 import { useUndo } from './useUndo';
 import { useGameState } from './useGameState';
-import { emptyStats, recordRound } from '../utils/nightStats';
+import { emptyStats, recordRound, statsNames } from '../utils/nightStats';
 import { teenPattiSettlement } from '../utils/gameSettlement';
 import { archiveOrWarn } from '../utils/archive';
-import { playerLabels } from '../utils/owingsLogic';
+import { partyKey } from '../utils/owingsLogic';
 import { rememberPlayers } from '../utils/savedPlayers';
 import { betRefusal, bootRefusal, potLimitLines, roundCarryOver, tableRulesLine, type TableRules } from '../utils/teenPattiRules';
 
-// A starting balance is carried in (left out of tonight's result) when it is not zero.
-const carry = (balance: number) => (Math.abs(balance) >= 0.005 ? { carriedIn: balance } : {});
+// A non-zero starting balance marks the game as carried in; the summary then says so.
+const carry = (balances: number[]) => (balances.some(b => Math.abs(b) >= 0.005) ? { carriedIn: true } : {});
 
 const createInitialGameState = (): GameState => ({
   players: [],
@@ -145,14 +145,14 @@ export const useTeenPattiGame = () => {
 
         afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
 
-        const label = playerLabels(prev.players);
+        const key = (p: Player) => partyKey(p.name, p.phoneNumber);
         const nets: Record<string, number> = {};
         prev.players.forEach(p => {
           const contribution = prev.roundContributions.get(p.id) || 0;
-          if (p.id === winner.id) nets[label(p)] = prev.potAmount - contribution;
-          else if (contribution > 0) nets[label(p)] = -contribution;
+          if (p.id === winner.id) nets[key(p)] = prev.potAmount - contribution;
+          else if (contribution > 0) nets[key(p)] = -contribution;
         });
-        stats = recordRound(stats, nets, { name: label(prev.players.find(p => p.id === winner.id) ?? winner), amount: prev.potAmount });
+        stats = recordRound(stats, nets, { key: key(winner), amount: prev.potAmount }, statsNames(prev.players));
 
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
@@ -186,11 +186,12 @@ export const useTeenPattiGame = () => {
   // --- Player Actions ---
   const startNewGame = (newPlayers: Player[], rules: TableRules = {}) => {
     setGameState(prev => {
-      afterCommit(() => archiveOrWarn('teen-patti', prev.stats, teenPattiSettlement(prev, 'tonight')));
+      afterCommit(() => archiveOrWarn('teen-patti', prev.stats, teenPattiSettlement(prev)));
       return {
         ...createInitialGameState(),
         ...rules,
-        players: newPlayers.map(p => ({ ...p, isTakingBreak: false, ...carry(p.balance) })), // Ensure break status is reset
+        ...carry(newPlayers.map(p => p.balance)),
+        players: newPlayers.map(p => ({ ...p, isTakingBreak: false })), // Ensure break status is reset
         messages: newPlayers.length > 0 ? [`New game started with ${newPlayers.length} players. Please set the boot amount.`] : ["Returning to setup..."],
       };
     });
@@ -448,12 +449,12 @@ export const useTeenPattiGame = () => {
       name: toTitleCase(name), 
       balance, 
       phoneNumber,
-      isTakingBreak: false, // ADDED
-      ...carry(balance),
+      isTakingBreak: false // ADDED
     };
     setGameState(prev => ({
       ...prev,
-      players: [...prev.players, newPlayer]
+      players: [...prev.players, newPlayer],
+      ...carry([balance]),
     }));
     addMessage(`Player ${toTitleCase(name)} added with balance ₹${balance}.`);
     const full = rememberPlayers([{ name: newPlayer.name, phone: phoneNumber }]);

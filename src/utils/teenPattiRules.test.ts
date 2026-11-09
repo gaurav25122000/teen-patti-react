@@ -40,9 +40,12 @@ test('a blind player past the blind-turn limit cannot show; a seen player can', 
     assert.equal(betRefusal(s, 'show', 20, 'Raj', 3, false), null);
 });
 
-test('a round reset keeps entities and table rules', () => {
+test('a round reset keeps entities, table rules and the carried-in flag', () => {
     const entities = [{ id: 1, name: 'Team A' }];
-    assert.deepEqual(roundCarryOver({ entities, potLimit: 500, maxBlindTurns: 3, maxChaal: 100 }), { entities, potLimit: 500, maxBlindTurns: 3, maxChaal: 100 });
+    assert.deepEqual(
+        roundCarryOver({ entities, potLimit: 500, maxBlindTurns: 3, maxChaal: 100, carriedIn: true }),
+        { entities, carriedIn: true, potLimit: 500, maxBlindTurns: 3, maxChaal: 100 }
+    );
 });
 
 test('max chaal: chaal above it, blind above half of it, boot above half of it', () => {

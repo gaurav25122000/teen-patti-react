@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chipPlayers, duplicatePhone, fillRow, phoneInUse, readSavedPlayers, saveEntry, upsertPlayers, type SavedPlayer } from './savedPlayers.ts';
+import { chipPlayers, cleanPhone, duplicatePhone, fillRow, loadSavedPlayers, phoneInUse, readSavedPlayers, saveEntry, upsertPlayers, type SavedPlayer } from './savedPlayers.ts';
 
 const asha: SavedPlayer = { name: 'Asha', phone: '9000000001', upi: 'asha@okhdfc' };
 
@@ -93,4 +93,17 @@ test('setup refuses two rows with one phone; adding a phone already at the table
     const table = [{ name: 'raj', phoneNumber: '9000000002' }];
     assert.equal(phoneInUse(table, ' 9000000002'), '9000000002 is already playing as Raj.');
     assert.equal(phoneInUse(table, '9000000003'), null);
+});
+
+test('a saved-players list that cannot be read is reported, not shown as empty', () => {
+    assert.deepEqual(loadSavedPlayers({ getItem: () => '{oops' }), { list: [], failed: true });
+    assert.deepEqual(loadSavedPlayers({ getItem: () => '{"a":1}' }), { list: [], failed: true });
+    assert.deepEqual(loadSavedPlayers({ getItem: () => null }), { list: [], failed: false });
+    assert.deepEqual(loadSavedPlayers({ getItem: () => { throw new Error('blocked'); } }), { list: [], failed: true });
+});
+
+test('a blank phone is no phone: it is never "in use"', () => {
+    assert.equal(cleanPhone('  '), undefined);
+    assert.equal(cleanPhone(' 9000000001 '), '9000000001');
+    assert.equal(phoneInUse([{ name: 'Raj', phoneNumber: '' }], '  '), null);
 });

@@ -106,10 +106,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
 
     const handleShowOwings = () => {
-        // Transfers include balances carried in; the summary is tonight's result only.
-        setTransactions(teenPattiSettlement(gameState).transactions);
-        const tonight = teenPattiSettlement(gameState, 'tonight');
-        setSummary(summaryLines(gameState.stats ?? emptyStats(), tonight.nets, 'teen-patti', tonight.carried));
+        const { people, transactions, carried } = teenPattiSettlement(gameState);
+        setTransactions(transactions);
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'teen-patti', carried));
         setShowOwings(true);
     };
 

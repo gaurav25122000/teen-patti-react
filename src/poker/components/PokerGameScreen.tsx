@@ -122,9 +122,9 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     };
 
     const handleShowOwings = () => {
-        const { nets, transactions } = pokerSettlement(gameState);
+        const { people, transactions } = pokerSettlement(gameState);
         setTransactions(transactions);
-        setSummary(summaryLines(gameState.stats ?? emptyStats(), nets, 'poker'));
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'poker'));
         setModalMode('owings');
     };
 

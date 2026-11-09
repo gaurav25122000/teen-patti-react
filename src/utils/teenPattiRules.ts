@@ -34,9 +34,10 @@ export const betRefusal = (s: RoundState, kind: 'blind' | 'chaal' | 'show', amou
     return null;
 };
 
-// Entities and table rules survive a round reset; endRound sets players, winner, boot, stats and log itself.
-export const roundCarryOver = (prev: Pick<GameState, 'entities' | 'potLimit' | 'maxBlindTurns' | 'maxChaal'>) => ({
+// Entities, table rules and the carried-in flag survive a round reset; endRound sets the rest itself.
+export const roundCarryOver = (prev: Pick<GameState, 'entities' | 'potLimit' | 'maxBlindTurns' | 'maxChaal' | 'carriedIn'>) => ({
     entities: prev.entities,
+    carriedIn: prev.carriedIn,
     potLimit: prev.potLimit,
     maxBlindTurns: prev.maxBlindTurns,
     maxChaal: prev.maxChaal,
