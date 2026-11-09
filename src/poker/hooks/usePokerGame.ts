@@ -5,6 +5,7 @@ import { calculatePots } from '../utils/pokerLogic';
 import { toTitleCase } from '../../utils/formatters';
 import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsService';
 import { splitEvenly } from '../../utils/money';
+import { foldOutLine, foldOutStreak, nextStreak, potLine } from '../utils/streak';
 import { SHA256 } from 'crypto-js';
 import { useUndo } from '../../hooks/useUndo';
 import { useGameState } from '../../hooks/useGameState';
@@ -50,7 +51,7 @@ export const usePokerGame = () => {
                 parsed.players = parsed.players.map((p: any) => ({
                     ...p,
                     winningStreak: p.winningStreak ?? 0,
-                    roundWinnings: 0 // Always reset on load
+                    roundWinnings: p.roundWinnings ?? 0 // pots already won this hand count toward its result
                 }));
             }
             setGameState(parsed);
@@ -123,14 +124,12 @@ export const usePokerGame = () => {
 
         const finalPlayers = updatedPlayers.map(p => {
             const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false, canOnlyCall: false };
-            if (p.id === winner.id) {
-                return { ...playerWithReset, stack: p.stack + totalPot, winningStreak: p.winningStreak + 1 };
-            }
-            return { ...playerWithReset, winningStreak: 0 };
+            const winningStreak = foldOutStreak(p, winner.id, totalPot);
+            return p.id === winner.id ? { ...playerWithReset, stack: p.stack + totalPot, winningStreak } : { ...playerWithReset, winningStreak };
         });
 
         const finalWinner = finalPlayers.find(p => p.id === winner.id)!;
-        const newMessages = [...prevGameState.messages, `--- HAND OVER ---`, `${toTitleCase(winner.name)} wins the pot of ₹${totalPot}. Their final stack is ₹${finalWinner.stack}.`];
+        const newMessages = [...prevGameState.messages, `--- HAND OVER ---`, foldOutLine(toTitleCase(winner.name), totalPot, winner.totalPotContribution, finalWinner.stack)];
 
         return {
             ...createInitialPokerState(),
@@ -404,7 +403,7 @@ export const usePokerGame = () => {
             });
 
             const oddNote = shares.some(s => s !== splitAmount) ? ', odd chips to the first left of the dealer' : '';
-            addMessage(`${winnerNames.join(' & ')} win(s) the pot of ₹${potToAward.amount} (Split: ₹${splitAmount} each${oddNote}).`);
+            addMessage(potLine(winnerNames, potToAward.amount, potToAward.eligiblePlayers.size, splitAmount, oddNote));
 
             const newPots = prev.pot.filter((_, index) => index !== potIndex);
 
@@ -436,8 +435,6 @@ export const usePokerGame = () => {
 
                 afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
 
-                const maxRoundWinnings = Math.max(...newPlayers.map(p => p.roundWinnings));
-                
                 // Reset hand state for everyone, apply streak logic
                 const finalPlayersWithStreak = newPlayers.map(p => ({ 
                     ...p, 
@@ -447,7 +444,7 @@ export const usePokerGame = () => {
                     totalPotContribution: 0, 
                     hasActed: false, 
                     canOnlyCall: false,
-                    winningStreak: (p.roundWinnings === maxRoundWinnings && p.roundWinnings > 0) ? p.winningStreak + 1 : 0, 
+                    winningStreak: nextStreak(p, p.roundWinnings),
                     roundWinnings: 0, // Reset for next hand
                     totalBuyIn: p.totalBuyIn 
                 }));

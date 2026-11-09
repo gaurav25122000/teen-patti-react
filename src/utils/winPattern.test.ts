@@ -24,6 +24,8 @@ test('ordinary log lines do not', () => {
         '--- Turn is now on Ravi ---',
         'Asha raises to ₹40 (a raise of ₹20).',
         '↩ Last action undone.',
+        '₹700 goes to Ravi, the only player left in this pot.',
+        'Everyone folded; Ravi takes back their own ₹10. Their final stack is ₹1000.',
     ]) {
         assert.doesNotMatch(line, WIN_PATTERN, line);
     }
