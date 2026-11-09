@@ -1,4 +1,6 @@
 // src/types/gameTypes.ts
+import type { NightStats } from '../utils/nightStats';
+import type { TableRules } from '../utils/teenPattiRules';
 
 export interface Player {
   id: number;
@@ -14,7 +16,7 @@ export interface Entity {
     name:string;
 }
 
-export interface GameState {
+export interface GameState extends TableRules {
   players: Player[];
   entities: Entity[];
   lastWinnerId: number | null;
@@ -27,6 +29,8 @@ export interface GameState {
   lastActorWasBlind: boolean;
   roundInitialBootAmount: number | null;
   roundContributions: Map<number, number>;
+  blindTurns?: Record<number, number>; // blind bets per player this round
+  stats?: NightStats; // absent in saves from before the night summary
   messages: string[];
 }
 
@@ -40,4 +44,5 @@ export type InteractionType =
   | 'showingCards'
   | 'reorderingPlayers'
   | 'deductAndDistribute'
-  | 'toggleBreak'; // ADDED
+  | 'toggleBreak' // ADDED
+  | 'tableRules';

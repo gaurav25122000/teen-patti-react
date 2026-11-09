@@ -1,15 +1,18 @@
 // src/poker/components/PokerGameSetup.tsx
 import React, { useState } from 'react';
 import { toTitleCase } from '../../utils/formatters';
+import { fillRow } from '../../utils/savedPlayers';
+import SavedPlayerChips from '../../components/SavedPlayerChips';
 
 interface PokerGameSetupProps {
-    onStartGame: (players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }) => void;
+    onStartGame: (players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }, levelMinutes?: number) => void;
 }
 
 const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
     const [players, setPlayers] = useState([{ name: '', stack: '1000', phoneNumber: '' }]);
     const [sb, setSb] = useState('10');
     const [bb, setBb] = useState('20');
+    const [levelMinutes, setLevelMinutes] = useState('');
 
     const handlePlayerChange = (index: number, field: 'name' | 'stack' | 'phoneNumber', value: string) => {
         const newPlayers = [...players];
@@ -43,7 +46,12 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
             return;
         }
 
-        onStartGame(finalPlayers, blinds);
+        const minutes = levelMinutes.trim() ? Number(levelMinutes) : undefined;
+        if (minutes !== undefined && !(Number.isInteger(minutes) && minutes >= 1 && minutes <= 240)) {
+            return alert("Blind level must be 1 to 240 minutes.");
+        }
+
+        onStartGame(finalPlayers, blinds, minutes);
     };
 
     return (
@@ -55,7 +63,15 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
                 <label>Big Blind:</label>
                 <input type="number" value={bb} onChange={e => setBb(e.target.value)} />
             </div>
+            <div className="form-group" style={{ flexDirection: 'row', justifyContent: 'center', gap: '1rem' }}>
+                <label htmlFor="level-minutes">Blind level (minutes):</label>
+                <input id="level-minutes" type="number" min="1" max="240" placeholder="Off" value={levelMinutes} onChange={e => setLevelMinutes(e.target.value)} />
+            </div>
             <hr />
+            <SavedPlayerChips
+                formPhones={players.map(p => p.phoneNumber)}
+                onPick={picked => setPlayers(rows => fillRow(rows, picked, { name: '', stack: '1000', phoneNumber: '' }))}
+            />
             {players.map((p, index) => (
                 <div key={index} className="player-setup-row" style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0', flexWrap: 'wrap' }}>
                     <input

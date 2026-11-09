@@ -21,6 +21,12 @@ const ModeSelectionScreen: React.FC = () => {
         <Link to="/lifetime-winnings" className="btn btn-accent" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none', width: '100%', marginTop: '1rem', textAlign: 'center' }}>
           Lifetime Winnings
         </Link>
+        <Link to="/saved-players" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
+          Saved Players
+        </Link>
+        <Link to="/history" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
+          History
+        </Link>
       </div>
     </div>
   );

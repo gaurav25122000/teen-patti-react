@@ -19,6 +19,8 @@ const BlackjackLobby = lazy(() => import('./blackjack/components/BlackjackLobby'
 // General Components
 import ModeSelectionScreen from './components/ModeSelectionScreen';
 const LifetimeWinnings = lazy(() => import('./components/LifetimeWinnings'));
+const SavedPlayersScreen = lazy(() => import('./components/SavedPlayersScreen'));
+const HistoryScreen = lazy(() => import('./components/HistoryScreen'));
 const SpectatorWrapper = lazy(() => import('./components/SpectatorWrapper'));
 
 function App() {
@@ -59,6 +61,8 @@ function App() {
         <Route path="/blackjack" element={<BlackjackLobby blackjackHook={blackjackHook} onInteractionChange={handleInteractionChange} />} />
         <Route path="/watch/:streamId" element={<SpectatorWrapper />} />
         <Route path="/lifetime-winnings" element={<LifetimeWinnings />} />
+        <Route path="/saved-players" element={<SavedPlayersScreen />} />
+        <Route path="/history" element={<HistoryScreen />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
       </Suspense>

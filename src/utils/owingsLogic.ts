@@ -1,5 +1,5 @@
 // src/utils/owingsLogic.ts
-import { toTitleCase } from './formatters';
+import { toTitleCase } from './formatters.ts';
 import type { Entity } from '../types/gameTypes';
 
 interface PlayerBalance {

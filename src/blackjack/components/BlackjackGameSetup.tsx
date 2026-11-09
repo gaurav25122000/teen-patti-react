@@ -1,6 +1,8 @@
 // src/blackjack/components/BlackjackGameSetup.tsx
 import React, { useState } from 'react';
 import { toTitleCase } from '../../utils/formatters';
+import { fillRow } from '../../utils/savedPlayers';
+import SavedPlayerChips from '../../components/SavedPlayerChips';
 
 interface BlackjackGameSetupProps {
     onStartGame: (players: { name: string, stack: number, phoneNumber: string, numHands: number }[]) => void;
@@ -52,6 +54,10 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
         <div className="setup-screen">
             <h2>Blackjack Game Setup</h2>
             <hr />
+            <SavedPlayerChips
+                formPhones={players.map(p => p.phoneNumber)}
+                onPick={picked => setPlayers(rows => fillRow(rows, picked, { name: '', stack: '1000', phoneNumber: '', numHands: '1' }))}
+            />
             {players.map((p, index) => (
                 <div key={index} className="player-setup-row" style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0', flexWrap: 'wrap', alignItems: 'center' }}>
                     <input

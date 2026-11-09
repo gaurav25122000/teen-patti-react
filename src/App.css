@@ -1097,3 +1097,89 @@ h1 {
   box-shadow: 0 0 18px var(--color-glow-lime);
   animation: neon-flicker 1.5s infinite alternate;
 }
+
+/* Saved players, settlement sharing, night summary, history */
+.saved-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 0.5rem 0 1rem;
+}
+.saved-chip {
+  padding: 0.3em 0.9em;
+  border-radius: 999px;
+  border: 1px solid var(--color-glow-cyan);
+  color: var(--color-glow-cyan);
+  background: transparent;
+}
+.saved-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+.saved-list,
+.history-list,
+.history-transactions,
+.summary-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+.saved-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.saved-list .saved-name {
+  flex: 1;
+  font-weight: 600;
+}
+.history-list li {
+  margin: 0.5rem 0;
+}
+.history-list button {
+  width: 100%;
+  text-align: left;
+}
+.history-transactions li,
+.summary-list li {
+  padding: 0.3rem 0;
+}
+.owings-pay {
+  padding: 4px 12px;
+  font-size: 0.8em;
+  margin-left: 0.75rem;
+  text-decoration: none;
+}
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+.share-note,
+.rule-note {
+  width: 100%;
+  text-align: center;
+  color: var(--color-glow-yellow);
+  margin: 0.5rem 0 0;
+}
+.form-error {
+  color: var(--color-glow-magenta);
+  text-align: center;
+}
+.blind-clock {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  color: var(--color-glow-yellow);
+  font-family: var(--font-display);
+}

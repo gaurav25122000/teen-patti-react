@@ -9,6 +9,11 @@ import { splitEvenly } from '../utils/money';
 import { SHA256 } from 'crypto-js';
 import { useUndo } from './useUndo';
 import { useGameState } from './useGameState';
+import { emptyStats, recordRound } from '../utils/nightStats';
+import { teenPattiSettlement } from '../utils/gameSettlement';
+import { archiveGame } from '../utils/history';
+import { rememberPlayers } from '../utils/savedPlayers';
+import { betRefusal, bootRefusal, potLimitLines, tableRulesLine, type TableRules } from '../utils/teenPattiRules';
 
 const createInitialGameState = (): GameState => ({
   players: [],
@@ -23,6 +28,8 @@ const createInitialGameState = (): GameState => ({
   lastActorWasBlind: false,
   roundInitialBootAmount: null,
   roundContributions: new Map<number, number>(),
+  blindTurns: {},
+  stats: emptyStats(),
   messages: ["Welcome! Load a game or set up a new one."],
 });
 
@@ -105,6 +112,7 @@ export const useTeenPattiGame = () => {
       const finalMessages = [...prev.messages];
       let finalPlayers = prev.players;
       let newLastWinnerId = prev.lastWinnerId;
+      let stats = prev.stats ?? emptyStats();
       const lastBootFromRound = prev.roundInitialBootAmount;
 
       if (winner) {
@@ -133,6 +141,14 @@ export const useTeenPattiGame = () => {
 
         afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
 
+        const nets: Record<string, number> = {};
+        prev.players.forEach(p => {
+          const contribution = prev.roundContributions.get(p.id) || 0;
+          if (p.id === winner.id) nets[toTitleCase(p.name)] = prev.potAmount - contribution;
+          else if (contribution > 0) nets[toTitleCase(p.name)] = -contribution;
+        });
+        stats = recordRound(stats, nets, { name: toTitleCase(winner.name), amount: prev.potAmount });
+
         finalPlayers = prev.players.map(p =>
           p.id === winner.id ? { ...p, balance: p.balance + prev.potAmount } : p
         );
@@ -155,17 +171,44 @@ export const useTeenPattiGame = () => {
         players: finalPlayersWithBreakStatus, // Use players with break status
         lastWinnerId: newLastWinnerId,
         roundInitialBootAmount: lastBootFromRound,
+        stats,
+        potLimit: prev.potLimit,
+        maxBlindTurns: prev.maxBlindTurns,
+        maxChaal: prev.maxChaal,
         messages: finalMessages,
       };
     });
   }, [setGameState, afterCommit]);
 
   // --- Player Actions ---
-  const startNewGame = (newPlayers: Player[]) => {
-    setGameState({
-      ...createInitialGameState(),
-      players: newPlayers.map(p => ({ ...p, isTakingBreak: false })), // Ensure break status is reset
-      messages: newPlayers.length > 0 ? [`New game started with ${newPlayers.length} players. Please set the boot amount.`] : ["Returning to setup..."],
+  const startNewGame = (newPlayers: Player[], rules: TableRules = {}) => {
+    setGameState(prev => {
+      afterCommit(() => {
+        const { nets, transactions } = teenPattiSettlement(prev);
+        const failed = archiveGame('teen-patti', prev.stats, nets, transactions);
+        if (failed) addMessage(failed, true);
+      });
+      return {
+        ...createInitialGameState(),
+        ...rules,
+        players: newPlayers.map(p => ({ ...p, isTakingBreak: false })), // Ensure break status is reset
+        messages: newPlayers.length > 0 ? [`New game started with ${newPlayers.length} players. Please set the boot amount.`] : ["Returning to setup..."],
+      };
+    });
+    const full = rememberPlayers(newPlayers.map(p => ({ name: p.name, phone: p.phoneNumber })));
+    if (full) addMessage(full);
+  };
+
+  // Empties the game without saving it to history (used after handing the game to another phone).
+  const clearGame = () => setGameState(createInitialGameState());
+
+  const updateTableRules = (rules: TableRules) => {
+    setGameState(prev => prev.roundActive ? prev : {
+      ...prev,
+      potLimit: rules.potLimit,
+      maxBlindTurns: rules.maxBlindTurns,
+      maxChaal: rules.maxChaal,
+      messages: [...prev.messages, tableRulesLine(rules)],
     });
   };
 
@@ -182,7 +225,12 @@ export const useTeenPattiGame = () => {
     return false;
   };
 
-  const startRound = (startingPlayerIndex: number, bootAmount: number) => {
+  const startRound = (startingPlayerIndex: number, bootAmount: number): string | null => {
+    const bootRefused = bootRefusal(gameState, bootAmount);
+    if (bootRefused) {
+      addMessage(bootRefused, true);
+      return bootRefused;
+    }
     localStorage.setItem('poker-notes', "Game \nBUST - \nJOKER - ");
     setGameState(prev => {
       // MODIFIED: Filter out players on break
@@ -227,7 +275,8 @@ export const useTeenPattiGame = () => {
         `--- NEW ROUND STARTED ---`,
         `Collecting Boot Amount: ₹${bootAmount} from ${activePlayersForRound.length} active players.`,
         `Total Pot: ₹${newPot}.`,
-        `Turn starts with ${toTitleCase(startingPlayer.name)}.`
+        `Turn starts with ${toTitleCase(startingPlayer.name)}.`,
+        ...potLimitLines(prev.potLimit, newPot),
       ];
 
       return {
@@ -240,15 +289,26 @@ export const useTeenPattiGame = () => {
         potAmount: newPot,
         foldedPlayerIds: initialFoldedPlayerIds,
         roundContributions: newContributions,
+        blindTurns: {},
         lastActorWasBlind: true,
         roundInitialBootAmount: bootAmount,
         messages,
       };
     });
+    return null;
   };
 
-  const playBlind = (isRaise: boolean, amount: number) => {
-    if (!currentPlayer || !gameState.blindPlayerIds.has(currentPlayer.id)) return;
+  // Bet actions return the table-rule refusal, or null.
+  const refuse = (kind: 'blind' | 'chaal' | 'show', amount: number, player: Player) => {
+    const refusal = betRefusal(gameState, kind, amount, toTitleCase(player.name), gameState.blindTurns?.[player.id] ?? 0);
+    if (refusal) addMessage(refusal, true);
+    return refusal;
+  };
+
+  const playBlind = (isRaise: boolean, amount: number): string | null => {
+    if (!currentPlayer || !gameState.blindPlayerIds.has(currentPlayer.id)) return null;
+    const refusal = refuse('blind', amount, currentPlayer);
+    if (refusal) return refusal;
 
     setGameState(prev => {
       const updatedPlayers = prev.players.map(p =>
@@ -269,10 +329,12 @@ export const useTeenPattiGame = () => {
         roundContributions: newContributions,
         currentStake: isRaise ? amount : prev.currentStake,
         lastActorWasBlind: true,
-        messages: [...prev.messages, message],
+        blindTurns: { ...prev.blindTurns, [currentPlayer.id]: (prev.blindTurns?.[currentPlayer.id] ?? 0) + 1 },
+        messages: [...prev.messages, message, ...potLimitLines(prev.potLimit, newPotAmount)],
       };
     });
     advanceTurn();
+    return null;
   };
 
   const seeCards = () => {
@@ -288,8 +350,10 @@ export const useTeenPattiGame = () => {
     });
   };
 
-  const betChaal = (amount: number) => {
-    if (!currentPlayer || gameState.blindPlayerIds.has(currentPlayer.id)) return;
+  const betChaal = (amount: number): string | null => {
+    if (!currentPlayer || gameState.blindPlayerIds.has(currentPlayer.id)) return null;
+    const refusal = refuse('chaal', amount, currentPlayer);
+    if (refusal) return refusal;
 
     setGameState(prev => {
       const newPlayers = prev.players.map(p =>
@@ -306,6 +370,7 @@ export const useTeenPattiGame = () => {
       if (newCurrentStake > prev.currentStake) {
         messages.push(`New stake for Blind players is now ₹${newCurrentStake}.`);
       }
+      messages.push(...potLimitLines(prev.potLimit, newPotAmount));
 
       return {
         ...prev,
@@ -318,6 +383,7 @@ export const useTeenPattiGame = () => {
       };
     });
     advanceTurn();
+    return null;
   };
 
   const fold = () => {
@@ -338,8 +404,10 @@ export const useTeenPattiGame = () => {
     }
   };
 
-  const requestShow = (cost: number) => {
-    if (!currentPlayer) return;
+  const requestShow = (cost: number): string | null => {
+    if (!currentPlayer) return null;
+    const refusal = refuse('show', cost, currentPlayer);
+    if (refusal) return refusal;
     setGameState(prev => {
       const updatedPlayers = prev.players.map(p =>
         p.id === currentPlayer.id ? { ...p, balance: p.balance - cost } : p
@@ -351,9 +419,10 @@ export const useTeenPattiGame = () => {
         players: updatedPlayers,
         potAmount: prev.potAmount + cost,
         roundContributions: newContributions,
-        messages: [...prev.messages, `A Show is requested for ₹${cost}. Pot is now ₹${prev.potAmount + cost}.`]
+        messages: [...prev.messages, `A Show is requested for ₹${cost}. Pot is now ₹${prev.potAmount + cost}.`, ...potLimitLines(prev.potLimit, prev.potAmount + cost)]
       };
     });
+    return null;
   };
 
   const resolveShow = (loserId: number) => {
@@ -387,6 +456,8 @@ export const useTeenPattiGame = () => {
       players: [...prev.players, newPlayer]
     }));
     addMessage(`Player ${toTitleCase(name)} added with balance ₹${balance}.`);
+    const full = rememberPlayers([{ name: newPlayer.name, phone: phoneNumber }]);
+    if (full) addMessage(full);
   };
 
   const removePlayer = (playerId: number) => {
@@ -493,6 +564,8 @@ export const useTeenPattiGame = () => {
       updateEntities,
       updatePlayers,
       togglePlayerBreak, // ADDED
+      clearGame,
+      updateTableRules,
     })
   };
 };

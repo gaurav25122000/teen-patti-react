@@ -1,4 +1,6 @@
 // src/poker/types/pokerGameTypes.ts
+import type { NightStats } from '../../utils/nightStats';
+import type { BlindClock } from '../utils/blindLevels';
 
 export interface PokerPlayer {
     hasActed: boolean;
@@ -24,7 +26,7 @@ export interface Pot {
     eligiblePlayers: Set<number>;
 }
 
-export interface PokerGameState {
+export interface PokerGameState extends BlindClock {
     players: PokerPlayer[];
     gameStage: GameStage;
     pot: Pot[];
@@ -37,5 +39,6 @@ export interface PokerGameState {
     bigBlindIndex: number;
     smallBlindAmount: number;
     bigBlindAmount: number;
+    stats?: NightStats; // absent in saves from before the night summary
     messages: string[];
 }

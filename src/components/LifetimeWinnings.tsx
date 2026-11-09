@@ -3,6 +3,7 @@ import { getWinnings } from '../utils/winningsService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './LifetimeWinnings.css'; // Import the updated CSS
 import { toTitleCase } from '../utils/formatters';
+import { readSavedPlayers } from '../utils/savedPlayers';
 
 const LifetimeWinnings: React.FC = () => {
     const [phoneNumbers, setPhoneNumbers] = useState('');
@@ -10,8 +11,8 @@ const LifetimeWinnings: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleFetchWinnings = async () => {
-        const numbers = phoneNumbers.split(',').map(n => n.trim()).filter(n => /^\d{10}$/.test(n));
+    const handleFetchWinnings = async (text: string) => {
+        const numbers = text.split(',').map(n => n.trim()).filter(n => /^\d{10}$/.test(n));
         if (numbers.length === 0) {
             setError("Please enter at least one valid 10-digit phone number.");
             return;
@@ -26,6 +27,13 @@ const LifetimeWinnings: React.FC = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const checkSavedPlayers = () => {
+        const phones = readSavedPlayers().map(p => p.phone).join(', ');
+        if (!phones) return setError('No saved players yet.');
+        setPhoneNumbers(phones);
+        handleFetchWinnings(phones);
     };
 
     const COLORS = ['#00ffff', '#ff00ff', '#39ff14', '#ffd700', '#e8e8e8', '#ff6600'];
@@ -95,8 +103,11 @@ const LifetimeWinnings: React.FC = () => {
                     placeholder="e.g., 1234567890, 0987654321"
                     style={{ width: '100%', maxWidth: '500px', textAlign: 'center' }}
                 />
-                <button className="btn btn-primary" onClick={handleFetchWinnings} disabled={loading}>
+                <button className="btn btn-primary" onClick={() => handleFetchWinnings(phoneNumbers)} disabled={loading}>
                     {loading ? 'Loading...' : 'Get Winnings'}
+                </button>
+                <button className="btn btn-secondary" onClick={checkSavedPlayers} disabled={loading}>
+                    Check saved players
                 </button>
             </div>
             {error && <p style={{ color: 'var(--color-glow-magenta)', textAlign: 'center' }}>{error}</p>}

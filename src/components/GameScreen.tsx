@@ -10,8 +10,12 @@ import RoundControls from './RoundControls';
 import OwingsModal from './OwingsModal';
 import InteractionModal from './InteractionModal';
 import EntityManager from './EntityManager';
-import { calculateOwings, type Transaction } from '../utils/owingsLogic';
+import type { Transaction } from '../utils/owingsLogic';
 import { toTitleCase } from '../utils/formatters';
+import { emptyStats, summaryLines } from '../utils/nightStats';
+import { teenPattiSettlement } from '../utils/gameSettlement';
+import { bootRefusal, parseTableRules, potLimitReached } from '../utils/teenPattiRules';
+import TableRulesFields from './TableRulesFields';
 import StreamControls from './StreamControls';
 import ActionToast from './ActionToast';
 import Celebration from './Celebration';
@@ -38,6 +42,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     const [showOwings, setShowOwings] = useState(false);
     const [showEntityManager, setShowEntityManager] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [summary, setSummary] = useState<string[]>([]);
+    const [rulesInput, setRulesInput] = useState({ potLimit: '', maxBlindTurns: '', maxChaal: '' });
 
     const [bootAmount, setBootAmount] = useState('10');
     const [startPlayerId, setStartPlayerId] = useState('');
@@ -81,13 +87,27 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
             case 'reorderingPlayers':
                 setReorderablePlayers([...gameState.players]);
                 break;
+            case 'tableRules':
+                setRulesInput({
+                    potLimit: String(gameState.potLimit ?? ''),
+                    maxBlindTurns: String(gameState.maxBlindTurns ?? ''),
+                    maxChaal: String(gameState.maxChaal ?? ''),
+                });
+                break;
         }
-    }, [interaction, gameState.players, gameState.roundInitialBootAmount, activePlayers]);
+    }, [interaction, gameState.players, gameState.roundInitialBootAmount, gameState.potLimit, gameState.maxBlindTurns, gameState.maxChaal, activePlayers]);
+
+    // A bet that takes the pot to the limit ends the betting: pick the winner.
+    const limitReached = potLimitReached(gameState);
+    useEffect(() => {
+        if (limitReached && !isReadOnly) setInteraction('selectingWinner');
+    }, [limitReached, isReadOnly]);
 
 
     const handleShowOwings = () => {
-        const playersWithInitialBalance = gameState.players.map(p => ({ ...p, totalBuyIn: 0 }));
-        setTransactions(calculateOwings(playersWithInitialBalance, gameState.entities));
+        const { nets, transactions } = teenPattiSettlement(gameState);
+        setTransactions(transactions);
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), nets, 'teen-patti'));
         setShowOwings(true);
     };
 
@@ -114,7 +134,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
             while (players[nextPlayerIndex].isTakingBreak) {
                 nextPlayerIndex = (nextPlayerIndex + 1) % players.length;
             }
-            actions.startRound(nextPlayerIndex, roundInitialBootAmount);
+            const refusal = actions.startRound(nextPlayerIndex, roundInitialBootAmount);
+            if (refusal) alert(refusal);
         } else {
             setInteraction('gettingBoot');
         }
@@ -154,6 +175,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 body = <div className="form-group"><label htmlFor="boot-amount">Enter amount</label><input id="boot-amount" type="number" value={bootAmount} onChange={e => setBootAmount(e.target.value)} min="1" autoFocus /></div>;
                 confirmText = "Set & Continue";
                 primaryAction = () => {
+                    const refusal = bootRefusal(gameState, parseInt(bootAmount, 10));
+                    if (refusal) return alert(refusal);
                     if (parseInt(bootAmount, 10) > 0) {
                         setInteraction('gettingStartPlayer');
                     } else {
@@ -206,7 +229,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     
                     primaryAction = () => {
                         const cost = gameState.blindPlayerIds.has(requester!.id) ? gameState.currentStake : gameState.currentStake * 2;
-                        actions.requestShow(cost);
+                        const refusal = actions.requestShow(cost);
+                        if (refusal) {
+                            alert(refusal);
+                            return closeModal();
+                        }
                         actions.resolveShow(parseInt(selectedPlayerId, 10));
                         addMessage(`${toTitleCase(requester!.name)} pays ₹ ${cost} for Show with ${toTitleCase(target!.name)}.`);
                         closeModal();
@@ -273,6 +300,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     break;
                 }
 
+            case 'tableRules':
+                title = "Table Rules"; theme = 'default'; icon = <IconList />;
+                body = <TableRulesFields value={rulesInput} onChange={setRulesInput} />;
+                confirmText = "Save";
+                primaryAction = () => {
+                    const rules = parseTableRules(rulesInput);
+                    if (typeof rules === 'string') return alert(rules);
+                    actions.updateTableRules(rules);
+                    closeModal();
+                };
+                break;
+
             case 'deductAndDistribute':
                 title = "Deduct & Distribute"; theme = 'danger'; icon = <IconCash />;
                 body = <><div className="form-group"><label>Deduct from</label><select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div><div className="form-group"><label>Amount</label><input type="number" value={deductAmount} onChange={e => setDeductAmount(Number(e.target.value))} /></div></>;
@@ -301,7 +340,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     <div className="game-controls-container">
                         {isReadOnly && <div className="badge badge-warning" style={{ alignSelf: 'center', marginBottom: '1rem' }}>SPECTATOR MODE</div>}
                         
-                        {!isReadOnly && <StreamControls gameState={gameState} gameType="teen-patti" style={{ marginBottom: '1rem' }} onHandedOver={() => actions.startNewGame([])} />}
+                        {!isReadOnly && <StreamControls gameState={gameState} gameType="teen-patti" style={{ marginBottom: '1rem' }} onHandedOver={actions.clearGame} />}
                         {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginBottom: '1rem', alignSelf: 'center' }} onClick={undo}>↩ Undo</button>}
 
                     <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
@@ -317,6 +356,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                             onShowSetup={onShowSetup}
                             onManageEntities={() => setShowEntityManager(true)}
                             onTogglePlayerBreak={() => setInteraction('toggleBreak')}
+                            onTableRules={() => setInteraction('tableRules')}
                         />
                     </div>
                     {gameState.roundActive && currentPlayer && (
@@ -344,6 +384,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 isOpen={showOwings}
                 onClose={() => setShowOwings(false)}
                 transactions={transactions}
+                summary={summary}
             />
 
             {showEntityManager && (

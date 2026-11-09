@@ -7,6 +7,10 @@ import { POKER_STORAGE_KEY } from '../poker/hooks/usePokerGame';
 import { BLACKJACK_STORAGE_KEY } from '../blackjack/hooks/useBlackjackGame';
 import { LOCAL_STORAGE_KEY } from '../constants/gameConstants';
 import { toTitleCase } from '../utils/formatters';
+import { rehydrateState } from '../utils/serialization';
+import { archiveGame } from '../utils/history';
+import { blackjackSettlement, pokerSettlement, teenPattiSettlement } from '../utils/gameSettlement';
+import type { GameKind } from '../utils/nightStats';
 import PokerGameScreen from '../poker/components/PokerGameScreen';
 import GameScreen from './GameScreen';
 import BlackjackGameScreen from '../blackjack/components/BlackjackGameScreen';
@@ -17,6 +21,21 @@ const GAMES: Record<string, { route: string; storageKey: string; label: string }
     'teen-patti': { route: '/teen-patti', storageKey: LOCAL_STORAGE_KEY, label: 'Teen Patti' },
     poker: { route: '/poker', storageKey: POKER_STORAGE_KEY, label: 'Poker' },
     blackjack: { route: '/blackjack', storageKey: BLACKJACK_STORAGE_KEY, label: 'Blackjack' },
+};
+
+const SETTLEMENTS = { 'teen-patti': teenPattiSettlement, poker: pokerSettlement, blackjack: blackjackSettlement };
+
+// Taking a game over replaces this phone's own saved game of that type, so that one goes to History first.
+const archiveReplaced = (kind: GameKind, previous: string | null) => {
+    if (!previous) return;
+    try {
+        const old = rehydrateState(JSON.parse(previous));
+        if (!Array.isArray(old?.players)) return;
+        const { nets, transactions } = SETTLEMENTS[kind](old);
+        archiveGame(kind, old.stats, nets, transactions);
+    } catch (err) {
+        console.error('Could not archive the replaced game:', err);
+    }
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stream state is untyped across three games
@@ -37,7 +56,7 @@ const SpectatorWrapper: React.FC = () => {
     const [handoverError, setHandoverError] = useState<string | null>(null);
     const [leaving, setLeaving] = useState(false);
     // What this phone had saved before accepting, restored if the host never confirms.
-    const acceptedRef = useRef<{ storageKey: string; previous: string | null; route: string } | null>(null);
+    const acceptedRef = useRef<{ kind: GameKind; storageKey: string; previous: string | null; route: string } | null>(null);
 
     // Player view: the viewer picks who they are; ids come from the host, so coerce before use in CSS.
     const players: { id: number; name: string; balance?: number; stack?: number }[] = Array.isArray(gameState?.players) ? gameState.players : [];
@@ -68,7 +87,7 @@ const SpectatorWrapper: React.FC = () => {
         const saved = { ...handoverOffer };
         delete saved.gameType;
         try {
-            acceptedRef.current = { storageKey: game.storageKey, previous: localStorage.getItem(game.storageKey), route: game.route };
+            acceptedRef.current = { kind: handoverOffer.gameType as GameKind, storageKey: game.storageKey, previous: localStorage.getItem(game.storageKey), route: game.route };
             localStorage.setItem(game.storageKey, JSON.stringify(saved));
         } catch {
             acceptedRef.current = null;
@@ -81,7 +100,9 @@ const SpectatorWrapper: React.FC = () => {
 
     // Move only once the host confirms; a host that cancelled meanwhile never does.
     useEffect(() => {
-        if (handoverConfirmed && acceptedRef.current) window.location.assign(`${acceptedRef.current.route}?host=1`);
+        if (!handoverConfirmed || !acceptedRef.current) return;
+        archiveReplaced(acceptedRef.current.kind, acceptedRef.current.previous);
+        window.location.assign(`${acceptedRef.current.route}?host=1`);
     }, [handoverConfirmed]);
 
     useEffect(() => {

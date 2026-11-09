@@ -24,6 +24,11 @@ The application leverages local storage to save game state, allowing you to clos
   * **Install & Offline:** Installable as an app; local games work without internet once the app has loaded. Streaming and Lifetime Winnings need a connection.
   * **Notes:** Saved automatically as you type.
   * **Blackjack Insurance:** A side bet of half the hand's bet; at the dealer's turn the host says whether the dealer had blackjack, and it pays 2:1.
+  * **Saved Players:** Players are saved on this device (name, phone, optional UPI ID) when a game is set up or a player is added; tap a chip on any setup screen to fill a row. Manage them from the home screen, and check everyone's lifetime winnings in one tap.
+  * **Settle Up:** Final Owings has a PAY button (UPI, amount filled in) for payees with a saved UPI ID, and COPY / WHATSAPP to share the settlement with a night summary (biggest pot, most rounds won, best streak, biggest winner and loser).
+  * **History:** The last 50 finished games, with each payment's paid tick, the summary and re-sharing.
+  * **Teen Patti Table Rules:** Optional pot limit, max blind turns and max chaal, set at setup or between rounds.
+  * **Poker Blind Levels:** Optional blind clock; blinds double at the first hand after each level ends, with pause and resume.
 
 ## 🚀 Tech Stack
 

@@ -7,6 +7,10 @@ import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsSer
 import { SHA256 } from 'crypto-js';
 import { useUndo } from '../../hooks/useUndo';
 import { useGameState } from '../../hooks/useGameState';
+import { biggestWin, emptyStats, recordRound } from '../../utils/nightStats';
+import { blackjackSettlement } from '../../utils/gameSettlement';
+import { archiveGame } from '../../utils/history';
+import { rememberPlayers } from '../../utils/savedPlayers';
 
 export const BLACKJACK_STORAGE_KEY = 'blackjackGameState';
 
@@ -23,7 +27,14 @@ const createInitialBlackjackState = (): BlackjackGameState => ({
     blackjackPayout: '3to2',
     dealerNet: 0, 
     isBettingLocked: true, 
+    stats: emptyStats(),
 });
+
+// Returns the failure message, if any.
+const archiveBlackjack = (state: BlackjackGameState) => {
+    const { nets, transactions } = blackjackSettlement(state);
+    return archiveGame('blackjack', state.stats, nets, transactions);
+};
 
 // --- HELPER FUNCTION ---
 const loadStateFromStorage = (): BlackjackGameState | null => {
@@ -105,6 +116,17 @@ export const useBlackjackGame = () => {
 
     // --- ADDED: Action to reset game ---
     const setupNewGame = useCallback(() => {
+        setGameState(prev => {
+            afterCommit(() => {
+                const failed = archiveBlackjack(prev);
+                if (failed) addMessage(failed);
+            });
+            return createInitialBlackjackState();
+        });
+    }, [setGameState, afterCommit, addMessage]);
+
+    // Empties the game without saving it to history (used after handing the game to another phone).
+    const clearGame = useCallback(() => {
         setGameState(createInitialBlackjackState());
     }, [setGameState]);
 
@@ -120,12 +142,20 @@ export const useBlackjackGame = () => {
             isTakingBreak: false,
             lastBets: Array(p.numHands).fill(createInitialBlackjackState().minBet), // UPDATED
         }));
-        setGameState({
-            ...createInitialBlackjackState(),
-            players: initialPlayers,
-            messages: [`Game setup with ${players.length} players. Bets are locked to ₹${createInitialBlackjackState().minBet}. Click 'Deal Cards' to play or 'Change Bets' to unlock.`]
+        setGameState(prev => {
+            afterCommit(() => {
+                const failed = archiveBlackjack(prev);
+                if (failed) addMessage(failed);
+            });
+            return {
+                ...createInitialBlackjackState(),
+                players: initialPlayers,
+                messages: [`Game setup with ${players.length} players. Bets are locked to ₹${createInitialBlackjackState().minBet}. Click 'Deal Cards' to play or 'Change Bets' to unlock.`]
+            };
         });
-    }, [setGameState]);
+        const full = rememberPlayers(initialPlayers.map(p => ({ name: p.name, phone: p.phoneNumber })));
+        if (full) addMessage(full);
+    }, [setGameState, afterCommit, addMessage]);
 
     const placeBet = useCallback((playerId: number, handIndex: number, amount: number) => {
         setGameState(prev => {
@@ -331,6 +361,7 @@ export const useBlackjackGame = () => {
 
         const recordsToUpdate: WinningsRecord[] = [];
         const timestamp = new Date().toISOString();
+        const nets: Record<string, number> = {}; // players who bet this round
         
         const finalPlayers = endState.players.map(p => {
             let roundNet = 0;
@@ -354,6 +385,8 @@ export const useBlackjackGame = () => {
                 else if (h.insuranceResult === 'lost') roundNet -= h.insurance!;
                 // Push is net 0
             });
+
+            if (p.hands.some(h => h.bet > 0)) nets[toTitleCase(p.name)] = roundNet;
 
             if (p.phoneNumber && roundNet !== 0) {
                 recordsToUpdate.push({
@@ -384,6 +417,7 @@ export const useBlackjackGame = () => {
             currentHandId: null,
             dealerHand: { cards: [], status: 'playing', score: 0 },
             isBettingLocked: true, // Lock betting for next round
+            stats: recordRound(endState.stats ?? emptyStats(), nets, biggestWin(nets)),
             messages: [...endState.messages, "--- ROUND OVER ---", `Bets locked to last amount. Click 'Change Bets' to unlock.`]
         };
     }, [gameState, afterCommit]);
@@ -684,9 +718,13 @@ export const useBlackjackGame = () => {
                 lastBets: Array(numHands).fill(prev.minBet), // UPDATED
             };
             addMessage(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
+            afterCommit(() => {
+                const full = rememberPlayers([{ name: newPlayer.name, phone: phoneNumber }]);
+                if (full) addMessage(full);
+            });
             return { ...prev, players: [...prev.players, newPlayer] };
         });
-    }, [addMessage, setGameState]);
+    }, [addMessage, setGameState, afterCommit]);
 
     const removePlayer = useCallback((playerId: number) => {
         setGameState(prev => {
@@ -806,6 +844,7 @@ export const useBlackjackGame = () => {
 
     const actions = useMemo(() => ({
         setupNewGame, // ADDED
+        clearGame,
         setupGame,
         loadGame,
         placeBet,
@@ -819,7 +858,7 @@ export const useBlackjackGame = () => {
         updatePlayerHandCount,
         unlockAllBets, 
         settleInsurance,
-    }), [setupNewGame, setupGame, loadGame, placeBet, startRound, handlePlayerAction, setHandStatus, // ADDED setupNewGame
+    }), [setupNewGame, clearGame, setupGame, loadGame, placeBet, startRound, handlePlayerAction, setHandStatus, // ADDED setupNewGame
          addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, updatePlayerHandCount, unlockAllBets, settleInsurance]);
 
     const recordedActions = useMemo(() => record(actions), [record, actions]);

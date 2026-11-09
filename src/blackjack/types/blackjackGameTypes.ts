@@ -1,5 +1,6 @@
 // teen-patti-react/src/blackjack/types/blackjackGameTypes.ts
 // src/blackjack/types/blackjackGameTypes.ts
+import type { NightStats } from '../../utils/nightStats';
 
 export type Card = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 export type HandStatus = 'playing' | 'stand' | 'busted' | 'blackjack' | 'push' | 'win' | 'lose' | 'surrendered';
@@ -48,4 +49,5 @@ export interface BlackjackGameState {
     blackjackPayout: '3to2' | '6to5';
     dealerNet: number;
     isBettingLocked: boolean; // ADDED
+    stats?: NightStats; // absent in saves from before the night summary
 }

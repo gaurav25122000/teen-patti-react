@@ -3,15 +3,20 @@
 import React, { useState } from 'react';
 import type { Player } from '../types/gameTypes';
 import { toTitleCase } from '../utils/formatters';
+import { fillRow } from '../utils/savedPlayers';
+import { parseTableRules, type TableRules } from '../utils/teenPattiRules';
+import SavedPlayerChips from './SavedPlayerChips';
+import TableRulesFields from './TableRulesFields';
 
 interface GameSetupProps {
-    onStartNewGame: (players: Player[]) => void;
+    onStartNewGame: (players: Player[], rules: TableRules) => void;
     onLoadGame: () => void;
 }
 
 const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => {
     const [numPlayersInput, setNumPlayersInput] = useState("2");
     const [playerInputs, setPlayerInputs] = useState<{ name: string; balance: string; phoneNumber: string; }[]>([]);
+    const [rulesInput, setRulesInput] = useState({ potLimit: '', maxBlindTurns: '', maxChaal: '' });
 
     const handleConfirmNumPlayers = () => {
         const num = parseInt(numPlayersInput);
@@ -40,7 +45,9 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
             newPlayers.push({ id: index + 1, name: toTitleCase(input.name), balance, phoneNumber: input.phoneNumber, isTakingBreak: false });
         }
         if (newPlayers.length < 2) return alert("Need at least 2 players.");
-        onStartNewGame(newPlayers);
+        const rules = parseTableRules(rulesInput);
+        if (typeof rules === 'string') return alert(rules);
+        onStartNewGame(newPlayers, rules);
     };
 
     return (
@@ -62,6 +69,10 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
                 />
                 <button className="btn-primary" onClick={handleConfirmNumPlayers}>Confirm</button>
             </div>
+            <SavedPlayerChips
+                formPhones={playerInputs.map(p => p.phoneNumber)}
+                onPick={picked => setPlayerInputs(rows => fillRow(rows, picked, { name: '', balance: '0', phoneNumber: '' }))}
+            />
             {playerInputs.length > 0 && (
                 <div>
                     <h4>Enter Player Details:</h4>
@@ -87,6 +98,8 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
                             />
                         </div>
                     ))}
+                    <h4>Table rules (optional)</h4>
+                    <TableRulesFields value={rulesInput} onChange={setRulesInput} />
                     <button className="btn btn-start rainbow-outline" onClick={handleStartGame} style={{ marginTop: '1rem' }}>Start Game</button>
                 </div>
             )}

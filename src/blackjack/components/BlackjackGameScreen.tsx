@@ -8,7 +8,9 @@ import BlackjackDealerDisplay from './BlackjackDealerDisplay';
 import BlackjackManageModal, { type ModalMode } from './BlackjackManageModal';
 import { toTitleCase } from '../../utils/formatters';
 import OwingsModal from '../../components/OwingsModal';
-import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
+import type { Transaction } from '../../utils/owingsLogic';
+import { emptyStats, summaryLines } from '../../utils/nightStats';
+import { blackjackSettlement } from '../../utils/gameSettlement';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
 import Celebration from '../../components/Celebration';
@@ -27,6 +29,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     const [modalMode, setModalMode] = useState<ModalMode>('none');
     const [showOwings, setShowOwings] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [summary, setSummary] = useState<string[]>([]);
 
     const handleShowModal = (mode: ModalMode) => {
         if (isReadOnly) return;
@@ -40,18 +43,9 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     };
 
     const handleShowOwings = () => {
-        const dealerAsPlayer = {
-          name: 'Dealer (House)',
-          stack: gameState.dealerNet, 
-          totalBuyIn: 0,              
-          id: 9999,                   
-          balance: undefined,
-          entityId: undefined,
-          phoneNumber: undefined,
-          isTakingBreak: false,
-        };
-        
-        setTransactions(calculateOwings([...players, dealerAsPlayer], [])); 
+        const { nets, transactions } = blackjackSettlement(gameState);
+        setTransactions(transactions);
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), nets, 'blackjack'));
         setShowOwings(true);
         onInteractionChange(true);
     };
@@ -63,7 +57,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     
     // --- ADDED: Handler for new button ---
     const handleShowSetup = () => {
-        if (window.confirm("Are you sure you want to end this game and start a new one? All progress will be lost.")) {
+        if (window.confirm("Are you sure you want to end this game and start a new one?")) {
             actions.setupNewGame(); // 1. Clears the hook state
             onShowSetupRequest();   // 2. Tells lobby to change view
         }
@@ -102,7 +96,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                         <h2>{toTitleCase(gameStage)}</h2>
                         {isReadOnly && <div className="badge badge-warning" style={{ marginTop: '0.5rem' }}>SPECTATOR MODE</div>}
             
-                        {!isReadOnly && <StreamControls gameState={gameState} gameType="blackjack" style={{ marginTop: '0.5rem' }} onHandedOver={actions.setupNewGame} />}
+                        {!isReadOnly && <StreamControls gameState={gameState} gameType="blackjack" style={{ marginTop: '0.5rem' }} onHandedOver={actions.clearGame} />}
                         {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
                     </div>
 
@@ -176,6 +170,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                 isOpen={showOwings}
                 onClose={handleCloseOwings}
                 transactions={transactions}
+                summary={summary}
             />
         </>
     );

@@ -5,10 +5,15 @@ import { calculatePots } from '../utils/pokerLogic';
 import { toTitleCase } from '../../utils/formatters';
 import { bulkUpdateWinnings, type WinningsRecord } from '../../utils/winningsService';
 import { splitEvenly } from '../../utils/money';
-import { foldOutLine, foldOutStreak, nextStreak, potLine } from '../utils/streak';
+import { foldOutLine, foldOutStreak, handCandidate, handNets, nextStreak, potLine } from '../utils/streak';
+import { pauseClock, resumeClock, startClock, tickLevel } from '../utils/blindLevels';
 import { SHA256 } from 'crypto-js';
 import { useUndo } from '../../hooks/useUndo';
 import { useGameState } from '../../hooks/useGameState';
+import { emptyStats, recordRound } from '../../utils/nightStats';
+import { pokerSettlement } from '../../utils/gameSettlement';
+import { archiveGame } from '../../utils/history';
+import { rememberPlayers } from '../../utils/savedPlayers';
 
 export const POKER_STORAGE_KEY = 'pokerGameState';
 
@@ -25,8 +30,39 @@ const createInitialPokerState = (): PokerGameState => ({
     bigBlindIndex: -1,
     smallBlindAmount: 10,
     bigBlindAmount: 20,
+    blindLevel: 1,
+    stats: emptyStats(),
     messages: ["Welcome to the Poker Bets Manager! Set up a new game to begin."],
 });
+
+// A parsed save with its Sets and newer fields restored.
+const restorePoker = (parsed: PokerGameState): PokerGameState => {
+    if (parsed.pot) {
+        parsed.pot.forEach((p: Pot) => {
+            if (p.eligiblePlayers && !(p.eligiblePlayers instanceof Set)) {
+                p.eligiblePlayers = new Set(Array.from(p.eligiblePlayers));
+            }
+        });
+    }
+    if (parsed.players) {
+        parsed.players = parsed.players.map((p: any) => ({
+            ...p,
+            winningStreak: p.winningStreak ?? 0,
+            roundWinnings: p.roundWinnings ?? 0 // pots already won this hand count toward its result
+        }));
+    }
+    return { ...parsed, blindLevel: parsed.blindLevel ?? 1 };
+};
+
+// Poker does not load its save on launch, so a new game set up over it archives the saved copy.
+const storedPoker = (): PokerGameState | null => {
+    try {
+        const saved = localStorage.getItem(POKER_STORAGE_KEY);
+        return saved ? restorePoker(JSON.parse(saved)) : null;
+    } catch {
+        return null;
+    }
+};
 
 export const usePokerGame = () => {
     const [gameState, setGameState, addMessage, afterCommit] = useGameState<PokerGameState>(createInitialPokerState);
@@ -39,22 +75,7 @@ export const usePokerGame = () => {
             return false;
         };
         try {
-            const parsed = JSON.parse(savedState);
-            if (parsed.pot) {
-                parsed.pot.forEach((p: Pot) => {
-                    if (p.eligiblePlayers && !(p.eligiblePlayers instanceof Set)) {
-                        p.eligiblePlayers = new Set(Array.from(p.eligiblePlayers));
-                    }
-                });
-            }
-            if (parsed.players) {
-                parsed.players = parsed.players.map((p: any) => ({
-                    ...p,
-                    winningStreak: p.winningStreak ?? 0,
-                    roundWinnings: p.roundWinnings ?? 0 // pots already won this hand count toward its result
-                }));
-            }
-            setGameState(parsed);
+            setGameState(restorePoker(JSON.parse(savedState)));
             return true;
         } catch {
             localStorage.removeItem(POKER_STORAGE_KEY);
@@ -130,6 +151,7 @@ export const usePokerGame = () => {
 
         const finalWinner = finalPlayers.find(p => p.id === winner.id)!;
         const newMessages = [...prevGameState.messages, `--- HAND OVER ---`, foldOutLine(toTitleCase(winner.name), totalPot, winner.totalPotContribution, finalWinner.stack)];
+        const nets = handNets(updatedPlayers.map(p => ({ ...p, roundWinnings: p.id === winner.id ? totalPot : 0 })));
 
         return {
             ...createInitialPokerState(),
@@ -137,6 +159,11 @@ export const usePokerGame = () => {
             dealerButtonIndex: prevGameState.dealerButtonIndex,
             smallBlindAmount: prevGameState.smallBlindAmount,
             bigBlindAmount: prevGameState.bigBlindAmount,
+            levelMinutes: prevGameState.levelMinutes,
+            blindLevel: prevGameState.blindLevel,
+            levelEndsAt: prevGameState.levelEndsAt,
+            pausedRemainingMs: prevGameState.pausedRemainingMs,
+            stats: recordRound(prevGameState.stats ?? emptyStats(), nets, { name: toTitleCase(winner.name), amount: totalPot }),
             messages: newMessages,
         };
     }, [afterCommit]);
@@ -287,7 +314,7 @@ export const usePokerGame = () => {
         });
     }, [addMessage, advanceToNextStageOrShowdown, getEndOfHandState, setGameState]);
 
-    const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }) => {
+    const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }, levelMinutes?: number) => {
         const initialPlayers: PokerPlayer[] = players.map((p, i) => ({
             id: i + 1, name: toTitleCase(p.name), stack: p.stack,
             totalBuyIn: p.stack, phoneNumber: p.phoneNumber,
@@ -297,15 +324,27 @@ export const usePokerGame = () => {
             roundWinnings: 0
         }));
 
-        setGameState({
-            ...createInitialPokerState(),
-            players: initialPlayers,
-            smallBlindAmount: blinds.sb,
-            bigBlindAmount: blinds.bb,
-            dealerButtonIndex: -1,
-            messages: [`Game setup with ${players.length} players. Blinds are ${blinds.sb}/${blinds.bb}. Click 'Start Next Hand' to begin.`]
+        setGameState(prev => {
+            const previous = prev.players.length > 0 ? prev : storedPoker();
+            afterCommit(() => {
+                if (!previous) return;
+                const { nets, transactions } = pokerSettlement(previous);
+                const failed = archiveGame('poker', previous.stats, nets, transactions);
+                if (failed) addMessage(failed);
+            });
+            return {
+                ...createInitialPokerState(),
+                ...startClock(levelMinutes, Date.now()),
+                players: initialPlayers,
+                smallBlindAmount: blinds.sb,
+                bigBlindAmount: blinds.bb,
+                dealerButtonIndex: -1,
+                messages: [`Game setup with ${players.length} players. Blinds are ${blinds.sb}/${blinds.bb}. Click 'Start Next Hand' to begin.`]
+            };
         });
-    }, [setGameState]);
+        const full = rememberPlayers(initialPlayers.map(p => ({ name: p.name, phone: p.phoneNumber })));
+        if (full) addMessage(full);
+    }, [setGameState, afterCommit, addMessage]);
 
     const startNewHand = useCallback(() => {
         setGameState(prev => {
@@ -315,6 +354,7 @@ export const usePokerGame = () => {
                 addMessage("Not enough active players with stacks to start a hand.");
                 return prev;
             }
+            const { state: leveled, line: levelLine } = tickLevel(prev, Date.now());
             
             const activePlayerIds = new Set(playersWithChips.map(p => p.id));
 
@@ -338,12 +378,12 @@ export const usePokerGame = () => {
             }));
 
             const sbPlayer = newPlayers[newSmallBlindIndex];
-            const sbAmount = Math.min(prev.smallBlindAmount, sbPlayer.stack);
+            const sbAmount = Math.min(leveled.smallBlindAmount, sbPlayer.stack);
             sbPlayer.stack -= sbAmount; sbPlayer.roundBet = sbAmount; sbPlayer.totalPotContribution = sbAmount;
             if (sbPlayer.stack === 0) sbPlayer.isAllIn = true;
 
             const bbPlayer = newPlayers[newBigBlindIndex];
-            const bbAmount = Math.min(prev.bigBlindAmount, bbPlayer.stack);
+            const bbAmount = Math.min(leveled.bigBlindAmount, bbPlayer.stack);
             bbPlayer.stack -= bbAmount; bbPlayer.roundBet = bbAmount; bbPlayer.totalPotContribution = bbAmount;
             if (bbPlayer.stack === 0) bbPlayer.isAllIn = true;
 
@@ -355,6 +395,7 @@ export const usePokerGame = () => {
             const messages = [
                 ...prev.messages,
                 `--- NEW HAND (#${prev.dealerButtonIndex + 2}) ---`,
+                ...(levelLine ? [levelLine] : []),
                 `Dealer button is on ${toTitleCase(newPlayers[newDealerIndex].name)}.`,
                 `${toTitleCase(sbPlayer.name)} posts small blind of ₹${sbAmount}.`,
                 `${toTitleCase(bbPlayer.name)} posts big blind of ₹${bbAmount}.`,
@@ -363,12 +404,12 @@ export const usePokerGame = () => {
             ];
 
             return {
-                ...prev,
+                ...leveled,
                 players: newPlayers,
                 gameStage: 'pre-flop',
                 pot: [],
-                currentBet: prev.bigBlindAmount,
-                lastRaiseAmount: prev.bigBlindAmount,
+                currentBet: leveled.bigBlindAmount,
+                lastRaiseAmount: leveled.bigBlindAmount,
                 activePlayerIndex: firstToActIndex,
                 dealerButtonIndex: newDealerIndex,
                 smallBlindIndex: newSmallBlindIndex,
@@ -434,6 +475,7 @@ export const usePokerGame = () => {
                 });
 
                 afterCommit(() => bulkUpdateWinnings(recordsToUpdate));
+                const totalPot = prev.players.reduce((sum, p) => sum + p.totalPotContribution, 0);
 
                 // Reset hand state for everyone, apply streak logic
                 const finalPlayersWithStreak = newPlayers.map(p => ({ 
@@ -455,6 +497,7 @@ export const usePokerGame = () => {
                     pot: [],
                     gameStage: 'pre-deal',
                     activePlayerIndex: -1,
+                    stats: recordRound(prev.stats ?? emptyStats(), handNets(newPlayers), handCandidate(newPlayers, totalPot)),
                 };
             }
 
@@ -487,9 +530,13 @@ export const usePokerGame = () => {
                 roundWinnings: 0
             };
             addMessage(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
+            afterCommit(() => {
+                const full = rememberPlayers([{ name: newPlayer.name, phone: phoneNumber }]);
+                if (full) addMessage(full);
+            });
             return { ...prev, players: [...prev.players, newPlayer] };
         });
-    }, [addMessage, setGameState]);
+    }, [addMessage, setGameState, afterCommit]);
 
     const removePlayer = useCallback((playerId: number) => {
         setGameState(prev => {
@@ -581,6 +628,16 @@ export const usePokerGame = () => {
         });
     }, [addMessage, setGameState, afterCommit]);
 
+    const pauseBlindClock = useCallback(() => {
+        setGameState(prev => (!prev.levelMinutes || prev.pausedRemainingMs !== undefined) ? prev
+            : { ...pauseClock(prev, Date.now()), messages: [...prev.messages, 'Blind clock paused.'] });
+    }, [setGameState]);
+
+    const resumeBlindClock = useCallback(() => {
+        setGameState(prev => prev.pausedRemainingMs === undefined ? prev
+            : { ...resumeClock(prev, Date.now()), messages: [...prev.messages, 'Blind clock resumed.'] });
+    }, [setGameState]);
+
     // Empties the game and its saved copy (used after handing the game to another phone).
     const clearGame = useCallback(() => {
         localStorage.removeItem(POKER_STORAGE_KEY);
@@ -588,8 +645,8 @@ export const usePokerGame = () => {
     }, [setGameState]);
 
     const actions = useMemo(() => ({
-        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame
-    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame]);
+        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame, pauseBlindClock, resumeBlindClock
+    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame, pauseBlindClock, resumeBlindClock]);
 
     const recordedActions = useMemo(() => record(actions), [record, actions]);
 

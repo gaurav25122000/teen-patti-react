@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { GameState, Player } from '../types/gameTypes';
 import { toTitleCase } from '../utils/formatters';
+import { blindTurnsRefusal, potLimitReached } from '../utils/teenPattiRules';
 
 interface RoundControlsProps {
     gameState: GameState;
@@ -9,9 +10,9 @@ interface RoundControlsProps {
     precedingPlayer: Player | null; // <-- RECEIVE AS PROP
     activePlayers: Player[];
     actions: {
-        playBlind: (isRaise: boolean, amount: number) => void;
+        playBlind: (isRaise: boolean, amount: number) => string | null; // table-rule refusal
         seeCards: () => void;
-        betChaal: (amount: number) => void;
+        betChaal: (amount: number) => string | null;
         fold: () => void;
         onShowClick: () => void;
         onEndBettingClick: () => void;
@@ -50,7 +51,13 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
             alert(`Blind raise must be greater than the current stake of ₹ ${currentStake}.`);
             return;
         }
-        actions.playBlind(true, raiseAmount);
+        const refusal = actions.playBlind(true, raiseAmount);
+        if (refusal) alert(refusal);
+    };
+
+    const handlePlayBlind = () => {
+        const refusal = actions.playBlind(false, currentStake);
+        if (refusal) alert(refusal);
     };
 
     const handleBetChaal = () => {
@@ -60,8 +67,12 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
             alert(`Bet must be at least ₹ ${minChaalBet}.`);
             return;
         }
-        actions.betChaal(betAmount);
+        const refusal = actions.betChaal(betAmount);
+        if (refusal) alert(refusal);
     };
+
+    const limitReached = potLimitReached(gameState);
+    const mustSee = blindTurnsRefusal(gameState, toTitleCase(currentPlayer.name), gameState.blindTurns?.[currentPlayer.id] ?? 0);
 
     // This logic is now simpler as precedingPlayer is passed in
     const isShowDisabled = !precedingPlayer || activePlayers.length < 2 || (blindPlayerIds.has(precedingPlayer.id) && !blindPlayerIds.has(currentPlayer.id) && activePlayers.length !== 2);
@@ -80,22 +91,28 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
                     <strong>₹ {potAmount}</strong></div>
             </div>
 
-            {blindPlayerIds.has(currentPlayer.id) ? (
+            {limitReached ? (
+                <p className="rule-note">POT LIMIT REACHED</p>
+            ) : blindPlayerIds.has(currentPlayer.id) ? (
                 // --- Actions for BLIND players ---
                 <>
-                    <div className="inline-input-group">
-                        <input
-                            type="number"
-                            step="10"
-                            value={blindRaiseAmountInput}
-                            onChange={(e) => setBlindRaiseAmountInput(e.target.value)}
-                            placeholder={`₹ ` + `${currentStake}`}
-                        />
-                        <button onClick={handleConfirmBlindRaise} className="btn btn-success">Raise Blind</button>
-                    </div>
-                    <button onClick={() => actions.playBlind(false, currentStake)} className="btn btn-primary">
-                        Play Blind (Cost: ₹ {currentStake})
-                    </button>
+                    {mustSee ? <p className="rule-note">MUST SEE · {mustSee}</p> : (
+                        <>
+                            <div className="inline-input-group">
+                                <input
+                                    type="number"
+                                    step="10"
+                                    value={blindRaiseAmountInput}
+                                    onChange={(e) => setBlindRaiseAmountInput(e.target.value)}
+                                    placeholder={`₹ ` + `${currentStake}`}
+                                />
+                                <button onClick={handleConfirmBlindRaise} className="btn btn-success">Raise Blind</button>
+                            </div>
+                            <button onClick={handlePlayBlind} className="btn btn-primary">
+                                Play Blind (Cost: ₹ {currentStake})
+                            </button>
+                        </>
+                    )}
                     <button onClick={actions.seeCards} className="btn btn-accent">
                         See Cards
                     </button>
@@ -116,10 +133,12 @@ const RoundControls: React.FC<RoundControlsProps> = ({ gameState, currentPlayer,
 
             {/* --- Common Actions for ALL players --- */}
             <button onClick={actions.fold} className="btn btn-error">Fold</button>
-            <button onClick={actions.onShowClick} className="btn btn-accent" disabled={isShowDisabled} title={showTitle}>
-                Show (Cost: ₹ {calculateShowCost()})
-            </button>
-            <button onClick={actions.onEndBettingClick} className="btn btn-secondary">End Betting</button>
+            {!limitReached && (
+                <button onClick={actions.onShowClick} className="btn btn-accent" disabled={isShowDisabled} title={showTitle}>
+                    Show (Cost: ₹ {calculateShowCost()})
+                </button>
+            )}
+            <button onClick={actions.onEndBettingClick} className="btn btn-secondary">{limitReached ? 'PICK WINNER' : 'End Betting'}</button>
         </div>
     );
 };

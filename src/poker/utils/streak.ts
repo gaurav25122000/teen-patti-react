@@ -1,4 +1,5 @@
 import type { PokerPlayer } from '../types/pokerGameTypes';
+import { toTitleCase } from '../../utils/formatters.ts';
 
 type StreakFields = Pick<PokerPlayer, 'winningStreak' | 'isTakingBreak' | 'stack' | 'totalPotContribution'>;
 
@@ -8,6 +9,16 @@ const dealtIn = (p: StreakFields) => !p.isTakingBreak && (p.stack > 0 || p.total
 // Ending the hand up money extends the streak, anyone else dealt in resets, players not dealt in keep theirs.
 export const nextStreak = (p: StreakFields, won: number) =>
     !dealtIn(p) ? p.winningStreak : (won > p.totalPotContribution ? p.winningStreak + 1 : 0);
+
+// Night summary round nets: each dealt-in player's winnings minus their chips in the pot.
+export const handNets = (players: (StreakFields & { name: string; roundWinnings: number })[]) =>
+    Object.fromEntries(players.filter(dealtIn).map(p => [toTitleCase(p.name), p.roundWinnings - p.totalPotContribution]));
+
+// The hand's biggest-pot candidate: the player who won the most, with the whole pot.
+export const handCandidate = (players: { name: string; roundWinnings: number }[], totalPot: number) => {
+    const top = players.reduce<{ name: string; roundWinnings: number } | null>((best, p) => (!best || p.roundWinnings > best.roundWinnings ? p : best), null);
+    return top ? { name: toTitleCase(top.name), amount: totalPot } : null;
+};
 
 // Everyone else folded: the last player wins the whole pot, the rest win nothing.
 export const foldOutStreak = (p: StreakFields & { id: number }, winnerId: number, totalPot: number) =>

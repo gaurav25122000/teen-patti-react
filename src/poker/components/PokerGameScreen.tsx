@@ -6,8 +6,11 @@ import PokerRoundControls from './PokerRoundControls';
 import ActionLog from '../../components/ActionLog';
 import InteractionModal from '../../components/InteractionModal';
 import OwingsModal from '../../components/OwingsModal';
-import { calculateOwings, type Transaction } from '../../utils/owingsLogic';
+import type { Transaction } from '../../utils/owingsLogic';
 import { toTitleCase } from '../../utils/formatters';
+import { emptyStats, summaryLines } from '../../utils/nightStats';
+import { pokerSettlement } from '../../utils/gameSettlement';
+import { clockLabel } from '../utils/blindLevels';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
 import Celebration from '../../components/Celebration';
@@ -35,6 +38,16 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const [addChipsAmount, setAddChipsAmount] = useState('1000');
     const [streakAmount, setStreakAmount] = useState('50');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [summary, setSummary] = useState<string[]>([]);
+    const [now, setNow] = useState(() => Date.now());
+
+    // The blind clock display ticks once a second while levels are on.
+    useEffect(() => {
+        if (!gameState.levelMinutes) return;
+        const timer = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(timer);
+    }, [gameState.levelMinutes]);
+    const levelText = clockLabel(gameState, now);
 
 
     const currentPlayer = activePlayerIndex > -1 ? players[activePlayerIndex] : null;
@@ -108,7 +121,9 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     };
 
     const handleShowOwings = () => {
-        setTransactions(calculateOwings(players));
+        const { nets, transactions } = pokerSettlement(gameState);
+        setTransactions(transactions);
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), nets, 'poker'));
         setModalMode('owings');
     };
 
@@ -150,6 +165,14 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             
             {!isReadOnly && <StreamControls gameState={gameState} gameType="poker" style={{ marginTop: '0.5rem' }} onHandedOver={actions.clearGame} />}
             {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
+            {levelText && (
+                <div className="blind-clock">
+                    <span>{levelText}</span>
+                    {!isReadOnly && (gameState.pausedRemainingMs !== undefined
+                        ? <button className="btn-sm btn-outline-secondary" onClick={actions.resumeBlindClock}>RESUME</button>
+                        : <button className="btn-sm btn-outline-secondary" onClick={actions.pauseBlindClock}>PAUSE</button>)}
+                </div>
+            )}
         </div>
     );
 
@@ -162,7 +185,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         }
 
         if (modalMode === 'owings') {
-            return <OwingsModal isOpen={true} onClose={closeModal} transactions={transactions} />;
+            return <OwingsModal isOpen={true} onClose={closeModal} transactions={transactions} summary={summary} />;
         }
 
         if (modalMode !== 'showdown') {
