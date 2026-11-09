@@ -106,9 +106,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
 
     const handleShowOwings = () => {
-        const { people, transactions, carried } = teenPattiSettlement(gameState);
+        const { people, transactions, carried, offBy } = teenPattiSettlement(gameState);
         setTransactions(transactions);
-        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'teen-patti', carried));
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'teen-patti', carried, offBy));
         setShowOwings(true);
     };
 

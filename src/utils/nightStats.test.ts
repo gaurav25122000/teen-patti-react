@@ -124,3 +124,9 @@ test('the carried-in note comes last', () => {
 test('stats names: the latest title-cased name per party key', () => {
     assert.deepEqual(statsNames([{ name: 'asha', phoneNumber: A }, { name: ' esha ' }]), { [A]: 'Asha', [E]: 'Esha' });
 });
+
+test('the imbalance line comes last, signed, only when a paisa or more is uncovered', () => {
+    assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', true, 500), ['Includes balances carried in at setup.', 'Balances are off by +₹500: settle the difference by hand.']);
+    assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', false, -12.5), ['Balances are off by -₹12.5: settle the difference by hand.']);
+    assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', false, 0.004), []);
+});

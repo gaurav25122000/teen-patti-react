@@ -153,3 +153,8 @@ test('a blackjack entry lists players only; the house stays out of its nets', ()
     const built = buildEntry('blackjack', emptyStats(), { people: [person(A, 'Asha', -300), person('house', 'Dealer (House)', 300)], transactions: [] });
     assert.deepEqual(built.nets, [{ name: 'Asha', net: -300 }]);
 });
+
+test('an entry whose nets do not add up says so last', () => {
+    const built = buildEntry('teen-patti', emptyStats(), { people: [person(A, 'Asha', 500)], transactions: [], carried: true, offBy: 500 });
+    assert.equal(built.summary.at(-1), 'Balances are off by +₹500: settle the difference by hand.');
+});

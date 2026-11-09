@@ -9,6 +9,7 @@ interface SettlementParts {
     people: Person[]; // the house included
     transactions: Transaction[];
     carried?: boolean; // someone started or joined with a balance; the summary says so
+    offBy?: number; // nets that no transfer covers; the summary says so
 }
 
 export interface HistoryEntry {
@@ -74,7 +75,7 @@ export const buildEntry = (game: GameKind, stats: NightStats, s: SettlementParts
     game,
     nets: playerNets(s.people),
     transactions: s.transactions.map(t => ({ ...t, paid: false })),
-    summary: summaryLines(stats, s.people, game, s.carried),
+    summary: summaryLines(stats, s.people, game, s.carried, s.offBy),
 });
 
 const moved = (net: number) => Math.abs(net) >= 0.005;

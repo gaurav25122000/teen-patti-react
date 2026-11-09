@@ -43,7 +43,7 @@ export const useUndo = <T extends { messages: string[] }>(
         return wrapped as A;
     }, []);
 
-    // For state changes that are not undo steps: drops a snapshot left by a recorded action that changed nothing.
+    // For state changes that are not undo steps: drops any pending snapshot so the change is never recorded.
     const unrecorded = useCallback(<F extends (...args: never[]) => unknown>(action: F) => ((...args: Parameters<F>) => {
         pendingRef.current = null;
         return action(...args);

@@ -68,7 +68,7 @@ test('biggest pot on a fold-out is named for the winner', () => {
     assert.equal(handCandidate([]), null);
 });
 
-test('a chopped pot goes to the dealt-in player with the biggest net, then the most chips back, never to a sitter-out', () => {
+test('a chopped pot goes to the dealt-in player with the biggest net, then the most chips back', () => {
     const chop = [
         seat('Dev', { isTakingBreak: true }),
         seat('Kiran', { stack: 0 }),

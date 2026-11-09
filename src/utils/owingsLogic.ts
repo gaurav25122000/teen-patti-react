@@ -1,5 +1,6 @@
 // src/utils/owingsLogic.ts
 import { toTitleCase } from './formatters.ts';
+import { paise } from './money.ts';
 import type { Entity } from '../types/gameTypes';
 
 export interface Transaction {
@@ -33,23 +34,34 @@ export const HOUSE_KEY = 'house';
 // A person is their phone when known (blank counts as none), else their name; only identical keys merge.
 export const partyKey = (name: string, phone?: string | null) => phone?.trim() || `name:${toTitleCase(name)}`;
 
+// A label still shared after the other rules gets " (2)", " (3)", … in first-seen order.
+const numberRepeats = (labels: string[]) => {
+    const seen = new Map<string, number>();
+    return labels.map(label => {
+        const n = (seen.get(label) ?? 0) + 1;
+        seen.set(label, n);
+        return n === 1 ? label : `${label} (${n})`;
+    });
+};
+
 // Each key's first-listed name. When names collide, people with a phone get " (…<last 4 digits>)",
 // or the full phone when two of them share those digits.
 export const partyLabels = (people: { key: string; name: string; phone?: string | null }[]): Record<string, string> => {
     const first = new Map<string, { name: string; phone: string }>();
     people.forEach(p => { if (!first.has(p.key)) first.set(p.key, { name: toTitleCase(p.name), phone: p.phone?.trim() ?? '' }); });
     const all = [...first.values()];
-    return Object.fromEntries([...first].map(([key, me]) => {
+    const labels = [...first.values()].map(me => {
         const namesakes = all.filter(o => o !== me && o.name === me.name);
-        if (!me.phone || namesakes.length === 0) return [key, me.name];
+        if (!me.phone || namesakes.length === 0) return me.name;
         const sharedDigits = namesakes.some(o => o.phone && o.phone.slice(-4) === me.phone.slice(-4));
-        return [key, sharedDigits ? `${me.name} (${me.phone})` : `${me.name} (…${me.phone.slice(-4)})`];
-    }));
+        return sharedDigits ? `${me.name} (${me.phone})` : `${me.name} (…${me.phone.slice(-4)})`;
+    });
+    const numbered = numberRepeats(labels);
+    return Object.fromEntries([...first.keys()].map((key, i) => [key, numbered[i]]));
 };
 
 const keyOf = (p: OwingsPlayer) => p.key ?? partyKey(p.name, p.phoneNumber);
 const netOf = (p: OwingsPlayer) => (p.stack ?? p.balance ?? 0) - (p.totalBuyIn ?? 0);
-const paise = (amount: number) => Math.round(amount * 100);
 
 // People merged by key, and the fewest transfers between parties: members of a known group settle as
 // the group, which never merges with a player. Parties keep first-seen order (a group at its first member).
@@ -75,21 +87,24 @@ export const settleParties = (players: OwingsPlayer[], entities: Entity[] = []) 
         party.net += netOf(p);
     }
 
-    // Each side by amount ascending; equal amounts keep first-seen order.
-    const byAmount = (a: { net: number; order: number }, b: { net: number; order: number }) => paise(a.net) - paise(b.net) || a.order - b.order;
+    // Matched in whole paise, each side by amount ascending; equal amounts keep first-seen order.
+    const byAmount = (a: { cents: number; order: number }, b: { cents: number; order: number }) => a.cents - b.cents || a.order - b.order;
     const list = [...parties.values()];
-    const debtors = list.filter(p => p.net < -0.005).map(p => ({ ...p, net: -p.net })).sort(byAmount);
-    const creditors = list.filter(p => p.net > 0.005).map(p => ({ ...p })).sort(byAmount);
+    numberRepeats(list.map(p => p.label)).forEach((label, i) => { list[i].label = label; });
+    const debtors = list.map(p => ({ ...p, cents: -paise(p.net) })).filter(p => p.cents > 0).sort(byAmount);
+    const creditors = list.map(p => ({ ...p, cents: paise(p.net) })).filter(p => p.cents > 0).sort(byAmount);
     const transactions: Transaction[] = [];
     let d = 0;
     let c = 0;
     while (d < debtors.length && c < creditors.length) {
-        const amount = Math.min(debtors[d].net, creditors[c].net);
-        transactions.push({ from: debtors[d].label, to: creditors[c].label, amount: paise(amount) / 100, toPhone: creditors[c].phone });
-        debtors[d].net -= amount;
-        creditors[c].net -= amount;
-        if (debtors[d].net < 0.005) d++;
-        if (creditors[c].net < 0.005) c++;
+        const cents = Math.min(debtors[d].cents, creditors[c].cents);
+        transactions.push({ from: debtors[d].label, to: creditors[c].label, amount: cents / 100, toPhone: creditors[c].phone });
+        debtors[d].cents -= cents;
+        creditors[c].cents -= cents;
+        if (debtors[d].cents === 0) d++;
+        if (creditors[c].cents === 0) c++;
     }
-    return { transactions, people: [...people.values()] };
+    // offBy: what no transfer can cover when the nets don't sum to zero (carried-in balances).
+    const offBy = list.reduce((sum, p) => sum + paise(p.net), 0) / 100;
+    return { transactions, people: [...people.values()], parties: list.map(({ label, phone, net }) => ({ label, phone, net })), offBy };
 };

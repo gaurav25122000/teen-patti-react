@@ -122,16 +122,16 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     };
 
     const handleShowOwings = () => {
-        const { people, transactions } = pokerSettlement(gameState);
+        const { people, transactions, offBy } = pokerSettlement(gameState);
         setTransactions(transactions);
-        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'poker'));
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'poker', false, offBy));
         setModalMode('owings');
     };
 
     const handleManagePlayers = () => {
         switch (modalMode) {
             case 'addPlayer': {
-                if (!addPlayerName || !addPlayerStack) return alert("Please enter name and stack.");
+                if (!addPlayerName.trim() || !addPlayerStack) return alert("Please enter name and stack.");
                 if (!/^\d{10}$/.test(addPlayerPhone.trim())) {
                     return alert('Please enter a valid 10-digit phone number.');
                 }

@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { onToast, type ToastData } from '../utils/toast';
+import { clearPendingToast, onToast, pendingToast, type ToastData } from '../utils/toast';
 
-// Shows the latest toast; one with text to copy stays until dismissed.
+// Shows the latest toast; one with text to copy stays until dismissed, and offers the text if copying fails.
 const Toaster: React.FC = () => {
-    const [toast, setToast] = useState<ToastData | null>(null);
-    const [copied, setCopied] = useState(false);
+    const [toast, setToast] = useState<ToastData | null>(pendingToast);
+    const [copy, setCopy] = useState<'idle' | 'done' | 'failed'>('idle');
 
-    useEffect(() => onToast(next => { setToast(next); setCopied(false); }), []);
+    useEffect(() => onToast(next => { setToast(next); setCopy('idle'); }), []);
 
     useEffect(() => {
         if (!toast || toast.copyText) return;
@@ -15,16 +15,21 @@ const Toaster: React.FC = () => {
     }, [toast]);
 
     if (!toast) return null;
-    const copy = () => {
+    const dismiss = () => {
+        clearPendingToast();
+        setToast(null);
+    };
+    const copyText = () => {
         Promise.resolve()
             .then(() => navigator.clipboard.writeText(toast.copyText!))
-            .then(() => setCopied(true), () => setToast({ text: "Couldn't copy." }));
+            .then(() => { setCopy('done'); clearPendingToast(); }, () => setCopy('failed'));
     };
     return (
         <div className="app-toast" role="status">
-            <span>{copied ? 'Settlement copied' : toast.text}</span>
-            {toast.copyText && !copied && <button className="btn-sm" onClick={copy}>COPY</button>}
-            {toast.copyText && <button className="btn-sm" onClick={() => setToast(null)} aria-label="Dismiss">✕</button>}
+            <span>{copy === 'done' ? 'Settlement copied' : copy === 'failed' ? "Couldn't copy. Select the text and copy it." : toast.text}</span>
+            {toast.copyText && copy === 'idle' && <button className="btn-sm" onClick={copyText}>COPY</button>}
+            {toast.copyText && <button className="btn-sm" onClick={dismiss} aria-label="Dismiss">✕</button>}
+            {copy === 'failed' && <textarea className="toast-copy" readOnly value={toast.copyText} onFocus={e => e.target.select()} />}
         </div>
     );
 };

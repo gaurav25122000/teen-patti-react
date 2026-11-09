@@ -128,11 +128,28 @@ test('blackjack: a player named like the house stays a separate party', () => {
     assert.deepEqual(transactions, [{ from: 'Dealer (house)', to: 'Dealer (house) (…0004)', amount: 100, toPhone: '9000000004' }]);
 });
 
-test('a phoneless player named like the house is still not the house', () => {
+test('a phoneless player named like the house is still not the house; the house is numbered', () => {
     const s = blackjackSettlement({ players: [{ name: 'Dealer (House)', stack: 1100, totalBuyIn: 1000, hands: [] }] as never, dealerNet: -100 });
     assert.deepEqual(nets(s), [{ name: 'Dealer (house)', net: 100 }]);
-    assert.equal(s.transactions.length, 1);
-    assert.equal(s.transactions[0].amount, 100);
+    assert.deepEqual(s.transactions, [{ from: 'Dealer (house) (2)', to: 'Dealer (house)', amount: 100, toPhone: null }]);
+});
+
+test('two groups with one name are numbered in first-seen order', () => {
+    const { transactions } = settleParties([
+        { name: 'P1', phoneNumber: '1', balance: -50, entityId: 1 },
+        { name: 'P2', phoneNumber: '2', balance: 50, entityId: 2 },
+    ], [{ id: 1, name: 'Team' }, { id: 2, name: 'team' }]);
+    assert.deepEqual(transactions, [{ from: 'Team', to: 'Team (2)', amount: 50, toPhone: null }]);
+});
+
+test('nets that do not sum to zero report what no transfer covers', () => {
+    const s = settleParties([
+        { name: 'Asha', phoneNumber: '1', balance: 500 }, { name: 'Raj', phoneNumber: '2', balance: -200 }, { name: 'Dev', phoneNumber: '3', balance: 200 },
+    ]);
+    assert.equal(s.offBy, 500);
+    assert.deepEqual(s.transactions, [{ from: 'Raj', to: 'Dev', amount: 200, toPhone: '3' }]);
+    assert.equal(settleParties([{ name: 'A', phoneNumber: '1', balance: -10 }]).offBy, -10);
+    assert.equal(settleParties([{ name: 'A', phoneNumber: '1', balance: 10 }, { name: 'B', phoneNumber: '2', balance: -10 }]).offBy, 0);
 });
 
 test('blackjack: unsettled bets go back to their owners; settled hands stay settled', () => {
@@ -153,6 +170,7 @@ test('transfers balance every party within a paisa and nobody pays themselves', 
         { name: 'C', phoneNumber: '3', balance: 33.335 }, { name: 'D', phoneNumber: '4', balance: -33.335 },
     ];
     assert.deepEqual(settleParties(players).transactions, [{ from: 'B', to: 'A', amount: 0.3, toPhone: '1' }, { from: 'D', to: 'C', amount: 33.34, toPhone: '3' }]);
+    assert.equal(settleParties(players).offBy, 0);
 });
 
 test('float residue on either side never makes a ₹0 transfer', () => {
@@ -161,4 +179,16 @@ test('float residue on either side never makes a ₹0 transfer', () => {
         { name: 'C', phoneNumber: '3', balance: 10 }, { name: 'D', phoneNumber: '4', balance: -10 },
     ];
     assert.deepEqual(settleParties(players).transactions, [{ from: 'B', to: 'A', amount: 0.3, toPhone: '1' }, { from: 'D', to: 'C', amount: 10, toPhone: '3' }]);
+});
+
+test('a net under half a paisa is no party; half a paisa or more is paid as one paisa', () => {
+    assert.deepEqual(settleParties([{ name: 'A', phoneNumber: '1', balance: 0.004 }, { name: 'B', phoneNumber: '2', balance: -0.004 }]).transactions, []);
+    assert.deepEqual(settleParties([{ name: 'A', phoneNumber: '1', balance: 0.006 }, { name: 'B', phoneNumber: '2', balance: -0.006 }]).transactions,
+        [{ from: 'B', to: 'A', amount: 0.01, toPhone: '1' }]);
+});
+
+test('halves of a paisa round away from zero on both sides, so they never make a false imbalance', () => {
+    const s = settleParties([{ name: 'A', phoneNumber: '1', balance: 0.125 }, { name: 'B', phoneNumber: '2', balance: -0.125 }]);
+    assert.deepEqual(s.transactions, [{ from: 'B', to: 'A', amount: 0.13, toPhone: '1' }]);
+    assert.equal(s.offBy, 0);
 });

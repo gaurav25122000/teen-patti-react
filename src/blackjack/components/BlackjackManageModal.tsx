@@ -69,7 +69,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
                 <div className="form-group"><label>Number of Hands</label><input type="number" min="1" value={addPlayerNumHands} onChange={e => setAddPlayerNumHands(e.target.value)} /></div>
             </>;
             confirmAction = () => {
-                 if (!addPlayerName || !addPlayerStack) return alert("Please enter name and stack.");
+                 if (!addPlayerName.trim() || !addPlayerStack) return alert("Please enter name and stack.");
                 if (!/^\d{10}$/.test(addPlayerPhone.trim())) {
                     return alert('Please enter a valid 10-digit phone number.');
                 }

@@ -1199,3 +1199,11 @@ h1 {
   color: #fff;
   z-index: 10000;
 }
+.toast-copy {
+  width: 100%;
+  min-height: 6rem;
+  margin-top: 0.5rem;
+}
+.app-toast:has(.toast-copy) {
+  flex-wrap: wrap;
+}
