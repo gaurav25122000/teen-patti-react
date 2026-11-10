@@ -1207,3 +1207,33 @@ h1 {
 .app-toast:has(.toast-copy) {
   flex-wrap: wrap;
 }
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2em;
+  height: 2em;
+  border-radius: 50%;
+  color: #0d0d1a;
+  font-weight: 700;
+  font-size: 0.85em;
+  flex-shrink: 0;
+}
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+.color-swatch[aria-checked="true"] {
+  border-color: #fff;
+}
+.emoji-input {
+  width: 4em;
+}

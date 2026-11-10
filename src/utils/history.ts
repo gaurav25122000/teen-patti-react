@@ -19,7 +19,11 @@ export interface HistoryEntry {
     nets: PlayerNet[];
     transactions: (Transaction & { paid: boolean })[];
     summary: string[];
+    updatedAt?: number; // epoch ms of the last change, for sync
+    deleted?: boolean; // a tombstone: hidden, but kept so sync can't bring the entry back
 }
+
+export const liveHistory = (list: HistoryEntry[]) => list.filter(e => !e.deleted);
 
 export const HISTORY_KEY = 'bets-history';
 const UNREADABLE_PREFIX = 'bets-history-unreadable-';
@@ -35,12 +39,13 @@ const isTransfer = (t: HistoryEntry['transactions'][number] | null) =>
     typeof t?.from === 'string' && typeof t.to === 'string' && typeof t.amount === 'number' && typeof t.paid === 'boolean'
     && (t.toPhone === null || typeof t.toPhone === 'string');
 
-const isEntry = (value: unknown): value is HistoryEntry => {
+export const isEntry = (value: unknown): value is HistoryEntry => {
     const e = value as HistoryEntry;
     return typeof e === 'object' && e !== null && typeof e.id === 'string' && typeof e.endedAt === 'string'
         && GAMES.includes(e.game) && Array.isArray(e.nets) && e.nets.every(isNet)
         && Array.isArray(e.transactions) && e.transactions.every(isTransfer)
-        && Array.isArray(e.summary) && e.summary.every(line => typeof line === 'string');
+        && Array.isArray(e.summary) && e.summary.every(line => typeof line === 'string')
+        && (e.updatedAt === undefined || Number.isFinite(e.updatedAt)) && (e.deleted === undefined || typeof e.deleted === 'boolean');
 };
 
 // A stored value that is not a valid history is moved to a timestamped key, never overwritten.
@@ -67,11 +72,15 @@ export const writeHistory = (list: HistoryEntry[], storage: HistoryStorage = loc
     storage.setItem(HISTORY_KEY, JSON.stringify(list));
 };
 
-// Newest first: the newest 50, plus older games that still have an unpaid transfer, up to 200 in all.
-export const addEntry = (list: HistoryEntry[], entry: HistoryEntry) => {
-    const all = [entry, ...list];
-    return [...all.slice(0, MAX_HISTORY), ...all.slice(MAX_HISTORY).filter(e => e.transactions.some(t => !t.paid))].slice(0, MAX_WITH_UNPAID);
+// Newest first: the newest 50 live games, plus older ones that still have an unpaid transfer, up to 200 in all.
+// Tombstones don't count and are kept until sync prunes them.
+export const capHistory = (list: HistoryEntry[]) => {
+    const live = liveHistory(list);
+    const kept = [...live.slice(0, MAX_HISTORY), ...live.slice(MAX_HISTORY).filter(e => e.transactions.some(t => !t.paid))].slice(0, MAX_WITH_UNPAID);
+    return [...kept, ...list.filter(e => e.deleted)];
 };
+
+export const addEntry = (list: HistoryEntry[], entry: HistoryEntry) => capHistory([entry, ...list]);
 
 export const buildEntry = (game: GameKind, stats: NightStats, s: SettlementParts, now = new Date()): HistoryEntry => ({
     id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -80,6 +89,7 @@ export const buildEntry = (game: GameKind, stats: NightStats, s: SettlementParts
     nets: playerNets(s.people),
     transactions: s.transactions.map(t => ({ ...t, paid: false })),
     summary: summaryLines(stats, s.people, game, s.carried, s.offBy),
+    updatedAt: now.getTime(),
 });
 
 const moved = (net: number) => Math.abs(net) >= 0.005;
@@ -108,5 +118,9 @@ export const archiveGame = (
 export const historyShareText = (e: HistoryEntry, saved: SavedPlayer[]) =>
     shareText(e.transactions.filter(t => !t.paid), e.summary, saved);
 
-export const setPaid = (list: HistoryEntry[], id: string, index: number, paid: boolean) =>
-    list.map(e => (e.id !== id ? e : { ...e, transactions: e.transactions.map((t, i) => (i === index ? { ...t, paid } : t)) }));
+export const setPaid = (list: HistoryEntry[], id: string, index: number, paid: boolean, now = Date.now()) =>
+    list.map(e => (e.id !== id ? e : { ...e, transactions: e.transactions.map((t, i) => (i === index ? { ...t, paid } : t)), updatedAt: now }));
+
+// A delete leaves a tombstone so sync can't bring the entry back.
+export const deleteHistoryEntry = (list: HistoryEntry[], id: string, now = Date.now()) =>
+    list.map(e => (e.id === id ? { ...e, deleted: true, updatedAt: now } : e));

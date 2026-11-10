@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { hasUnreadableHistory, historyShareText, readHistory, setPaid, writeHistory, type HistoryEntry } from '../utils/history';
+import { deleteHistoryEntry, hasUnreadableHistory, historyShareText, liveHistory, readHistory, setPaid, writeHistory, type HistoryEntry } from '../utils/history';
 import type { GameKind } from '../utils/nightStats';
 import { couldNot, formatAmount } from '../utils/formatters';
 import { readSavedPlayers } from '../utils/savedPlayers';
@@ -44,10 +44,10 @@ const HistoryScreen: React.FC = () => {
         }
     };
 
-    const open = entries.find(e => e.id === openId);
+    const open = liveHistory(entries).find(e => e.id === openId);
     if (open) {
         const remove = () => {
-            if (window.confirm('Delete this game from history?') && persist(entries.filter(e => e.id !== open.id), 'delete')) setOpenId(null);
+            if (window.confirm('Delete this game from history?') && persist(deleteHistoryEntry(entries, open.id), 'delete')) setOpenId(null);
         };
         return (
             <div className="setup-screen">
@@ -94,9 +94,9 @@ const HistoryScreen: React.FC = () => {
         <div className="setup-screen">
             <h2>History</h2>
             {notice && <p className="form-error">{notice}</p>}
-            {entries.length === 0 ? <p>No finished games yet. A game is kept here when you end it.</p> : (
+            {liveHistory(entries).length === 0 ? <p>No finished games yet. A game is kept here when you end it.</p> : (
                 <ul className="history-list">
-                    {entries.map(e => (
+                    {liveHistory(entries).map(e => (
                         <li key={e.id}>
                             <button className="btn-secondary" onClick={() => setOpenId(e.id)}>
                                 {when(e.endedAt)} · {GAME_LABEL[e.game]} · {e.nets.length} players

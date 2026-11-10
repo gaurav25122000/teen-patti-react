@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chipPlayers, cleanPhone, duplicatePhone, fillRow, loadSavedPlayers, phoneInUse, readSavedPlayers, saveEntry, upsertPlayers, type SavedPlayer } from './savedPlayers.ts';
+import { avatarColor, chipPlayers, cleanPhone, deleteEntry, duplicatePhone, fillRow, initials, isOneEmoji, loadSavedPlayers, phoneInUse, readSavedPlayers, saveEntry, upsertPlayers, type SavedPlayer } from './savedPlayers.ts';
+
+const NOW = 1762800000000;
 
 const asha: SavedPlayer = { name: 'Asha', phone: '9000000001', upi: 'asha@okhdfc' };
 
@@ -8,17 +10,17 @@ test('upsert by phone: latest trimmed name wins, an existing UPI ID stays, new p
     const { list, refused } = upsertPlayers([asha], [
         { name: '  Asha Rao ', phone: '9000000001' },
         { name: 'Raj', phone: '9000000002' },
-    ]);
+    ], NOW);
     assert.equal(refused, 0);
     assert.deepEqual(list, [
-        { name: 'Asha Rao', phone: '9000000001', upi: 'asha@okhdfc' },
-        { name: 'Raj', phone: '9000000002' },
+        { name: 'Asha Rao', phone: '9000000001', upi: 'asha@okhdfc', updatedAt: NOW },
+        { name: 'Raj', phone: '9000000002', updatedAt: NOW },
     ]);
 });
 
 test('upsert trims the phone before matching and saving', () => {
-    const { list } = upsertPlayers([asha], [{ name: 'Asha', phone: ' 9000000001 ' }, { name: 'Raj', phone: '9000000002 ' }]);
-    assert.deepEqual(list, [asha, { name: 'Raj', phone: '9000000002' }]);
+    const { list } = upsertPlayers([asha], [{ name: 'Asha', phone: ' 9000000001 ' }, { name: 'Raj', phone: '9000000002 ' }], NOW);
+    assert.deepEqual(list, [asha, { name: 'Raj', phone: '9000000002', updatedAt: NOW }]); // unchanged Asha is not re-stamped
 });
 
 test('upsert skips players without a valid phone or name', () => {
@@ -46,11 +48,11 @@ test('add and edit validate name, phone, UPI and phone uniqueness', () => {
 });
 
 test('add trims and stores UPI only when present; edit replaces in place, may change phone and clear UPI', () => {
-    const added = saveEntry([asha], { name: ' Dev ', phone: '9000000003', upi: ' dev.k-1@okaxis ' });
-    assert.deepEqual(added, [asha, { name: 'Dev', phone: '9000000003', upi: 'dev.k-1@okaxis' }]);
-    const edited = saveEntry([asha], { name: 'Asha', phone: '9000000009', upi: '' }, '9000000001');
-    assert.deepEqual(edited, [{ name: 'Asha', phone: '9000000009' }]);
-    assert.deepEqual(saveEntry([asha], { name: 'Asha', phone: '9000000001', upi: 'asha@okhdfc' }, '9000000001'), [asha]);
+    const added = saveEntry([asha], { name: ' Dev ', phone: '9000000003', upi: ' dev.k-1@okaxis ' }, undefined, NOW);
+    assert.deepEqual(added, [asha, { name: 'Dev', phone: '9000000003', upi: 'dev.k-1@okaxis', updatedAt: NOW }]);
+    const edited = saveEntry([asha], { name: 'Asha', phone: '9000000009', upi: '' }, '9000000001', NOW);
+    assert.deepEqual(edited, [{ ...asha, deleted: true, updatedAt: NOW }, { name: 'Asha', phone: '9000000009', updatedAt: NOW }]);
+    assert.deepEqual(saveEntry([asha], { name: 'Asha', phone: '9000000001', upi: 'asha@okhdfc' }, '9000000001', NOW), [{ ...asha, updatedAt: NOW }]);
 });
 
 test('reading drops malformed entries and survives bad JSON', () => {
@@ -106,4 +108,29 @@ test('a blank phone is no phone: it is never "in use"', () => {
     assert.equal(cleanPhone('  '), undefined);
     assert.equal(cleanPhone(' 9000000001 '), '9000000001');
     assert.equal(phoneInUse([{ name: 'Raj', phoneNumber: '' }], '  '), null);
+});
+
+test('deleting leaves a tombstone that hides the player; adding them back revives the entry', () => {
+    const gone = deleteEntry([asha], '9000000001', NOW);
+    assert.deepEqual(gone, [{ ...asha, deleted: true, updatedAt: NOW }]);
+    assert.deepEqual(readSavedPlayers({ getItem: () => JSON.stringify(gone) }), []);
+    assert.equal(saveEntry(gone, { name: 'Asha', phone: '9000000001', upi: '' }, undefined, NOW + 1).toString().includes('Another'), false);
+    assert.deepEqual(upsertPlayers(gone, [{ name: 'Asha', phone: '9000000001' }], NOW + 1).list, [{ name: 'Asha', phone: '9000000001', updatedAt: NOW + 1 }]);
+});
+
+test('tombstones do not count toward the 200 cap', () => {
+    const full = Array.from({ length: 200 }, (_, i) => ({ name: `P${i}`, phone: String(9000000000 + i), deleted: i === 0 }));
+    assert.equal(upsertPlayers(full, [{ name: 'New', phone: '8000000000' }], NOW).refused, 0);
+});
+
+test('avatar: own colour, else phone digits mod 12; initials of the first two words; one emoji only', () => {
+    assert.equal(avatarColor({ phone: '9000000001' }), 10);
+    assert.equal(avatarColor({ phone: '9000000001', color: 3 }), 3);
+    assert.equal(initials('Asha'), 'A');
+    assert.equal(initials(' raj kumar singh '), 'RK');
+    assert.equal(isOneEmoji('🃏'), true);
+    assert.equal(isOneEmoji('👍🏽'), true);
+    assert.equal(isOneEmoji('🃏🃏'), false);
+    assert.equal(isOneEmoji('A'), false);
+    assert.equal(saveEntry([], { name: 'Asha', phone: '9000000001', upi: '', emoji: 'ab' }), 'Pick one emoji.');
 });

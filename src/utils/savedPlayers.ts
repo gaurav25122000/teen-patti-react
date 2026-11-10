@@ -1,11 +1,34 @@
 import { couldNot, toTitleCase } from './formatters.ts';
 
-// Players remembered on this device only, keyed by phone.
+// Players remembered on this device (and synced to a group, if any), keyed by phone.
 export interface SavedPlayer {
     name: string;
     phone: string;
     upi?: string;
+    color?: number; // 0-11 into AVATAR_COLORS; absent means the default from the phone
+    emoji?: string; // shown instead of initials
+    updatedAt?: number; // epoch ms of the last change, for sync
+    deleted?: boolean; // a tombstone: hidden, but kept so sync can't bring the player back
 }
+
+export const AVATAR_COLORS = ['#00C6FF', '#FF416C', '#00F260', '#FDC830', '#B388FF', '#FF9100', '#18FFFF', '#FF80AB', '#69F0AE', '#FFD740', '#8C9EFF', '#FF6E40'];
+
+// The player's colour index: their own, else the sum of the phone's digits mod 12.
+export const avatarColor = (p: { phone: string; color?: number }) =>
+    p.color ?? [...p.phone].reduce((sum, d) => sum + (Number(d) || 0), 0) % AVATAR_COLORS.length;
+
+export const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('');
+
+// Intl.Segmenter is newer than this project's ES2020 type library.
+type GraphemeSegmenter = new (locale: undefined, options: { granularity: 'grapheme' }) => { segment: (text: string) => Iterable<unknown> };
+
+// One emoji (a single grapheme that is a pictograph).
+export const isOneEmoji = (text: string) => {
+    const Segmenter = (Intl as unknown as { Segmenter: GraphemeSegmenter }).Segmenter;
+    return [...new Segmenter(undefined, { granularity: 'grapheme' }).segment(text)].length === 1 && /\p{Extended_Pictographic}/u.test(text);
+};
+
+export const livePlayers = (list: SavedPlayer[]) => list.filter(p => !p.deleted);
 
 const SAVED_PLAYERS_KEY = 'bets-saved-players';
 const MAX_SAVED_PLAYERS = 200;
@@ -14,14 +37,18 @@ const SAVED_PLAYERS_FULL = `You can save up to ${MAX_SAVED_PLAYERS} players.`;
 const PHONE_PATTERN = /^\d{10}$/;
 const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
 
-const isSavedPlayer = (value: unknown): value is SavedPlayer => {
+export const isSavedPlayer = (value: unknown): value is SavedPlayer => {
     const p = value as SavedPlayer;
     return typeof p === 'object' && p !== null && typeof p.name === 'string' && p.name.trim() !== '' && typeof p.phone === 'string'
-        && PHONE_PATTERN.test(p.phone) && (p.upi === undefined || (typeof p.upi === 'string' && UPI_PATTERN.test(p.upi)));
+        && PHONE_PATTERN.test(p.phone) && (p.upi === undefined || (typeof p.upi === 'string' && UPI_PATTERN.test(p.upi)))
+        && (p.color === undefined || (Number.isInteger(p.color) && p.color >= 0 && p.color < AVATAR_COLORS.length))
+        && (p.emoji === undefined || (typeof p.emoji === 'string' && p.emoji.length <= 16))
+        && (p.updatedAt === undefined || Number.isFinite(p.updatedAt))
+        && (p.deleted === undefined || typeof p.deleted === 'boolean');
 };
 
-// failed: the stored list could not be read, so callers can say so instead of showing nobody.
-export const loadSavedPlayers = (storage: Pick<Storage, 'getItem'> = localStorage): { list: SavedPlayer[]; failed: boolean } => {
+// Every entry, tombstones included (sync needs them). failed: the stored list could not be read.
+export const loadAllSavedPlayers = (storage: Pick<Storage, 'getItem'> = localStorage): { list: SavedPlayer[]; failed: boolean } => {
     try {
         const parsed = JSON.parse(storage.getItem(SAVED_PLAYERS_KEY) ?? '[]');
         if (!Array.isArray(parsed)) return { list: [], failed: true };
@@ -39,6 +66,12 @@ export const loadSavedPlayers = (storage: Pick<Storage, 'getItem'> = localStorag
     }
 };
 
+// The live players; failed lets callers say so instead of showing nobody.
+export const loadSavedPlayers = (storage: Pick<Storage, 'getItem'> = localStorage) => {
+    const { list, failed } = loadAllSavedPlayers(storage);
+    return { list: livePlayers(list), failed };
+};
+
 export const readSavedPlayers = (storage: Pick<Storage, 'getItem'> = localStorage) => loadSavedPlayers(storage).list;
 
 // A stored phone, trimmed; blank counts as no phone.
@@ -48,8 +81,9 @@ export const writeSavedPlayers = (list: SavedPlayer[], storage: Pick<Storage, 's
     storage.setItem(SAVED_PLAYERS_KEY, JSON.stringify(list));
 };
 
-// Game players upserted by phone: the latest trimmed name wins, an existing UPI ID stays.
-export const upsertPlayers = (list: SavedPlayer[], players: { name: string; phone?: string }[]) => {
+// Game players upserted by phone into the full list: the latest trimmed name wins, an existing UPI ID stays,
+// a deleted player comes back fresh. Only changes are stamped.
+export const upsertPlayers = (list: SavedPlayer[], players: { name: string; phone?: string }[], now = Date.now()) => {
     const next = [...list];
     let refused = 0;
     for (const p of players) {
@@ -57,9 +91,16 @@ export const upsertPlayers = (list: SavedPlayer[], players: { name: string; phon
         const phone = p.phone?.trim() ?? '';
         if (!name || !PHONE_PATTERN.test(phone)) continue;
         const index = next.findIndex(s => s.phone === phone);
-        if (index >= 0) next[index] = { ...next[index], name };
-        else if (next.length >= MAX_SAVED_PLAYERS) refused++;
-        else next.push({ name, phone });
+        const existing = next[index];
+        if (existing && !existing.deleted) {
+            if (existing.name !== name) next[index] = { ...existing, name, updatedAt: now };
+        } else if (livePlayers(next).length >= MAX_SAVED_PLAYERS) {
+            refused++;
+        } else if (existing) {
+            next[index] = { name, phone, updatedAt: now };
+        } else {
+            next.push({ name, phone, updatedAt: now });
+        }
     }
     return { list: next, refused };
 };
@@ -68,7 +109,9 @@ export const upsertPlayers = (list: SavedPlayer[], players: { name: string; phon
 export const rememberPlayers = (players: { name: string; phone?: string }[]): string | null => {
     if (players.length === 0) return null;
     try {
-        const { list, refused } = upsertPlayers(readSavedPlayers(), players);
+        const { list: stored, failed } = loadAllSavedPlayers();
+        if (failed) throw new Error("saved players can't be read"); // never write over a list we couldn't read
+        const { list, refused } = upsertPlayers(stored, players);
         writeSavedPlayers(list);
         return refused > 0 ? SAVED_PLAYERS_FULL : null;
     } catch (error) {
@@ -77,25 +120,38 @@ export const rememberPlayers = (players: { name: string; phone?: string }[]): st
     }
 };
 
-// Adds (originalPhone undefined) or edits one entry from the Saved Players screen; returns the new list or an error.
+// Adds (originalPhone undefined) or edits one entry from the Saved Players screen, in the full list (tombstones
+// included); returns the new list or an error. A changed phone leaves a tombstone at the old one.
 export const saveEntry = (
     list: SavedPlayer[],
-    entry: { name: string; phone: string; upi: string },
-    originalPhone?: string
+    entry: { name: string; phone: string; upi: string; color?: number; emoji?: string },
+    originalPhone?: string,
+    now = Date.now()
 ): SavedPlayer[] | string => {
     const name = entry.name.trim();
     const phone = entry.phone.trim();
     const upi = entry.upi.trim();
+    const emoji = entry.emoji?.trim() ?? '';
     if (!name) return 'Enter a name.';
     if (!PHONE_PATTERN.test(phone)) return 'Phone must be 10 digits.';
     if (upi && !UPI_PATTERN.test(upi)) return 'Enter a valid UPI ID.';
-    if (list.some(s => s.phone === phone && s.phone !== originalPhone)) return 'Another saved player has this phone.';
-    const saved: SavedPlayer = upi ? { name, phone, upi } : { name, phone };
-    if (originalPhone === undefined) {
-        return list.length >= MAX_SAVED_PLAYERS ? SAVED_PLAYERS_FULL : [...list, saved];
-    }
-    return list.map(s => (s.phone === originalPhone ? saved : s));
+    if (emoji && !isOneEmoji(emoji)) return 'Pick one emoji.';
+    const live = livePlayers(list);
+    if (live.some(s => s.phone === phone && s.phone !== originalPhone)) return 'Another saved player has this phone.';
+    if (originalPhone === undefined && live.length >= MAX_SAVED_PLAYERS) return SAVED_PLAYERS_FULL;
+    const saved: SavedPlayer = {
+        name, phone, ...(upi ? { upi } : {}), ...(entry.color !== undefined ? { color: entry.color } : {}), ...(emoji ? { emoji } : {}), updatedAt: now,
+    };
+    const next = originalPhone !== undefined && originalPhone !== phone ? deleteEntry(list, originalPhone, now) : [...list];
+    const index = next.findIndex(s => s.phone === phone);
+    if (index < 0) return [...next, saved];
+    next[index] = saved;
+    return next;
 };
+
+// A delete leaves a tombstone so sync can't bring the player back.
+export const deleteEntry = (list: SavedPlayer[], phone: string, now = Date.now()) =>
+    list.map(s => (s.phone === phone ? { ...s, deleted: true, updatedAt: now } : s));
 
 // Chips for a setup form: saved players whose phone is not in the form yet (typed phones count once trimmed).
 export const chipPlayers = (saved: SavedPlayer[], formPhones: string[]) => {

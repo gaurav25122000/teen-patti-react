@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, archiveGame, buildEntry, hasUnreadableHistory, historyShareText, HISTORY_KEY, MAX_HISTORY, readHistory, setPaid, writeHistory, type HistoryEntry } from './history.ts';
+import { addEntry, archiveGame, buildEntry, deleteHistoryEntry, hasUnreadableHistory, historyShareText, HISTORY_KEY, liveHistory, MAX_HISTORY, readHistory, setPaid, writeHistory, type HistoryEntry } from './history.ts';
 import { emptyStats, partialStats, recordRound } from './nightStats.ts';
 import type { Person } from './owingsLogic.ts';
 
@@ -170,4 +170,19 @@ test('history keeps the newest 50, plus older games with an unpaid transfer, up 
     const settledOld = addEntry([...Array.from({ length: 50 }, (_, i) => entry(`n${i}`)), entry('old-paid')], entry('new'));
     assert.equal(settledOld.length, 50);
     assert.equal(settledOld.some(e => e.id === 'old-paid'), false);
+});
+
+test('deleting a game leaves a tombstone; tombstones are hidden and never count toward the cap', () => {
+    const list = deleteHistoryEntry([entry('a'), entry('b')], 'a', 99);
+    assert.deepEqual(list[0], { ...entry('a'), deleted: true, updatedAt: 99 });
+    assert.deepEqual(liveHistory(list).map(e => e.id), ['b']);
+    let many: HistoryEntry[] = [{ ...entry('gone'), deleted: true }];
+    for (let i = 1; i <= 50; i++) many = addEntry(many, entry(`g${i}`));
+    assert.equal(liveHistory(many).length, 50);
+    assert.equal(many.some(e => e.id === 'gone'), true);
+});
+
+test('a paid tick stamps the entry for sync', () => {
+    const a = { ...entry('a'), transactions: [{ from: 'R', to: 'A', amount: 1, toPhone: null, paid: false }] };
+    assert.equal(setPaid([a], 'a', 0, true, 77)[0].updatedAt, 77);
 });
