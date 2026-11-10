@@ -5,6 +5,7 @@ import { toTitleCase, formatAmount } from '../../utils/formatters';
 import { pokerChips, stepDown, stepUp } from '../../utils/quickBets';
 import { readAppSettings } from '../../utils/appSettings';
 import ActionPanel, { type PanelButton } from '../../components/ActionPanel';
+import { useFormError } from '../../hooks/useFormError';
 
 interface PokerPanelProps {
     gameState: PokerGameState;
@@ -27,7 +28,7 @@ const PokerPanel: React.FC<PokerPanelProps> = ({ gameState, currentPlayer, timer
     const canRaise = !p.canOnlyCall && p.stack > callAmount && !facingAllInCall;
     const floor = Math.min(minTotal, maxTotal); // a short stack can only go all-in
     const [amount, setAmount] = useState(floor);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useFormError();
 
     const raise = () => {
         if (amount >= maxTotal) return onAction('all-in'); // the whole stack, even short of a full raise
@@ -45,7 +46,7 @@ const PokerPanel: React.FC<PokerPanelProps> = ({ gameState, currentPlayer, timer
         : canCheck ? { label: 'CHECK', onClick: () => onAction('check'), theme: 'btn-primary' } : { label: `CALL ₹${formatAmount(callAmount)}`, onClick: () => onAction('call'), theme: 'btn-primary' };
 
     const buttons: PanelButton[] = [
-        { label: 'FOLD', onClick: fold, theme: 'btn-error', kind: 'fold' },
+        { label: 'FOLD', onClick: fold, theme: 'btn-error' },
         ...(canRaise ? [call] : []),
         ...(facingAllInCall || p.canOnlyCall ? [] : [{ label: `ALL-IN ₹${formatAmount(p.stack)}`, onClick: () => onAction('all-in'), theme: 'btn-accent rainbow-outline' }]),
         canRaise ? { label: `${currentBet > 0 ? 'RAISE' : 'BET'} ₹${formatAmount(amount)}`, onClick: raise, theme: 'btn-success', kind: 'primary' } : { ...call, kind: 'primary' },

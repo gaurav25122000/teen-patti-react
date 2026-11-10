@@ -9,6 +9,7 @@ import Avatar from './Avatar';
 import { loadSavedPlayers } from '../utils/savedPlayers';
 import { isUnbalanced, shareText, upiFor } from '../utils/settlement';
 import { GAME_LABELS, type GameKind } from '../utils/nightStats';
+import { formatAmount } from '../utils/formatters';
 
 interface OwingsModalProps {
     isOpen: boolean;
@@ -60,7 +61,7 @@ const OwingsContent: React.FC<Omit<OwingsModalProps, 'isOpen'>> = ({ onClose, su
                                 <span className="from"><Avatar name={t.from} /> {t.from}</span>
                                 <span className="arrow">→</span>
                                 <span className="to"><Avatar name={t.to} phone={t.toPhone ?? undefined} saved={saved} /> {t.to}</span>
-                                <span className="amount">₹ {t.amount.toFixed(2)}</span>
+                                <span className="amount">₹{formatAmount(t.amount)}</span>
                                 {upi && <PayLink upi={upi} payee={t.to} amount={t.amount} onNoApp={setPayNote} />}
                             </li>
                         );

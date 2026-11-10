@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { readAppSettings, writeAppSettings, type AppSettings } from '../utils/appSettings';
+import { useFormError } from '../hooks/useFormError';
 
 const LABELS: [keyof AppSettings, string][] = [['sounds', 'Sounds'], ['haptics', 'Haptics'], ['keepAwake', 'Keep screen awake'], ['confirmFold', 'Confirm before fold']];
 
 // This phone's own settings; they don't sync.
 const AppSettingsScreen: React.FC = () => {
     const [settings, setSettings] = useState(readAppSettings);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useFormError();
     const toggle = (key: keyof AppSettings) => {
         const next = { ...settings, [key]: !settings[key] };
         if (writeAppSettings(next)) {

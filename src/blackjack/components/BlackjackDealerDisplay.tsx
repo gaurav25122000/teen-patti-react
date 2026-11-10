@@ -1,5 +1,6 @@
 // src/blackjack/components/BlackjackDealerDisplay.tsx
 import React from 'react';
+import { money } from '../../utils/formatters';
 
 interface BlackjackDealerDisplayProps {
     dealerNet: number;
@@ -36,7 +37,7 @@ const BlackjackDealerDisplay: React.FC<BlackjackDealerDisplayProps> = ({ dealerN
                     textShadow: `0 0 5px ${getNetColor()}`
                 }}
             >
-                ₹{dealerNet.toFixed(2)}
+                {money(dealerNet)}
             </div>
         </div>
     );

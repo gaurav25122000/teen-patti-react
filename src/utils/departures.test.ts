@@ -18,7 +18,7 @@ test('a departure keeps the result; the same person and group leaving again is s
 });
 
 test('the removal note and the minimum-players refusal', () => {
-    assert.equal(departureNote(120.5), ' They leave ₹120.5 up and stay in Final Owings.');
+    assert.equal(departureNote(120.5), ' They leave ₹120.50 up and stay in Final Owings.');
     assert.equal(departureNote(-80), ' They leave ₹80 down and stay in Final Owings.');
     assert.equal(departureNote(0.004), '');
     assert.equal(tooFewToRemove(2), 'Keep at least 2 players at the table; use Final Owings to settle up.');

@@ -121,12 +121,12 @@ test('poker chips are conserved over 50 seeded random games of 200 actions, and 
 
 test('a fold-out pays the whole pot to the last player and records each phone', () => {
     let s = E.newPokerGame([{ name: 'Asha', stack: 100, phoneNumber: '9000000001' }, { name: 'Raj', stack: 100, phoneNumber: '9000000002' }], { smallBlindAmount: 5, bigBlindAmount: 10 }, 0);
-    s = go(s, (x, io) => E.startNewHand(x, io)); // Asha deals and posts the big blind; Raj posts the small and acts
-    assert.equal(s.players[s.activePlayerIndex].name, 'Raj');
+    s = go(s, (x, io) => E.startNewHand(x, io)); // heads-up: Asha deals, posts the small blind and acts; Raj posts the big
+    assert.equal(s.players[s.activePlayerIndex].name, 'Asha');
     const { state, records } = runStep(s, (x, io) => E.playerAction(x, 'fold', 0, io));
     assert.equal(state.gameStage, 'pre-deal');
-    assert.deepEqual(state.players.map(p => p.stack), [105, 95]);
-    assert.deepEqual(records, [{ phone: '9000000001', name: 'Asha', winnings: 5 }, { phone: '9000000002', name: 'Raj', winnings: -5 }]);
+    assert.deepEqual(state.players.map(p => p.stack), [95, 105]);
+    assert.deepEqual(records, [{ phone: '9000000001', name: 'Asha', winnings: -5 }, { phone: '9000000002', name: 'Raj', winnings: 5 }]);
 });
 
 test('tournament chips are conserved over 50 seeded random games, prizes sum to the pool exactly, and the end settles', () => {

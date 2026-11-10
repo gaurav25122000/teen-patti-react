@@ -8,6 +8,8 @@ import { isUnbalanced, upiFor } from '../utils/settlement';
 import ShareButtons from './ShareButtons';
 import PayLink from './PayLink';
 import Avatar from './Avatar';
+import { useFormError } from '../hooks/useFormError';
+import { cue } from '../utils/feedback';
 
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
@@ -27,7 +29,7 @@ const HistoryScreen: React.FC = () => {
     const [{ entries, notice }, setHistory] = useState(loadHistory);
     const [openId, setOpenId] = useState<string | null>(null);
     const [saved] = useState(() => readSavedPlayers());
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useFormError();
     const [payNote, setPayNote] = useState<string | null>(null);
 
     const persist = (next: HistoryEntry[], verb: 'save' | 'delete') => {
@@ -66,7 +68,7 @@ const HistoryScreen: React.FC = () => {
                             return (
                                 <li key={i}>
                                     <label>
-                                        <input type="checkbox" checked={t.paid} onChange={e => persist(setPaid(entries, open.id, i, e.target.checked), 'save')} />
+                                        <input type="checkbox" checked={t.paid} onChange={e => persist(setPaid(entries, open.id, i, e.target.checked), 'save') && e.target.checked && cue('settle')} />
                                         {' '}{t.from} → {t.to} ₹{formatAmount(t.amount)}
                                     </label>
                                     {upi && <PayLink upi={upi} payee={t.to} amount={t.amount} onNoApp={setPayNote} />}
@@ -98,8 +100,9 @@ const HistoryScreen: React.FC = () => {
                 <ul className="history-list">
                     {liveHistory(entries).map(e => (
                         <li key={e.id}>
-                            <button className="btn-secondary" onClick={() => setOpenId(e.id)}>
-                                {when(e.endedAt)} · {GAME_LABELS[e.game]} · {e.nets.length} players
+                            <button className="btn-secondary history-tile" onClick={() => setOpenId(e.id)}>
+                                <strong>{GAME_LABELS[e.game]}</strong>
+                                <span>{when(e.endedAt)} · {e.nets.length} players</span>
                             </button>
                         </li>
                     ))}

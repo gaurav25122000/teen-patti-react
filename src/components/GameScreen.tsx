@@ -31,6 +31,8 @@ import { clockText, useTurnTimer } from '../hooks/useTurnTimer';
 import { END_GAME_CONFIRM } from '../utils/archive';
 import { useFormError } from '../hooks/useFormError';
 import { teenPattiMinBet } from '../utils/quickBets';
+import { parseAmount } from '../utils/money';
+import { useFollowTurn } from '../hooks/useFollowTurn';
 
 // --- SVG Icons ---
 const IconTrophy = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9a9 9 0 119 0zM16.5 18.75a9 9 0 00-9 0m9 0a9 9 0 01-9 0m9 0v-4.5A3.375 3.375 0 0012 10.5h-1.5a3.375 3.375 0 00-3.375 3.375v4.5m5.906-9.043c.124.083.242.172.355.267.112.096.22.2.322.308.1.107.196.22.286.338a3.743 3.743 0 01.286.338c.107.112.208.228.308.347.1.118.19.242.27.375M8.094 9.457c.124-.083.242-.172.355-.267.112-.096.22-.2.322-.308.1-.107.196-.22.286-.338a3.743 3.743 0 00.286-.338c.107-.112.208-.228.308-.347.1-.118.19-.242.27-.375" /></svg>;
@@ -56,6 +58,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     useWakeLock(readAppSettings().keepAwake);
     const timerLeft = useTurnTimer(isReadOnly ? undefined : gameState.turnTimer,
         gameState.roundActive && currentPlayer ? `${gameState.roundsStarted ?? 0}:${currentPlayer.id}` : null, toTitleCase(currentPlayer?.name ?? ''));
+    useFollowTurn(gameState.roundActive && currentPlayer ? `[data-player-id="${currentPlayer.id}"]` : null);
     const blinds = gameState.blindPlayerIds;
     const showDisabled = !currentPlayer || !precedingPlayer || activePlayers.length < 2
         || (blinds.has(precedingPlayer.id) && !blinds.has(currentPlayer.id) && activePlayers.length !== 2);
@@ -194,9 +197,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 body = <div className="form-group"><label htmlFor="boot-amount">Enter amount</label><input id="boot-amount" type="number" inputMode="decimal" value={bootAmount} onChange={e => setBootAmount(e.target.value)} min="1" autoFocus /></div>;
                 confirmText = "Set & Continue";
                 primaryAction = () => {
-                    const refusal = bootRefusal(gameState, nextBoot(gameState, Number(bootAmount)));
+                    const refusal = bootRefusal(gameState, nextBoot(gameState, parseAmount(bootAmount)));
                     if (refusal) return setFormError(refusal);
-                    if (Number(bootAmount) > 0) {
+                    if (parseAmount(bootAmount) > 0) {
                         setInteraction('gettingStartPlayer');
                     } else {
                         setFormError('Invalid boot amount.');
@@ -214,7 +217,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 primaryAction = () => {
                     const playerIndex = gameState.players.findIndex(p => p.id === parseInt(startPlayerId, 10));
                     if (playerIndex > -1) {
-                        actions.startRound(playerIndex, Number(bootAmount));
+                        actions.startRound(playerIndex, parseAmount(bootAmount));
                         closeModal();
                     }
                 };
@@ -273,7 +276,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     }
                     const taken = phoneInUse(gameState.players, addPlayerPhone);
                     if (taken) return setFormError(taken);
-                    actions.addPlayer(addPlayerName, Number(addPlayerBalance) || 0, addPlayerPhone.trim());
+                    actions.addPlayer(addPlayerName, parseAmount(addPlayerBalance, true), addPlayerPhone.trim());
                     closeModal();
                 };
                 break;
@@ -332,7 +335,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
             case 'deductAndDistribute':
                 title = "Deduct & Distribute"; theme = 'danger'; icon = <IconCash />;
-                body = <><div className="form-group"><label>Deduct from</label><select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div><div className="form-group"><label>Amount</label><input type="number" inputMode="decimal" value={deductAmount} onChange={e => setDeductAmount(Number(e.target.value))} /></div></>;
+                body = <><div className="form-group"><label>Deduct from</label><select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div><div className="form-group"><label>Amount</label><input type="number" inputMode="decimal" value={deductAmount} onChange={e => setDeductAmount(parseAmount(e.target.value))} /></div></>;
                 primaryAction = () => {
                     if (!(deductAmount > 0)) return setFormError('Please enter a valid amount.');
                     actions.deductAndDistribute(parseInt(selectedPlayerId, 10), deductAmount);

@@ -8,6 +8,8 @@ export interface FieldSpec {
     options?: [string, string][];
     only?: 'cash' | 'tournament'; // poker mode the field belongs to
     placeholder?: string;
+    group?: string; // heading shown above the first field of each group
+    wide?: boolean; // a row of its own
 }
 
 export const TEEN_PATTI_FIELDS: FieldSpec[] = [
@@ -24,21 +26,21 @@ export const POKER_FIELDS: FieldSpec[] = [
     { key: 'smallBlindAmount', label: 'Small blind (₹)' },
     { key: 'bigBlindAmount', label: 'Big blind (₹)' },
     { key: 'levelMinutes', label: 'Blind level (minutes)', kind: 'count' },
-    { key: 'ante', label: 'Ante (₹)' },
-    { key: 'straddle', label: 'Straddle', kind: 'toggle' },
-    { key: 'turnTimer', label: 'Turn timer (5-300 s)', kind: 'count' },
-    { key: 'maxRebuys', label: 'Max rebuys', kind: 'count' },
-    { key: 'rebuyUntilLevel', label: 'Rebuys until level', kind: 'count' },
-    { key: 'addOnAmount', label: 'Add-on (₹)', only: 'cash' },
-    { key: 'minBuyIn', label: 'Min buy-in (₹)', only: 'cash' },
-    { key: 'maxBuyIn', label: 'Max buy-in (₹)', only: 'cash' },
-    { key: 'bombEvery', label: 'Bomb pot every N hands', kind: 'count' },
-    { key: 'bombAmount', label: 'Bomb pot (₹)' },
     { key: 'buyIn', label: 'Buy-in (₹)', only: 'tournament' },
     { key: 'startingChips', label: 'Starting chips', only: 'tournament' },
     { key: 'addOnPrice', label: 'Add-on price (₹)', only: 'tournament' },
     { key: 'addOnChips', label: 'Add-on chips', only: 'tournament' },
     { key: 'payouts', label: 'Payouts (%)', kind: 'text', only: 'tournament', placeholder: 'By entrants, e.g. 50, 30, 20' },
+    { key: 'ante', label: 'Ante (₹)', group: 'BETTING' },
+    { key: 'straddle', label: 'Straddle', kind: 'toggle', group: 'BETTING' },
+    { key: 'turnTimer', label: 'Turn timer (5-300 s)', kind: 'count', group: 'BETTING' },
+    { key: 'maxRebuys', label: 'Max rebuys', kind: 'count', group: 'REBUYS & BUY-INS', wide: true },
+    { key: 'rebuyUntilLevel', label: 'Rebuys until level', kind: 'count', group: 'REBUYS & BUY-INS', wide: true },
+    { key: 'addOnAmount', label: 'Add-on (₹)', only: 'cash', group: 'REBUYS & BUY-INS' },
+    { key: 'minBuyIn', label: 'Min buy-in (₹)', only: 'cash', group: 'REBUYS & BUY-INS' },
+    { key: 'maxBuyIn', label: 'Max buy-in (₹)', only: 'cash', group: 'REBUYS & BUY-INS' },
+    { key: 'bombAmount', label: 'Bomb pot (₹)', group: 'BOMB POTS' },
+    { key: 'bombEvery', label: 'Bomb pot every N hands', kind: 'count', group: 'BOMB POTS' },
 ];
 
 export const pokerFields = (tournament: boolean) => POKER_FIELDS.filter(f => !f.only || f.only === (tournament ? 'tournament' : 'cash'));
@@ -50,9 +52,11 @@ export const BLACKJACK_FIELDS: FieldSpec[] = [
     { key: 'maxBet', label: 'Max bet (₹)' },
     { key: 'insurance', label: 'Insurance', kind: 'toggle' },
     { key: 'defaultHands', label: 'Hands per player (1-5)', kind: 'count' },
-    { key: 'bankerEvery', label: 'Banker every N rounds', kind: 'count' },
+    { key: 'bankerEvery', label: 'Banker rounds', kind: 'count' },
     { key: 'sideBets', label: 'Side bets', kind: 'toggle' },
 ];
+
+export const BLACKJACK_NOTE = 'Blank banker rounds means the house banks.';
 
 // Settings to form text: numbers as text (blank when off), switches as 'on' or ''.
 export const toForm = (settings: object): Form =>

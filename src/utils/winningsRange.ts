@@ -9,6 +9,12 @@ export interface WinningsRecord {
     timestamp: string;
 }
 
+// The server sends winnings as text ("-880.00"); an unreadable or non-finite value counts as 0.
+export const winningsOf = (r: Pick<WinningsRecord, 'winnings'>) => {
+    const w = Number(r.winnings);
+    return Number.isFinite(w) ? w : 0;
+};
+
 // Local time: this month and this year by calendar; the last 30 days are today and the 29 before;
 // custom runs from the start of `from` to the end of `to` (YYYY-MM-DD), both inclusive.
 export const inRange = (timestamp: string, kind: RangeKind, now: Date, from = '', to = '') => {
@@ -32,7 +38,7 @@ export const gameTotals = (records: WinningsRecord[], hashes: string[], names: R
         .forEach(r => {
             const date = new Date(r.timestamp).toISOString().split('T')[0];
             daily[date] = daily[date] ?? {};
-            daily[date][r.phone_hash] = (daily[date][r.phone_hash] ?? 0) + Number(r.winnings);
+            daily[date][r.phone_hash] = (daily[date][r.phone_hash] ?? 0) + winningsOf(r);
         });
     const totals: Record<string, number> = Object.fromEntries(hashes.map(h => [h, 0]));
     const trend = Object.keys(daily).sort().map(date => {

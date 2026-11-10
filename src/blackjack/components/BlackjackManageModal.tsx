@@ -5,6 +5,7 @@ import InteractionModal from '../../components/InteractionModal';
 import { toTitleCase } from '../../utils/formatters';
 import { phoneInUse } from '../../utils/savedPlayers';
 import { useFormError } from '../../hooks/useFormError';
+import { parseAmount } from '../../utils/money';
 
 export type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'toggleBreak' | 'updateHands';
 
@@ -82,7 +83,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
                 }
                 const taken = phoneInUse(players, addPlayerPhone);
                 if (taken) return setFormError(taken);
-                onAddPlayer(addPlayerName, Number(addPlayerStack), addPlayerPhone.trim(), parseInt(addPlayerNumHands, 10));
+                onAddPlayer(addPlayerName, parseAmount(addPlayerStack), addPlayerPhone.trim(), parseInt(addPlayerNumHands, 10));
                 onClose();
             };
             break;
@@ -105,7 +106,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
             </>;
             confirmAction = () => {
                 if (!managePlayerId) return setFormError("Please select a player.");
-                onAddChips(parseInt(managePlayerId, 10), Number(addChipsAmount));
+                onAddChips(parseInt(managePlayerId, 10), parseAmount(addChipsAmount));
                 onClose();
             };
             break;

@@ -167,3 +167,16 @@ test('insurance and surrender halves are whole paise, and the books still balanc
     assert.equal(end.players[0].stack, 993.83);
     assert.equal(end.dealerNet, 6.17);
 });
+
+test('₹21 covers ten ₹2.10 bets, placed by hand and re-bet locked at DEAL', () => {
+    let s = unlock(E.newBlackjackGame([{ name: 'Asha', stack: 21, phoneNumber: '9000000001', numHands: 10 }], { ...BASE, minBet: 1 }));
+    for (let i = 0; i < 10; i++) s = go(s, (x, io) => E.placeBet(x, 1, i, 2.1, io));
+    assert.deepEqual(s.players[0].hands.map(h => h.bet), Array(10).fill(2.1));
+    s = deal(s);
+    for (let i = 0; i < 10; i++) s = act(s, 'stand');
+    for (const hand of s.players[0].hands) s = go(s, (x, io) => E.setHandStatus(x, 1, hand.id, 'push', io));
+    assert.equal(s.isBettingLocked, true);
+    s = deal(s);
+    assert.equal(s.gameStage, 'player-turn');
+    assert.deepEqual(s.players[0].hands.map(h => h.bet), Array(10).fill(2.1));
+});

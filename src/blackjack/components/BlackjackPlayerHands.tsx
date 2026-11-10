@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import type { BlackjackPlayer, HandStatus, PlayerHand, SideResult } from '../types/blackjackGameTypes';
 import { toTitleCase, formatAmount } from '../../utils/formatters';
 import type { SideKind } from '../engine';
+import { parseAmount } from '../../utils/money';
 
 const CHIPS = [10, 50, 100, 500];
 const PAIR_RESULTS: [SideResult, string][] = [['lose', 'Lose'], ['mixed', 'Mixed 6:1'], ['coloured', 'Coloured 12:1'], ['perfect', 'Perfect 25:1']];
@@ -38,7 +39,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
     };
 
     const handleBetSubmit = (handIndex: number) => {
-        const amount = Number(betAmounts[handIndex] || '0');
+        const amount = parseAmount(betAmounts[handIndex] ?? '');
         if (amount > 0) {
             onPlaceBet(player.id, handIndex, amount);
             handleBetChange(handIndex, ''); // Clear input
@@ -60,7 +61,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
         const lastBetForThisHand = player.lastBets[handIndex] || player.lastBets[0] || 10; // Fallback
 
         // Betting is unlocked: chips add to the field, Place Bet submits it (placeBet checks the limits).
-        const addChip = (chip: number) => handleBetChange(handIndex, String((Number(betAmounts[handIndex] || '0') || 0) + chip));
+        const addChip = (chip: number) => handleBetChange(handIndex, String(parseAmount(betAmounts[handIndex] ?? '') + chip));
         return (
             <>
                 <div className="inline-input-group">
@@ -68,7 +69,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                         type="number" inputMode="decimal"
                         value={betAmounts[handIndex] || ''}
                         onChange={e => handleBetChange(handIndex, e.target.value)}
-                        placeholder={`Bet (Last: ${lastBetForThisHand})`}
+                        placeholder={hand.bet > 0 ? `Bet ₹${formatAmount(hand.bet)}` : `Last ₹${formatAmount(lastBetForThisHand)}`}
                     />
                     <button className="btn-success" onClick={() => handleBetSubmit(handIndex)}>Place Bet</button>
                 </div>
@@ -93,7 +94,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                         <input type="number" inputMode="decimal" min="0" value={sideAmounts[key] ?? ''} placeholder={`${kind === 'pp' ? 'Perfect Pairs' : '21+3'}${placed ? ` (₹${formatAmount(placed)})` : ''}`}
                             onChange={e => setSideAmounts(prev => ({ ...prev, [key]: e.target.value }))} />
                         <button className="btn-orange" onClick={() => {
-                            onPlaceSideBet(player.id, handIndex, kind, Number(sideAmounts[key] || '0') || 0);
+                            onPlaceSideBet(player.id, handIndex, kind, parseAmount(sideAmounts[key] ?? ''));
                             setSideAmounts(prev => ({ ...prev, [key]: '' }));
                         }}>Place</button>
                     </div>
@@ -145,6 +146,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                 <div 
                     key={hand.id} 
                     className={`player-hand ${currentHandId === hand.id ? 'current-hand' : ''} status-${hand.status}`}
+                    data-hand-id={hand.id}
                 >
                     <div className="hand-info">
                         <strong>Hand {index + 1}</strong>
@@ -153,7 +155,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                             {/* --- UPDATED LOGIC --- */}
                             {hand.wager > 0 && 
                                 <span style={{color: 'var(--color-text-muted)', display: 'block', fontSize: '0.9rem'}}>
-                                    Bet: ₹{formatAmount(hand.wager)} {hand.wager !== hand.bet && `(2x${hand.bet})`}
+                                    Bet: ₹{formatAmount(hand.wager)} {hand.wager !== hand.bet && `(2x₹${formatAmount(hand.bet)})`}
                                 </span>
                             }
                             {(hand.pp || hand.t3) &&

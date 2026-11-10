@@ -36,7 +36,7 @@ const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, game
                         } else if (p.isTakingBreak) {
                             status = 'On Break';
                         } else if (gameStage === 'betting') {
-                            status = `Playing ${p.initialHandsCount} hand(s)`;
+                            status = `${p.initialHandsCount} HAND${p.initialHandsCount === 1 ? '' : 'S'}`;
                         } else if (gameStage === 'player-turn') {
                             status = p.hands.every(h => h.status !== 'playing') ? 'Done' : 'Playing';
                             if (isCurrent) status = 'Current Turn';
@@ -44,8 +44,9 @@ const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, game
                             status = 'Waiting for Settle';
                         }
                         
-                        // --- UPDATED LOGIC ---
-                        const totalWager = p.hands.reduce((acc, h) => acc + h.wager, 0);
+                        // Each hand's wager, or between rounds what the player usually bets.
+                        const bets = p.hands.some(h => h.wager > 0) ? p.hands.map(h => `₹${formatAmount(h.wager)}`).join(' | ')
+                            : p.lastBets.length > 0 ? `Last ${p.lastBets.slice(0, p.initialHandsCount).map(b => `₹${formatAmount(b)}`).join(' | ')}` : '';
 
                         return (
                             <tr key={p.id} className={isCurrent ? 'current-player' : (p.isTakingBreak ? 'on-break' : '')} data-player-id={p.id}>
@@ -53,7 +54,7 @@ const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, game
                                 <td data-label="Stack / Buy-In">₹ {formatAmount(p.stack)} / ₹ {formatAmount(p.totalBuyIn)}</td>
                                 <td data-label="Status">
                                     {status}
-                                    {totalWager > 0 && ` (Bet: ₹${formatAmount(totalWager)})`}
+                                    {bets && ` · ${bets}`}
                                 </td>
                             </tr>
                         );

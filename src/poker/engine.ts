@@ -142,7 +142,7 @@ const tournamentRecords = (entrants: Entrant[], io: Io) => io.records(entrants
     .map(e => ({ phone: e.phone!, name: e.name, winnings: toPaise(e.prize! - e.paid) })));
 
 const finishTournament = (s: PokerGameState, io: Io): PokerGameState => {
-    const winner = s.players.find(p => p.stack > 0)!;
+    const winner = s.players.find(p => p.stack >= 0.005)!;
     const table = prizeTable(poolPaise(s.entrants!), payoutsOf(s), s.entrants!.length);
     const entrants = s.entrants!.map(e => {
         const place = e.id === winner.id ? 1 : e.place!;
@@ -157,7 +157,7 @@ const finishTournament = (s: PokerGameState, io: Io): PokerGameState => {
 // Places for the last hand's busted players, best first: place = players still in + 1.
 const placeBusted = (s: PokerGameState, io: Io): PokerGameState => {
     const ranked = s.bust!.ranked;
-    const stillIn = s.players.filter(p => p.stack > 0).length;
+    const stillIn = s.players.filter(p => p.stack >= 0.005).length;
     const placeOf = new Map(ranked.map((id, i) => [id, stillIn + 1 + i]));
     const entrants = s.entrants!.map(e => (placeOf.has(e.id) ? { ...e, place: placeOf.get(e.id) } : e));
     const lines = ranked.map(id => `${s.entrants!.find(e => e.id === id)!.name} is out in ${ordinal(placeOf.get(id)!)} place.`);
@@ -169,7 +169,7 @@ const placeBusted = (s: PokerGameState, io: Io): PokerGameState => {
 const tournamentHandEnd = (s: PokerGameState, startChips: Map<number, number>, io: Io): PokerGameState => {
     if (!s.entrants) return s;
     const start = (id: number) => startChips.get(id) ?? 0;
-    const busted = s.players.filter(p => start(p.id) > 0 && p.stack === 0)
+    const busted = s.players.filter(p => start(p.id) > 0 && p.stack < 0.005)
         .sort((a, b) => start(b.id) - start(a.id) || seatFromDealer(s, a.id) - seatFromDealer(s, b.id));
     if (busted.length === 0) return s;
     const next = { ...s, bust: { ranked: busted.map(p => p.id), awaiting: busted.filter(p => !rebuyLimit(s, p)).map(p => p.id) } };
@@ -206,7 +206,7 @@ export const chop = (prev: PokerGameState, io: Io): PokerGameState => {
     const table = prizeTable(pool, payoutsOf(s), s.entrants!.length);
     const decided = (e: Entrant) => (e.place === undefined ? 0 : table[e.place - 1] ?? 0);
     const rest = pool - s.entrants!.reduce((sum, e) => sum + decided(e), 0);
-    const remaining = s.players.filter(p => p.stack > 0).sort((a, b) => b.stack - a.stack);
+    const remaining = s.players.filter(p => p.stack >= 0.005).sort((a, b) => b.stack - a.stack);
     const chips = remaining.reduce((sum, p) => sum + p.stack, 0);
     const shares = remaining.map(p => Math.floor((rest * p.stack) / chips));
     shares[0] += rest - shares.reduce((a, b) => a + b, 0);
@@ -231,7 +231,7 @@ const advanceToNextStageOrShowdown = (currentState: PokerGameState, io: Io): Pok
     io.log(`--- End of Betting Round. Total Pot: ₹${formatAmount(currentTotalPot)} ---`);
 
     const playersInHand = currentState.players.filter(p => p.inHand);
-    if (currentState.gameStage === 'river' || playersInHand.filter(p => !p.isAllIn && p.stack > 0).length < 2) {
+    if (currentState.gameStage === 'river' || playersInHand.filter(p => !p.isAllIn && p.stack >= 0.005).length < 2) {
         io.log("All betting is complete. Calculating final pots for showdown.");
         return { ...currentState, gameStage: 'showdown', pot: calculatePots(currentState.players), activePlayerIndex: -1 };
     }
@@ -318,7 +318,7 @@ export const playerAction = (prev: PokerGameState, action: PlayerAction, amount:
             player.stack -= callAmount;
             player.roundBet += callAmount;
             player.totalPotContribution += callAmount;
-            if (player.stack === 0) player.isAllIn = true;
+            if (player.stack < 0.005) player.isAllIn = true;
             io.log(`${toTitleCase(player.name)} calls ₹${formatAmount(callAmount)}.`);
             break;
         }
@@ -353,7 +353,7 @@ export const playerAction = (prev: PokerGameState, action: PlayerAction, amount:
             player.stack -= costToPlayer;
             player.totalPotContribution += costToPlayer;
             player.roundBet = amount;
-            if (player.stack === 0) player.isAllIn = true;
+            if (player.stack < 0.005) player.isAllIn = true;
             newCurrentBet = amount;
             players.forEach(p => {
                 if (p.id !== player.id) {
@@ -434,7 +434,7 @@ export const startNewHand = (prev: PokerGameState, io: Io): PokerGameState => {
         io.log(outOfChips(prev.players.find(p => p.id === prev.bust!.awaiting[0])!.name));
         return prev;
     }
-    const playersWithChips = prev.players.filter(p => p.stack > 0 && !p.isTakingBreak);
+    const playersWithChips = prev.players.filter(p => p.stack >= 0.005 && !p.isTakingBreak); // float dust like 5e-17 is no stack
     if (playersWithChips.length < 2) {
         io.log("Not enough active players with stacks to start a hand.");
         return prev;
@@ -465,7 +465,7 @@ export const startNewHand = (prev: PokerGameState, io: Io): PokerGameState => {
         p.stack -= paid;
         p.totalPotContribution += paid;
         if (live) p.roundBet += paid;
-        if (p.stack === 0) p.isAllIn = true;
+        if (p.stack < 0.005) p.isAllIn = true;
         return paid;
     };
     const messages = [...prev.messages, `--- NEW HAND (#${handNumber}) ---`, ...(levelLine ? [levelLine] : []), `Dealer button is on ${name(newDealerIndex)}.`];
@@ -488,7 +488,8 @@ export const startNewHand = (prev: PokerGameState, io: Io): PokerGameState => {
         dealtIn.forEach(p => post(p, prev.ante!, false));
         messages.push(`Antes: ₹${formatAmount(prev.ante)} from ${dealtIn.length} players.`);
     }
-    const newSmallBlindIndex = nextSeat(newDealerIndex, p => activePlayerIds.has(p.id));
+    // Heads-up the dealer posts the small blind: first to act before the flop, last after it.
+    const newSmallBlindIndex = activePlayerIds.size === 2 ? newDealerIndex : nextSeat(newDealerIndex, p => activePlayerIds.has(p.id));
     const newBigBlindIndex = nextSeat(newSmallBlindIndex, p => activePlayerIds.has(p.id));
     const sbPlayer = newPlayers[newSmallBlindIndex];
     const bbPlayer = newPlayers[newBigBlindIndex];

@@ -8,6 +8,8 @@ import { parseTeenPatti, type TeenPattiSettings } from '../utils/gameSettings';
 import { TEEN_PATTI_FIELDS } from '../utils/settingsFields';
 import SavedPlayerChips from './SavedPlayerChips';
 import SettingsFields from './SettingsFields';
+import { useFormError } from '../hooks/useFormError';
+import { parseAmount } from '../utils/money';
 
 interface GameSetupProps {
     onStartNewGame: (players: Player[], settings: TeenPattiSettings) => void;
@@ -18,7 +20,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
     const emptySeat = { name: '', balance: '0', phoneNumber: '' };
     const [playerInputs, setPlayerInputs] = useState<{ name: string; balance: string; phoneNumber: string; }[]>([emptySeat, emptySeat]);
     const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useFormError();
 
     const handlePlayerInputChange = (index: number, field: 'name' | 'balance' | 'phoneNumber', value: string) => {
         setPlayerInputs(prev => {
@@ -31,8 +33,8 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
     const handleStartGame = () => {
         const newPlayers: Player[] = [];
         for (const [index, input] of playerInputs.entries()) {
-            const balance = Number(input.balance);
-            if (!input.name.trim() || isNaN(balance)) {
+            const balance = parseAmount(input.balance, true);
+            if (!input.name.trim() || isNaN(Number(input.balance))) {
                 return setError(`Invalid name or balance for Player ${index + 1}.`);
             }
             const phoneNumber = input.phoneNumber.trim();

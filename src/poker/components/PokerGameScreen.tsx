@@ -28,6 +28,8 @@ import { parsePoker } from '../../utils/gameSettings';
 import { pokerFields, toForm } from '../../utils/settingsFields';
 import { pokerSettingsOf } from '../engine';
 import { formatAmount } from '../../utils/formatters';
+import { parseAmount } from '../../utils/money';
+import { useFollowTurn } from '../../hooks/useFollowTurn';
 
 interface PokerGameScreenProps {
     pokerHook: ReturnType<typeof usePokerGame>;
@@ -78,6 +80,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const nextIsBomb = gameState.bombAmount !== undefined && (!!gameState.bombNext || (!!gameState.bombEvery && nextHand % gameState.bombEvery === 0));
     const timerLeft = useTurnTimer(isReadOnly ? undefined : gameState.turnTimer,
         betting ? `${gameState.handNumber ?? 0}:${gameStage}:${currentPlayer!.id}` : null, toTitleCase(currentPlayer?.name ?? ''));
+    useFollowTurn(betting ? `[data-player-id="${currentPlayer!.id}"]` : null);
 
     useEffect(() => {
         if (gameStage === 'showdown' && pot.length > 0) {
@@ -168,7 +171,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 }
                 const taken = phoneInUse(players, addPlayerPhone);
                 if (taken) return setFormError(taken);
-                actions.addPlayer(addPlayerName, Number(addPlayerStack), addPlayerPhone.trim());
+                actions.addPlayer(addPlayerName, parseAmount(addPlayerStack), addPlayerPhone.trim());
                 break;
             }
             case 'removePlayer':
@@ -178,7 +181,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 break;
             case 'addChips':
                 if (!managePlayerId) return setFormError("Please select a player.");
-                actions.addChipsToPlayer(parseInt(managePlayerId, 10), Number(addChipsAmount));
+                actions.addChipsToPlayer(parseInt(managePlayerId, 10), parseAmount(addChipsAmount));
                 break;
             case 'toggleBreak':
                 if (!managePlayerId) return setFormError("Please select a player.");
@@ -186,8 +189,8 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 break;
             case 'streakWinnings':
                 if (!managePlayerId) return setFormError("Please select a player.");
-                if (!streakAmount || Number(streakAmount) <= 0) return setFormError("Please enter a valid amount.");
-                actions.applyStreakWinnings(parseInt(managePlayerId, 10), Number(streakAmount));
+                if (parseAmount(streakAmount) <= 0) return setFormError("Please enter a valid amount.");
+                actions.applyStreakWinnings(parseInt(managePlayerId, 10), parseAmount(streakAmount));
                 break;
             case 'addOn':
                 if (!managePlayerId) return setFormError("Please select a player.");

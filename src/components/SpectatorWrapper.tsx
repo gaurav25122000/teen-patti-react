@@ -6,7 +6,7 @@ import { useStoredState } from '../hooks/useStoredState';
 import { POKER_STORAGE_KEY } from '../poker/hooks/usePokerGame';
 import { BLACKJACK_STORAGE_KEY } from '../blackjack/hooks/useBlackjackGame';
 import { LOCAL_STORAGE_KEY } from '../constants/gameConstants';
-import { toTitleCase, formatAmount } from '../utils/formatters';
+import { toTitleCase, money } from '../utils/formatters';
 import { rehydrateState } from '../utils/serialization';
 import { archiveOrWarn } from '../utils/archive';
 import { runStep } from '../utils/engine';
@@ -18,6 +18,7 @@ import PokerGameScreen from '../poker/components/PokerGameScreen';
 import GameScreen from './GameScreen';
 import BlackjackGameScreen from '../blackjack/components/BlackjackGameScreen';
 import InteractionModal from './InteractionModal';
+import { useFormError } from '../hooks/useFormError';
 
 // Where a handed-over game is saved and opened on the new host's phone.
 const GAMES: Record<string, { route: string; storageKey: string; label: string }> = {
@@ -60,7 +61,7 @@ const SpectatorWrapper: React.FC = () => {
     const { streamId } = useParams<{ streamId: string }>();
     const { gameState, connectionStatus, handoverOffer, clearHandoverOffer, hostMovedTo, handoverConfirmed, send } = useSpectate(streamId);
     const [viewerName, setViewerName] = useStoredState('viewerName', '');
-    const [handoverError, setHandoverError] = useState<string | null>(null);
+    const [handoverError, setHandoverError] = useFormError();
     const [leaving, setLeaving] = useState(false);
     // What this phone had saved before accepting, restored if the host never confirms.
     const acceptedRef = useRef<{ kind: GameKind; storageKey: string; previous: string | null; route: string } | null>(null);
@@ -127,7 +128,7 @@ const SpectatorWrapper: React.FC = () => {
             setHandoverError("The host didn't confirm the hand over. Nothing changed on this phone.");
         }, 30_000);
         return () => clearTimeout(timer);
-    }, [leaving]);
+    }, [leaving, setHandoverError]);
 
     const offeredGame = handoverOffer ? GAMES[String(handoverOffer.gameType)] : undefined;
     const withViewerUi = (screen: React.ReactNode) => (
@@ -140,7 +141,7 @@ const SpectatorWrapper: React.FC = () => {
                         {players.map(p => <option key={p.id} value={p.name}>{toTitleCase(p.name)}</option>)}
                     </select>
                 </label>
-                {me && <span className="viewer-balance">You: ₹{formatAmount((me.balance ?? me.stack)!)}</span>}
+                {me && <span className="viewer-balance">You: {money((me.balance ?? me.stack)!)}</span>}
             </div>
             {isMyTurn && <div className="your-turn-banner" role="status">Your turn!</div>}
             {myId !== null && <style>{`[data-player-id="${myId}"] { outline: 2px solid var(--color-glow-lime); outline-offset: -2px; }`}</style>}

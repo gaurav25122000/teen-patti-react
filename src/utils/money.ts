@@ -16,3 +16,12 @@ export const paise = (amount: number) => Math.sign(amount) * Math.round(Math.abs
 
 // Money is kept in whole paise so every settlement can be paid exactly.
 export const toPaise = (amount: number) => paise(amount) / 100;
+
+// stack covers amount to the paisa, so float drift (21 - 2.1 × 9 = 2.0999…) can't refuse a bet that fits.
+export const covers = (stack: number, amount: number) => paise(stack) >= paise(amount);
+
+// A typed amount in whole paise, or 0 when blank, negative, not a number or above ₹1,00,000 crore.
+export const parseAmount = (text: string, allowNegative = false) => {
+    const n = Number(text);
+    return text.trim() && Number.isFinite(n) && (allowNegative || n >= 0) && Math.abs(n) <= 1e12 ? toPaise(n) : 0;
+};

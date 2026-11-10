@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { currentStatus, groupCode, joinGroup, leaveGroup, onStatus, syncNow } from '../sync/syncRunner';
 import { keyFromCode, newGroupKey } from '../sync/syncCrypto';
+import { cue } from '../utils/feedback';
+import { useFormError } from '../hooks/useFormError';
 
 const JOIN_LINK = 'https://teen-patti-bets.netlify.app/#join=';
 
@@ -10,7 +12,7 @@ const SyncScreen: React.FC = () => {
     const [joinInput, setJoinInput] = useState(() => (window.location.hash.startsWith('#join=') ? window.location.hash.slice(6) : ''));
     const [showCode, setShowCode] = useState(false);
     const [qr, setQr] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useFormError();
 
     useEffect(() => onStatus(setStatus), []);
     useEffect(() => {
@@ -28,6 +30,13 @@ const SyncScreen: React.FC = () => {
         setError(null);
         if (window.location.hash) window.history.replaceState(null, '', window.location.pathname);
     };
+
+    // Only a tapped sync sounds, and only on a result; one already running stays silent.
+    const syncTapped = () => void syncNow().then(() => {
+        const result = currentStatus();
+        if (result.startsWith('Synced')) cue('settle');
+        else if (result.startsWith('Sync failed')) cue('error');
+    });
 
     const create = () => {
         joinGroup(newGroupKey());
@@ -47,7 +56,7 @@ const SyncScreen: React.FC = () => {
             <p className="sync-status">{status}</p>
             {code ? (
                 <div className="setup-actions">
-                    <button className="btn btn-primary" onClick={() => void syncNow()}>SYNC NOW</button>
+                    <button className="btn btn-primary" onClick={syncTapped}>SYNC NOW</button>
                     <button className="btn btn-secondary" onClick={() => setShowCode(s => !s)}>SHOW CODE/QR</button>
                     <button className="btn btn-danger" onClick={leave}>LEAVE GROUP</button>
                 </div>

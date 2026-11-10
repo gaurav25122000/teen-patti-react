@@ -9,14 +9,14 @@ const ModeSelectionScreen: React.FC = () => {
       <p>Select which bets manager you would like to use.</p>
       <div className="setup-actions" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap' }}>
         <Link to="/teen-patti" className="btn btn-primary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
-          Teen Patti Manager
+          Teen Patti Manager<span className="home-line">Boot, blind &amp; chaal</span>
         </Link>
         <Link to="/poker" className="btn btn-success" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
-          Poker Manager
+          Poker Manager<span className="home-line">Blinds, side pots &amp; tournaments</span>
         </Link>
         {/* --- ADDED LINK --- */}
         <Link to="/blackjack" className="btn btn-error" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
-          Blackjack Manager
+          Blackjack Manager<span className="home-line">House or banker, side bets</span>
         </Link>
         <Link to="/lifetime-winnings" className="btn btn-accent" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none', width: '100%', marginTop: '1rem', textAlign: 'center' }}>
           Lifetime Winnings

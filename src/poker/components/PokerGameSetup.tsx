@@ -7,6 +7,8 @@ import SettingsFields from '../../components/SettingsFields';
 import { parsePoker, type PokerSettings } from '../../utils/gameSettings';
 import { pokerFields } from '../../utils/settingsFields';
 import { buyInRefusal } from '../engine';
+import { useFormError } from '../../hooks/useFormError';
+import { parseAmount } from '../../utils/money';
 
 interface PokerGameSetupProps {
     onStartGame: (players: { name: string, stack: number, phoneNumber: string }[], settings: PokerSettings) => void;
@@ -17,7 +19,7 @@ const SHOWN = ['smallBlindAmount', 'bigBlindAmount', 'buyIn', 'startingChips'];
 
 const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
     const [players, setPlayers] = useState([{ name: '', stack: '1000', phoneNumber: '' }]);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useFormError();
     const [form, setForm] = useState<Record<string, string>>({ smallBlindAmount: '10', bigBlindAmount: '20', buyIn: '500', startingChips: '1000' });
     const tournament = form.tournament === 'on';
     const fields = pokerFields(tournament);
@@ -35,7 +37,7 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
     const handleStart = () => {
         const finalPlayers = players
             .filter(p => p.name.trim() !== '')
-            .map(p => ({ name: toTitleCase(p.name), stack: Number(p.stack) || 0, phoneNumber: p.phoneNumber.trim() }));
+            .map(p => ({ name: toTitleCase(p.name), stack: parseAmount(p.stack), phoneNumber: p.phoneNumber.trim() }));
 
         if (finalPlayers.length < 2) {
             return setError("Please add at least 2 players.");

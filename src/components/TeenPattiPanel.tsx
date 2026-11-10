@@ -5,6 +5,7 @@ import { blindTurnsRefusal, potLimitReached } from '../utils/teenPattiRules';
 import { stepDown, stepUp, teenPattiChips, teenPattiMinBet } from '../utils/quickBets';
 import { readAppSettings } from '../utils/appSettings';
 import ActionPanel, { type PanelButton } from './ActionPanel';
+import { useFormError } from '../hooks/useFormError';
 
 interface TeenPattiPanelProps {
     gameState: GameState;
@@ -27,7 +28,7 @@ const TeenPattiPanel: React.FC<TeenPattiPanelProps> = ({ gameState, currentPlaye
     const blind = blindPlayerIds.has(currentPlayer.id);
     const minBet = teenPattiMinBet(currentStake, blind);
     const [amount, setAmount] = useState(minBet);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useFormError();
     const name = toTitleCase(currentPlayer.name);
     const limitReached = potLimitReached(gameState);
     const mustSee = blind ? blindTurnsRefusal(gameState, name, gameState.blindTurns?.[currentPlayer.id] ?? 0) : null;
@@ -44,7 +45,7 @@ const TeenPattiPanel: React.FC<TeenPattiPanelProps> = ({ gameState, currentPlaye
     const buttons: PanelButton[] = limitReached
         ? [{ label: 'PICK WINNER', onClick: actions.onEndBettingClick, theme: 'btn-secondary', kind: 'primary' }]
         : [
-            { label: 'FOLD', onClick: fold, theme: 'btn-error', kind: 'fold' },
+            { label: 'FOLD', onClick: fold, theme: 'btn-error' },
             ...(blind ? [{ label: 'SEE', onClick: actions.seeCards, theme: 'btn-orange' }] : []),
             ...(mustSee ? [] : [{ label: `SHOW ₹${formatAmount(minBet)}`, onClick: actions.onShowClick, theme: 'btn-pink', disabled: showDisabled }]),
             { label: 'END BETTING', onClick: actions.onEndBettingClick, theme: 'btn-secondary' },

@@ -1,6 +1,7 @@
 // What a state change says and sounds like, read from the log lines it added (same rules as Android).
 import { UNDO_LINE } from './log.ts';
 import type { Sound } from './feedback.ts';
+import { WIN_PATTERN } from './winPattern.ts';
 
 // Lines in next that prev didn't end with; a replaced log (new game, load, undo) counts only its last line.
 export const addedLines = (prev: string[], next: string[]): string[] => {
@@ -22,17 +23,18 @@ export const toastLine = (added: string[]): string | null => {
 
 const PRIORITY: [Sound, RegExp][] = [
     ['error', /^ERROR: |^Can only|must see|^Max (chaal|blind bet)|^Boot is above|already playing|^Keep at least|needs more chips|^(Minimum|Maximum) bet|^Settings can only|has used all|^Rebuys closed|already took the add-on|^Add-ons are open|^Buy-in must|^Players leave a tournament|^No valid bets|^Not enough|off in tournaments|is the banker this round|^Late entry is closed|^The tournament is over|^Side bets can be at most|^Place the hand's bet first|^Insurance is off|does not have enough chips|^Cannot |^Raise must be|^Bet must be|^Bets are locked|is out of chips\.$|^Please place|^Surrender is off|^Insurance is offered once|^No other active players/],
-    ['win', /won the pot|wins? the pot|win\(s\) the pot|has BLACKJACK!|\) wins ₹|Streak Winnings!/],
+    ['win', WIN_PATTERN],
+    ['win', /, wins ₹|insurance pays ₹/], // side-bet and insurance payouts: a win sound, no celebration
     ['alarm', /^Pot limit/],
-    ['level_up', /^Blinds up/],
+    ['level_up', /^Blinds up|^Boot is now|is now the banker/],
     ['raise', /raises|all-in|ALL-IN|straddles/],
-    ['fold', /folds|busted|loses|surrenders/],
-    ['show', /Show is requested|Calculating final pots/],
+    ['show', /Show is requested|Calculating final pots/], // above fold, as on Android: a batch with both plays the show
+    ['fold', /folds|busted|loses|surrenders|is out in /],
     ['see', /sees their cards/],
     ['deal', /^--- NEW HAND|^BOMB POT|^--- Dealing the /],
     ['new_round', /^--- NEW ROUND/],
     ['card', /hits|splits/],
-    ['chip', /plays blind|bets Chaal|calls|posts|^Antes|bets ₹|doubles|takes the add-on|takes insurance|pushes\.|^Deducted ₹|^Added ₹|stack/],
+    ['chip', /plays blind|bets Chaal|calls|posts|^Antes|bets ₹|doubles|takes the add-on|takes insurance|pushes\.|^Deducted ₹|^Added ₹|stack|rebuys: ₹/],
     ['tap', /checks\.|stands\./], // no chips move: a knock
 ];
 

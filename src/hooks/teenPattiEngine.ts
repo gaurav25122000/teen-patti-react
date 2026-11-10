@@ -2,7 +2,7 @@
 import type { GameState, Player, Entity } from '../types/gameTypes.ts';
 import type { Io, RawRecord } from '../utils/engine.ts';
 import { formatAmount, toTitleCase } from '../utils/formatters.ts';
-import { splitEvenly, toPaise } from '../utils/money.ts';
+import { paise, splitEvenly, toPaise } from '../utils/money.ts';
 import { emptyStats, recordRound, statsNames } from '../utils/nightStats.ts';
 import { partyKey } from '../utils/owingsLogic.ts';
 import { nextBoot, potLimitLines, roundCarryOver } from '../utils/teenPattiRules.ts';
@@ -261,7 +261,7 @@ export const betChaal = (prev: GameState, amount: number): GameState => {
   if (!current || prev.blindPlayerIds.has(current.id)) return prev;
   const paid = pay(prev, current.id, amount);
   // Half the chaal, rounded up, is the new blind stake (Gaurav, 10 Nov); a minimum chaal leaves it as it is.
-  const newCurrentStake = amount / 2 > prev.currentStake ? Math.ceil(amount / 2) : prev.currentStake;
+  const newCurrentStake = Math.max(prev.currentStake, Math.ceil(paise(amount) / 2) / 100); // half, rounded up to the paisa
   const messages = [...prev.messages, `${toTitleCase(current.name)} bets Chaal of ₹${formatAmount(amount)}. Pot is now ₹${formatAmount(paid.potAmount)}.`];
   if (newCurrentStake > prev.currentStake) messages.push(`New stake for Blind players is now ₹${formatAmount(newCurrentStake)}.`);
   messages.push(...potLimitLines(prev.potLimit, paid.potAmount));
@@ -363,6 +363,10 @@ export const deductAndDistribute = (prev: GameState, playerId: number, rawAmount
   const updatedPlayers = players.map(p => (p.id === playerId ? { ...p, balance: p.balance - amount } : { ...p, balance: p.balance + shares[shareIndex++] }));
   const leftoverNote = shares.some(s => s !== amountToDistribute) ? ' (leftover to the first players in order)' : '';
   io.log(`Deducted ₹${formatAmount(amount)} from ${toTitleCase(playerToDeduct.name)} and distributed ₹${formatAmount(amountToDistribute)} to everyone else${leftoverNote}.`);
+  // Lifetime Winnings gets the transfer too, as Poker's streak winnings do.
+  io.records(updatedPlayers
+    .map((p, i) => ({ phone: p.phoneNumber ?? '', name: p.name, winnings: p.balance - players[i].balance }))
+    .filter(r => r.phone && Math.abs(r.winnings) >= 0.005));
   return { ...prev, players: updatedPlayers };
 };
 

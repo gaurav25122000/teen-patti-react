@@ -22,8 +22,10 @@ import { readAppSettings } from '../../utils/appSettings';
 import InteractionModal from '../../components/InteractionModal';
 import SettingsFields from '../../components/SettingsFields';
 import { parseBlackjack } from '../../utils/gameSettings';
-import { BLACKJACK_FIELDS, toForm } from '../../utils/settingsFields';
+import { BLACKJACK_FIELDS, BLACKJACK_NOTE, toForm } from '../../utils/settingsFields';
 import { blackjackSettingsOf } from '../engine';
+import { useFormError } from '../../hooks/useFormError';
+import { useFollowTurn } from '../../hooks/useFollowTurn';
 
 interface BlackjackGameScreenProps {
     blackjackHook: ReturnType<typeof useBlackjackGame>;
@@ -43,8 +45,9 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     const [parties, setParties] = useState<Party[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
     const [settingsForm, setSettingsForm] = useState<Record<string, string> | null>(null);
-    const [settingsError, setSettingsError] = useState<string | null>(null);
+    const [settingsError, setSettingsError] = useFormError();
     const banker = players.find(p => p.id === gameState.bankerId);
+    useFollowTurn(gameStage === 'player-turn' && currentHandId ? `[data-hand-id="${currentHandId}"]` : null); // the hand, not just the player
 
     const openSettings = () => {
         if (isReadOnly) return;
@@ -186,7 +189,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                     return <ActionPanel
                         info={<><strong>{player.name}</strong> · Hand {handIndex + 1} · Bet ₹{formatAmount(hand.wager)}</>}
                         buttons={[
-                            ...(gameState.allowSurrender ? [{ label: 'SURRENDER', onClick: act('surrender'), theme: 'btn-error', kind: 'fold' as const }] : []),
+                            ...(gameState.allowSurrender ? [{ label: 'SURRENDER', onClick: act('surrender'), theme: 'btn-error' }] : []),
                             { label: 'DOUBLE', onClick: act('double'), theme: 'btn-accent' },
                             { label: 'SPLIT', onClick: act('split'), theme: 'btn-violet' },
                             ...(gameState.insurance ? [{ label: 'INSURANCE', onClick: act('insurance'), theme: 'btn-sky' }] : []),
@@ -197,7 +200,8 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                 }
                 if (gameStage === 'betting') {
                     return <ActionPanel
-                        info={<>Between rounds · {isBettingLocked ? 'Bets locked to the last amounts' : 'Place a bet on every hand'}</>}
+                        info={!isBettingLocked && isDealDisabled ? (players.every(p => p.isTakingBreak) ? 'Everyone is on a break.' : 'Place a bet to deal.')
+                            : <>Between rounds · {isBettingLocked ? 'Bets locked to the last amounts' : 'Place a bet on every hand'}</>}
                         buttons={[
                             ...(isBettingLocked ? [{ label: 'CHANGE BETS', onClick: actions.unlockAllBets, theme: 'btn-orange' }] : []),
                             { label: 'ADD PLAYER', onClick: () => handleShowModal('addPlayer'), theme: 'btn-violet' },
@@ -242,7 +246,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
             {settingsForm && (
                 <InteractionModal isOpen={true} onClose={closeSettings} title="Settings" theme="default"
                     footerContent={<><button className="btn-modal btn-modal-secondary" onClick={closeSettings}>Cancel</button><button className="btn-modal btn-modal-primary theme-default" onClick={saveSettings}>Confirm</button></>} error={settingsError}>
-                    <SettingsFields fields={BLACKJACK_FIELDS} form={settingsForm} onChange={setSettingsForm} />
+                    <SettingsFields fields={BLACKJACK_FIELDS} form={settingsForm} onChange={setSettingsForm} note={BLACKJACK_NOTE} />
                 </InteractionModal>
             )}
 

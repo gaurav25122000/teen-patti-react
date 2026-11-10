@@ -34,7 +34,7 @@ The application leverages local storage to save game state, allowing you to clos
   * **Settle through one person:** Final Owings can route every payment through one player instead of the fewest transfers.
   * **Session length:** summaries end with the session's length and the biggest winner's rate per hour.
   * **Lifetime Winnings ranges:** All time, This month, Last 30 days, This year or a custom range.
-  * **Docked action panel:** turn, stake, timer and pot, a stepper with quick chips, and large neon buttons, one colour per purpose; one ☰ TABLE sheet holds the rest. From 700 px wide, game screens use two columns with the log on the right. Sounds, haptics, keep-awake and Confirm before fold are app settings (home → Settings).
+  * **Docked action panel:** turn, stake, timer and pot, a stepper with quick chips, and large neon buttons, one colour per purpose: the other actions in even rows of up to three, the main action in its own row below; a phone held sideways gets the stepper beside one row of buttons, the main action last and twice as wide. Heads-up, the dealer posts the small blind. The screen follows whose turn it is. One ☰ TABLE sheet holds the rest. From 700 px wide, game screens use two columns with the log on the right. Sounds, haptics, keep-awake and Confirm before fold are app settings (home → Settings).
   * **Avatars:** each saved player gets a colour and an optional emoji, shown beside their name.
   * **Sync:** a group key, shared by code or QR, syncs saved players and history between phones, end-to-end encrypted.
 
@@ -158,7 +158,7 @@ src/
 
       * The highlighted player is the current turn.
       * **Blind players** can `PLAY` (match the current stake), `RAISE` (set a higher amount with the stepper or chips), or `SEE`.
-      * **Seen players** (`CHAAL`) must bet at least double the current stake. A bigger chaal makes the blind stake half of it, rounded up.
+      * **Seen players** (`CHAAL`) must bet at least double the current stake. A bigger chaal makes the blind stake half of it, rounded up to the paisa (₹25 sets ₹12.50).
       * Any player can `FOLD` or request a `SHOW` (if conditions are met).
 
 4.  **Ending a Round:**

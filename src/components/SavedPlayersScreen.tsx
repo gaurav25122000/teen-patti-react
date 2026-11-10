@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AVATAR_COLORS, avatarColor, deleteEntry, livePlayers, loadAllSavedPlayers, saveEntry, writeSavedPlayers, type SavedPlayer } from '../utils/savedPlayers';
 import { couldNot } from '../utils/formatters';
 import Avatar from './Avatar';
+import { useFormError } from '../hooks/useFormError';
 
 const BLANK = { name: '', phone: '', upi: '', color: undefined as number | undefined, emoji: '' };
 
@@ -10,7 +11,7 @@ const SavedPlayersScreen: React.FC = () => {
     const [all, setAll] = useState(loaded.list); // tombstones included, so sync can't bring deletes back
     const [form, setForm] = useState(BLANK);
     const [editingPhone, setEditingPhone] = useState<string | null>(null); // null = adding
-    const [error, setError] = useState<string | null>(loaded.failed ? "Couldn't load saved players." : null);
+    const [error, setError] = useFormError('', loaded.failed ? "Couldn't load saved players." : null);
     const list = livePlayers(all);
 
     const persist = (next: SavedPlayer[], verb: 'save' | 'delete') => {

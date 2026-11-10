@@ -5,8 +5,10 @@ import { duplicatePhone, fillRow } from '../../utils/savedPlayers';
 import SavedPlayerChips from '../../components/SavedPlayerChips';
 import SettingsFields from '../../components/SettingsFields';
 import { parseBlackjack, type BlackjackSettings } from '../../utils/gameSettings';
-import { BLACKJACK_FIELDS, toForm } from '../../utils/settingsFields';
+import { BLACKJACK_FIELDS, BLACKJACK_NOTE, toForm } from '../../utils/settingsFields';
 import { blackjackSettingsOf, createInitialBlackjackState } from '../engine';
+import { useFormError } from '../../hooks/useFormError';
+import { parseAmount } from '../../utils/money';
 
 interface BlackjackGameSetupProps {
     onStartGame: (players: { name: string, stack: number, phoneNumber: string, numHands: number }[], settings: BlackjackSettings) => void;
@@ -14,7 +16,7 @@ interface BlackjackGameSetupProps {
 
 const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) => {
     const [players, setPlayers] = useState([{ name: '', stack: '1000', phoneNumber: '', numHands: '1' }]);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useFormError();
     const [form, setForm] = useState(() => toForm(blackjackSettingsOf(createInitialBlackjackState())));
     const emptyRow = () => ({ name: '', stack: '1000', phoneNumber: '', numHands: form.defaultHands || '1' });
 
@@ -33,7 +35,7 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
             .filter(p => p.name.trim() !== '')
             .map(p => ({ 
                 name: toTitleCase(p.name), 
-                stack: Number(p.stack) || 0, 
+                stack: parseAmount(p.stack), 
                 phoneNumber: p.phoneNumber.trim(),
                 numHands: parseInt(p.numHands) || 1,
                 isTakingBreak: false // Ensure this is initialized
@@ -64,7 +66,7 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
             <h2>Blackjack Game Setup</h2>
             <details className="table-settings">
                 <summary>Table settings</summary>
-                <SettingsFields fields={BLACKJACK_FIELDS} form={form} onChange={setForm} />
+                <SettingsFields fields={BLACKJACK_FIELDS} form={form} onChange={setForm} note={BLACKJACK_NOTE} />
             </details>
             <hr />
             <SavedPlayerChips

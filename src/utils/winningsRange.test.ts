@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gameTotals, inRange } from './winningsRange.ts';
+import { gameTotals, inRange, winningsOf } from './winningsRange.ts';
 
 const now = new Date(2026, 10, 10, 15, 0); // 10 Nov 2026, 3 pm local
 
@@ -29,4 +29,15 @@ test('totals and the cumulative trend come from the records in range only', () =
         trend: [{ date: '2026-11-02', h1: 80.5, h2: 0 }, { date: '2026-11-03', h1: 80.5, h2: -80.5 }],
         players: [{ phoneHash: 'h1', playerName: 'asha', total: 80.5 }, { phoneHash: 'h2', playerName: 'raj', total: -80.5 }],
     });
+});
+
+test('a record whose winnings are unreadable or not finite counts as 0', () => {
+    assert.equal(winningsOf({ winnings: '-880.00' }), -880);
+    assert.equal(winningsOf({ winnings: 'abc' }), 0);
+    assert.equal(winningsOf({ winnings: 'Infinity' }), 0);
+    const totals = gameTotals([
+        { phone_hash: 'h1', player_name: 'asha', game_type: 'poker', winnings: '50', timestamp: '2026-11-02T10:00:00Z' },
+        { phone_hash: 'h1', player_name: 'asha', game_type: 'poker', winnings: 'oops', timestamp: '2026-11-03T10:00:00Z' },
+    ], ['h1'], {}, 'poker');
+    assert.equal(totals.players[0].total, 50);
 });

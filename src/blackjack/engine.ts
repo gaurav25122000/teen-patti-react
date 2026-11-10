@@ -7,7 +7,7 @@ import { biggestWin, emptyStats, partialStats, recordRound, statsNames } from '.
 import { partyKey } from '../utils/owingsLogic.ts';
 import { cleanPhone } from '../utils/savedPlayers.ts';
 import { depart, departureNote, tooFewToRemove } from '../utils/departures.ts';
-import { toPaise } from '../utils/money.ts';
+import { covers, toPaise } from '../utils/money.ts';
 
 // Side bet payouts (x:1) by result.
 export const PAIR_PAYS: Partial<Record<SideResult, number>> = { mixed: 6, coloured: 12, perfect: 25 };
@@ -211,7 +211,7 @@ export const placeBet = (prev: BlackjackGameState, playerId: number, handIndex: 
             if (p.id !== playerId) return p;
             const hand = p.hands[handIndex] ?? emptyHand(p.id, handIndex);
             // A new bet on a hand replaces its old one, which goes back to the stack first.
-            if (p.stack + hand.bet < amount) {
+            if (!covers(p.stack + hand.bet, amount)) {
                 io.log(`${p.name} does not have enough chips.`);
                 return p;
             }
@@ -233,7 +233,7 @@ export const placeSideBet = (prev: BlackjackGameState, playerId: number, handInd
         : player.id === prev.bankerId ? bankerRefusal(player.name)
         : !hand || hand.bet <= 0 ? "Place the hand's bet first."
         : amount > prev.maxBet ? `Side bets can be at most ₹${formatAmount(prev.maxBet)}.`
-        : player.stack + (hand[kind] ?? 0) < amount ? `${player.name} does not have enough chips.` : null;
+        : !covers(player.stack + (hand[kind] ?? 0), amount) ? `${player.name} does not have enough chips.` : null;
     if (refusal) {
         io.log(refusal);
         return prev;
@@ -279,7 +279,7 @@ export const startRound = (prev: BlackjackGameState, io: Io): BlackjackGameState
         if (p.id === prev.bankerId) return { ...p, stack: p.stack + p.hands.reduce((sum, h) => sum + placedOn(h), 0), hands: [] };
         const totalLastBet = p.lastBets.slice(0, p.initialHandsCount).reduce((sum, _, i) => sum + repeatBet(prev, p, i), 0);
         const placed = p.hands.some(h => h.bet > 0); // unlocked bets already came out of the stack
-        if (p.isTakingBreak || (prev.isBettingLocked ? p.stack < totalLastBet : !placed && p.stack < prev.minBet)) {
+        if (p.isTakingBreak || (prev.isBettingLocked ? !covers(p.stack, totalLastBet) : !placed && !covers(p.stack, prev.minBet))) {
             if (p.isTakingBreak) io.log(`${p.name} is on break.`);
             else io.log(`${p.name} has insufficient chips to play.`);
             // Bets already placed on a skipped player's hands go back to them.
@@ -293,7 +293,7 @@ export const startRound = (prev: BlackjackGameState, io: Io): BlackjackGameState
             let playerStack = p.stack;
             currentHands = currentHands.map((h, i) => {
                 const betAmount = repeatBet(prev, p, i);
-                if (playerStack >= betAmount) {
+                if (covers(playerStack, betAmount)) {
                     playerStack -= betAmount;
                     activePlayerFound = true;
                     handsWithBets++;
@@ -454,7 +454,7 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
                 io.log("Cannot double down after hitting.");
                 return prev;
             }
-            if (player.stack < hand.bet) {
+            if (!covers(player.stack, hand.bet)) {
                 io.log("Not enough stack to double down.");
                 return prev;
             }
@@ -467,7 +467,7 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
                 io.log("Cannot split after hitting.");
                 return prev;
             }
-            if (player.stack < hand.bet) {
+            if (!covers(player.stack, hand.bet)) {
                 io.log("Not enough stack to split.");
                 return prev;
             }
@@ -507,7 +507,7 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
                 return prev;
             }
             const insurance = toPaise(hand.bet / 2);
-            if (player.stack < insurance) {
+            if (!covers(player.stack, insurance)) {
                 io.log("Not enough stack for insurance.");
                 return prev;
             }

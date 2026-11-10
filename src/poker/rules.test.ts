@@ -91,7 +91,7 @@ test('preflop action skips players all-in from the ante; nobody left to act mean
     assert.equal(actor(skip), 'Asha');
     const allIn = deal(table(['Asha', 'Raj'], { ante: 5 }, [3, 4]));
     assert.equal(allIn.gameStage, 'showdown');
-    const matched = deal(table(['Asha', 'Raj'], { ante: 5 }, [1000, 3])); // Raj is all-in on the ante; Asha's big blind covers it
+    const matched = deal(table(['Asha', 'Raj'], { ante: 5 }, [1000, 3])); // Raj is all-in on the ante; Asha's blind covers it
     assert.equal(matched.gameStage, 'showdown');
     assert.equal(matched.activePlayerIndex, -1);
 });
@@ -289,9 +289,34 @@ test('decimal blinds stay in whole paise: pots, stacks and the log', () => {
     s = r(s, (x, io) => E.playerAction(x, 'call', 0, io));
     s = r(s, (x, io) => E.playerAction(x, 'call', 0, io));
     s = r(s, (x, io) => E.playerAction(x, 'check', 0, io));
-    assert.ok(s.messages.includes('--- End of Betting Round. Total Pot: ₹0.6 ---'));
+    assert.ok(s.messages.includes('--- End of Betting Round. Total Pot: ₹0.60 ---'));
     for (let i = 0; i < 9 && s.gameStage !== 'showdown'; i++) s = r(s, (x, io) => E.playerAction(x, 'check', 0, io));
     assert.equal(s.gameStage, 'showdown');
     assert.deepEqual(s.pot.map(p => p.amount), [0.6]);
     assert.deepEqual(stacks(s), [999.8, 999.8, 999.8]);
 });
+
+test('a stack under half a paisa is no stack: not dealt in, and posting down to dust is all-in', () => {
+    const dust = (s: PokerGameState, amounts: number[]) => ({ ...s, players: s.players.map((p, i) => ({ ...p, stack: amounts[i] })) });
+    const s = deal(dust(table(['Asha', 'Raj', 'Dev']), [1000, 1000, 5e-17]));
+    assert.deepEqual(s.players.map(p => p.inHand), [true, true, false]);
+    const posted = deal(dust(table(['Asha', 'Raj', 'Dev']), [10 + 1e-13, 10 + 1e-13, 10 + 1e-13]));
+    const bigBlind = posted.players.filter(p => p.stack < 0.005);
+    assert.equal(bigBlind.length, 1);
+    assert.equal(bigBlind[0].isAllIn, true);
+});
+
+test("heads-up the dealer posts the small blind and acts first; after the flop the big blind acts first", () => {
+    const h = deal(table(['Asha', 'Raj']));
+    assert.equal(h.dealerButtonIndex, 0);
+    assert.deepEqual(h.players.map(p => p.roundBet), [5, 10]);
+    assert.equal(actor(h), 'Asha');
+    const flop = act(act(h, 'call'), 'check');
+    assert.equal(flop.gameStage, 'flop');
+    assert.equal(actor(flop), 'Raj');
+    const next = deal(act(act(flop, 'check'), 'fold')); // Asha folds the flop; the button moves to Raj
+    assert.equal(next.dealerButtonIndex, 1);
+    assert.deepEqual(next.players.map(p => p.roundBet), [10, 5]);
+    assert.equal(actor(next), 'Raj');
+});
+

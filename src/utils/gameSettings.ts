@@ -57,7 +57,7 @@ const num = (text: string | undefined): number | undefined | null => {
     const t = (text ?? '').trim();
     if (!t) return undefined;
     const n = Number(t);
-    return Number.isFinite(n) ? n : null;
+    return Number.isFinite(n) && Math.abs(n) <= 1e12 ? n : null; // above ₹1,00,000 crore is refused
 };
 
 type Check = (n: number) => boolean;

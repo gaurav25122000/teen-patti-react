@@ -5,7 +5,7 @@ import { formatAmount } from '../../utils/formatters.ts';
 type StreakFields = Pick<PokerPlayer, 'winningStreak' | 'isTakingBreak' | 'stack' | 'totalPotContribution'>;
 
 // Dealt into the hand: not on break and had chips (a busted player has chips in the pot).
-const dealtIn = (p: StreakFields) => !p.isTakingBreak && (p.stack > 0 || p.totalPotContribution > 0);
+const dealtIn = (p: StreakFields) => !p.isTakingBreak && (p.stack >= 0.005 || p.totalPotContribution >= 0.005);
 
 // Ending the hand up money extends the streak, anyone else dealt in resets, players not dealt in keep theirs.
 export const nextStreak = (p: StreakFields, won: number) =>

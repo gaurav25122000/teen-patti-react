@@ -31,7 +31,7 @@ test('share text: UPI where the payee phone has one, then the night summary', ()
     assert.equal(text, [
         'Bets Manager settlement',
         'Dev pays Asha ₹500 (UPI: asha@okhdfc)',
-        'Dev pays Raj ₹120.5',
+        'Dev pays Raj ₹120.50',
         '',
         'Night summary',
         'Biggest pot: ₹2400 (Asha)',

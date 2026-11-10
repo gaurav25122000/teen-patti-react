@@ -30,3 +30,10 @@ test('ordinary log lines do not', () => {
         assert.doesNotMatch(line, WIN_PATTERN, line);
     }
 });
+
+test('a tournament end and a chop celebrate; side-bet and insurance payouts only sound', () => {
+    assert.match('Tournament over: 1st Asha ₹600, 2nd Raj ₹400', WIN_PATTERN);
+    assert.match('Chop: Asha ₹300, Raj ₹300', WIN_PATTERN);
+    assert.doesNotMatch('Asha (Hand 1) Perfect Pairs: Mixed, wins ₹60.', WIN_PATTERN);
+    assert.doesNotMatch('Asha (Hand 1) insurance pays ₹10.', WIN_PATTERN);
+});

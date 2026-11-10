@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { getWinnings } from '../utils/winningsService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './LifetimeWinnings.css'; // Import the updated CSS
-import { toTitleCase } from '../utils/formatters';
+import { signedAmount, toTitleCase } from '../utils/formatters';
 import { readSavedPlayers } from '../utils/savedPlayers';
-import { gameTotals, inRange, type RangeKind, type WinningsRecord } from '../utils/winningsRange';
+import { gameTotals, inRange, winningsOf, type RangeKind, type WinningsRecord } from '../utils/winningsRange';
+import { useFormError } from '../hooks/useFormError';
 
 const RANGES: [RangeKind, string][] = [['all', 'All time'], ['month', 'This month'], ['30d', 'Last 30 days'], ['year', 'This year'], ['custom', 'Custom']];
 
@@ -12,7 +13,7 @@ const LifetimeWinnings: React.FC = () => {
     const [phoneNumbers, setPhoneNumbers] = useState('');
     const [winningsData, setWinningsData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useFormError();
     const [range, setRange] = useState<RangeKind>('all');
     const [from, setFrom] = useState('');
     const [to, setTo] = useState('');
@@ -116,6 +117,7 @@ const LifetimeWinnings: React.FC = () => {
         <div className="setup-screen">
             <h2>Lifetime Winnings</h2>
             <div className="lookup-form">
+                <h3 className="section-title">Look up players</h3>
                 <label htmlFor="lifetime-phones">Phone numbers, comma-separated</label>
                 <input
                     id="lifetime-phones"
@@ -172,11 +174,11 @@ const LifetimeWinnings: React.FC = () => {
                                         return (
                                             <tr key={playerSummary.hash}>
                                                 <td>{toTitleCase(playerSummary.playerName)}</td>
-                                                <td className={playerSummary.teenPatti >= 0 ? 'win-amount' : 'loss-amount'}>₹{playerSummary.teenPatti.toFixed(2)}</td>
-                                                <td className={playerSummary.poker >= 0 ? 'win-amount' : 'loss-amount'}>₹{playerSummary.poker.toFixed(2)}</td>
+                                                <td className={playerSummary.teenPatti >= 0 ? 'win-amount' : 'loss-amount'}>{signedAmount(playerSummary.teenPatti)}</td>
+                                                <td className={playerSummary.poker >= 0 ? 'win-amount' : 'loss-amount'}>{signedAmount(playerSummary.poker)}</td>
                                                 {/* ADDED */}
-                                                <td className={playerSummary.blackjack >= 0 ? 'win-amount' : 'loss-amount'}>₹{playerSummary.blackjack.toFixed(2)}</td>
-                                                <td className={totalClass}>₹{overallTotal.toFixed(2)}</td>
+                                                <td className={playerSummary.blackjack >= 0 ? 'win-amount' : 'loss-amount'}>{signedAmount(playerSummary.blackjack)}</td>
+                                                <td className={totalClass}>{signedAmount(overallTotal)}</td>
                                             </tr>
                                         );
                                     })}
@@ -203,8 +205,8 @@ const LifetimeWinnings: React.FC = () => {
                                         <tr key={index}>
                                             <td>{toTitleCase(record.player_name)}</td>
                                             <td>{toTitleCase(record.game_type)}</td>
-                                            <td className={record.winnings >= 0 ? 'win-amount' : 'loss-amount'}>
-                                                ₹{parseFloat(record.winnings).toFixed(2)}
+                                            <td className={winningsOf(record) >= 0 ? 'win-amount' : 'loss-amount'}>
+                                                {signedAmount(winningsOf(record))}
                                             </td>
                                             <td>{new Date(record.timestamp).toLocaleString()}</td>
                                         </tr>

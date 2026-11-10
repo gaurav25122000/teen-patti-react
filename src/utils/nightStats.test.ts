@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { biggestWin, emptyStats, partialStats, recordRound, sessionMinutes, statsNames, summaryLines } from './nightStats.ts';
-import { formatAmount, toTitleCase } from './formatters.ts';
+import { formatAmount, money, toTitleCase } from './formatters.ts';
 import type { Person } from './owingsLogic.ts';
 
 // Party keys: phones for Asha/Raj/Dev, a name key for a phoneless Esha.
@@ -10,13 +10,19 @@ const NAMES = { [A]: 'Asha', [R]: 'Raj', [D]: 'Dev', [E]: 'Esha' };
 const person = (key: string, title: string, net: number): Person =>
     ({ key, label: title, title, phone: key.includes('|') ? key.split('|')[0] : null, net });
 
-test('formatAmount: whole amounts bare, up to 2 decimals, tiny amounts are 0', () => {
+test('formatAmount: whole amounts bare, paise always two digits, tiny amounts are 0', () => {
     assert.equal(formatAmount(500), '500');
-    assert.equal(formatAmount(120.5), '120.5');
+    assert.equal(formatAmount(120.5), '120.50');
+    assert.equal(formatAmount(12.05), '12.05');
+    assert.equal(formatAmount(-12.05), '-12.05');
     assert.equal(formatAmount(120.25), '120.25');
     assert.equal(formatAmount(1200.456), '1200.46');
     assert.equal(formatAmount(-0.004), '0');
-    assert.equal(formatAmount(0.1 + 0.2), '0.3');
+    assert.equal(formatAmount(0.1 + 0.2), '0.30');
+    assert.equal(formatAmount(NaN), 'NaN');
+    assert.equal(formatAmount(1e15), '1000000000000000.00');
+    assert.equal(money(-20), '-₹20');
+    assert.equal(money(12.5), '₹12.50');
 });
 
 test('names are trimmed when title-cased, so "Raj " and "raj" are one name', () => {
@@ -128,7 +134,7 @@ test('stats names: the latest title-cased name per party key', () => {
 
 test('the imbalance line comes last, signed, only when a paisa or more is uncovered', () => {
     assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', true, 500), ['Includes balances carried into this game.', 'Balances are off by +₹500: settle the difference by hand.']);
-    assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', false, -12.5), ['Balances are off by -₹12.5: settle the difference by hand.']);
+    assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', false, -12.5), ['Balances are off by -₹12.50: settle the difference by hand.']);
     assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', false, 0.004), []);
 });
 

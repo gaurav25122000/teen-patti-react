@@ -49,3 +49,16 @@ test('turn lines of every game are skipped, and this round\'s refusals sound as 
         assert.equal(soundFor([line]), 'error', line);
     }
 });
+
+test('a show outranks its fold, and the newer lines sound', () => {
+    assert.equal(soundFor(['Show is requested by Asha.', 'Raj folds.']), 'show');
+    assert.equal(soundFor(['Tournament over: 1st Asha ₹600']), 'win');
+    assert.equal(soundFor(['Chop: Asha ₹300, Raj ₹300']), 'win');
+    assert.equal(soundFor(['Asha (Hand 1) Perfect Pairs: Mixed, wins ₹60.']), 'win');
+    assert.equal(soundFor(['Asha (Hand 1) insurance pays ₹10.']), 'win');
+    assert.equal(soundFor(['Boot is now ₹20.']), 'level_up');
+    assert.equal(soundFor(['Asha is now the banker for 3 rounds.']), 'level_up');
+    assert.equal(soundFor(['Raj is out in 3rd place.']), 'fold');
+    assert.equal(soundFor(['Asha rebuys: ₹500 for 5000 chips.']), 'chip');
+    assert.equal(soundFor(['Settings: max rebuys 2']), null);
+});

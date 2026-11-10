@@ -66,7 +66,7 @@ test('max chaal: chaal above it, blind above half of it, boot above half of it',
     assert.equal(betRefusal(s, 'chaal', 25, 'Raj', 0, false), null);
     assert.equal(betRefusal(s, 'chaal', 26, 'Raj', 0, false), 'Max chaal is ₹25.');
     assert.equal(betRefusal(s, 'blind', 12, 'Raj', 0, true), null);
-    assert.equal(betRefusal(s, 'blind', 13, 'Raj', 0, true), 'Max blind bet is ₹12.5.');
+    assert.equal(betRefusal(s, 'blind', 13, 'Raj', 0, true), 'Max blind bet is ₹12.50.');
     assert.equal(betRefusal(s, 'show', 100, 'Raj', 0, false), null);
     assert.equal(bootRefusal({ maxChaal: 100 }, 50), null);
     assert.equal(bootRefusal({ maxChaal: 100 }, 51), 'Boot is above the max blind bet (₹50).');

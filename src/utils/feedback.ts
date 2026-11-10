@@ -54,11 +54,15 @@ const vibrate = (pattern: number | number[]) => {
 };
 
 let pendingTap: ReturnType<typeof setTimeout> | undefined;
+let last = { sound: '', at: 0 };
 
 // A sound with its haptic: error and alarm buzz heavy, tick none, everything else a light tap.
 // A tap waits 40 ms: when the press also logs an action, only the action's sound plays.
+// The same sound twice within 150 ms plays once (a refusal shown in the form and written to the log).
 export const cue = (sound: Sound) => {
     clearTimeout(pendingTap);
+    if (sound === last.sound && Date.now() - last.at < 150) return;
+    last = { sound, at: Date.now() };
     if (sound === 'tap') {
         pendingTap = setTimeout(() => { playSound('tap'); vibrate(15); }, 40);
         return;

@@ -163,15 +163,26 @@ test('an older save that cannot tell about carried-in balances stays unknown thr
     assert.equal(s.carriedIn, undefined);
 });
 
-test('the blind stake after a chaal is half of it, rounded up; a minimum chaal keeps it', () => {
+test('the blind stake after a chaal is half of it, rounded up to the paisa; a minimum chaal keeps it', () => {
     const seen = (boot: number) => go(go(E.newGame([player(1, 0), player(2, 0), player(3, 0)]), (x, io) => E.startRound(x, 0, boot, io)), x => E.seeCards(x));
-    assert.equal(go(seen(10), x => E.betChaal(x, 25)).currentStake, 13);
+    assert.equal(go(seen(10), x => E.betChaal(x, 25)).currentStake, 12.5);
+    assert.equal(go(seen(10), x => E.betChaal(x, 25.01)).currentStake, 12.51);
     assert.equal(go(seen(7.5), x => E.betChaal(x, 15)).currentStake, 7.5);
-    assert.equal(go(seen(7.5), x => E.betChaal(x, 17)).currentStake, 9);
+    assert.equal(go(seen(7.5), x => E.betChaal(x, 17)).currentStake, 8.5);
 });
 
 test('decimal amounts stay in whole paise, in the state and the log', () => {
     const s = runStep(E.newGame([player(1, 0), player(2, 0), player(3, 0)]), (x, io) => E.startRound(x, 0, 10.1, io), () => 0, E.roundMoney).state;
     assert.equal(s.potAmount, 30.3);
-    assert.ok(s.messages.includes('Total Pot: ₹30.3.'));
+    assert.ok(s.messages.includes('Total Pot: ₹30.30.'));
+});
+
+test('Deduct & distribute reaches Lifetime Winnings: the deducted player loses it, the rest share it', () => {
+    const s = E.newGame([player(1, 0), player(2, 0), { ...player(3, 0), phoneNumber: undefined }, player(4, 0)]);
+    const { records } = runStep(s, (x, io) => E.deductAndDistribute(x, 1, 31, io));
+    assert.deepEqual(records, [
+        { phone: '9000000001', name: 'P1', winnings: -31 },
+        { phone: '9000000002', name: 'P2', winnings: 11 },
+        { phone: '9000000004', name: 'P4', winnings: 10 },
+    ]);
 });

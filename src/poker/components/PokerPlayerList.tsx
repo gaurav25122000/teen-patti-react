@@ -37,6 +37,8 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
         return { p, status, className };
     });
     const totalPot = players.reduce((sum, p) => sum + p.totalPotContribution, 0);
+    const some = (amount: number) => (amount >= 0.005 ? `₹ ${formatAmount(amount)}` : ''); // BET and POT only when there is one
+    const inHand = players.some(p => p.roundBet >= 0.005 || p.totalPotContribution >= 0.005); // no column of ₹0s between hands
 
     return (
         <div className="player-list">
@@ -53,8 +55,8 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                     <tr>
                         <th>Name</th>
                         <th>Stack / Buy-In</th>
-                        <th>Round Bet</th>
-                        <th>Pot Contri</th>
+                        {inHand && <th>Round Bet</th>}
+                        {inHand && <th>Pot Contri</th>}
                     </tr>
                 </thead>
                 <tbody>
@@ -63,11 +65,11 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                             <tr key={p.id} className={className} data-player-id={p.id}>
                                 <td data-label="Name">
                                     <Avatar name={p.name} phone={p.phoneNumber} saved={saved} /> {toTitleCase(p.name)} {status}
-                                    <span style={{ marginLeft: '8px', opacity: p.winningStreak > 0 ? 1 : 0.7 }} title="Winning Streak">🔥 {p.winningStreak}</span>
+                                    {p.winningStreak > 0 && <span style={{ marginLeft: '8px' }} title="Winning Streak">🔥 {p.winningStreak}</span>}
                                 </td>
                                 <td data-label="Stack / Buy-In">₹ {formatAmount(p.stack)} / ₹ {formatAmount(p.totalBuyIn)}</td>
-                                <td data-label="Round Bet">₹ {formatAmount(p.roundBet)}</td>
-                                <td data-label="Pot Contribution">₹ {formatAmount(p.totalPotContribution)}</td>
+                                {inHand && <td data-label="Round Bet">{some(p.roundBet)}</td>}
+                                {inHand && <td data-label="Pot Contribution">{some(p.totalPotContribution)}</td>}
                             </tr>
                         );
                     })}
