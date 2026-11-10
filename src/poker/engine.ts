@@ -14,6 +14,22 @@ import { depart, departureNote, tooFewToRemove } from '../utils/departures.ts';
 
 export type PlayerAction = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
 
+// Every amount in whole paise after a step: float sums drift (10.1 + 10.1 + 10.1 = 30.299999999999997).
+export const roundMoney = (s: PokerGameState): PokerGameState => ({
+    ...s,
+    currentBet: toPaise(s.currentBet),
+    pot: s.pot.map(p => ({ ...p, amount: toPaise(p.amount) })),
+    players: s.players.map(p => ({
+        ...p,
+        stack: toPaise(p.stack),
+        totalBuyIn: toPaise(p.totalBuyIn),
+        roundBet: toPaise(p.roundBet),
+        totalPotContribution: toPaise(p.totalPotContribution),
+        roundWinnings: toPaise(p.roundWinnings),
+    })),
+    departed: s.departed?.map(d => ({ ...d, net: toPaise(d.net) })),
+});
+
 export const createInitialPokerState = (): PokerGameState => ({
     players: [],
     gameStage: 'pre-deal',
@@ -212,7 +228,7 @@ export const endTournament = (prev: PokerGameState, io: Io): PokerGameState => {
 
 const advanceToNextStageOrShowdown = (currentState: PokerGameState, io: Io): PokerGameState => {
     const currentTotalPot = currentState.players.reduce((sum, p) => sum + p.totalPotContribution, 0);
-    io.log(`--- End of Betting Round. Total Pot: ₹${currentTotalPot} ---`);
+    io.log(`--- End of Betting Round. Total Pot: ₹${formatAmount(currentTotalPot)} ---`);
 
     const playersInHand = currentState.players.filter(p => p.inHand);
     if (currentState.gameStage === 'river' || playersInHand.filter(p => !p.isAllIn && p.stack > 0).length < 2) {
@@ -303,7 +319,7 @@ export const playerAction = (prev: PokerGameState, action: PlayerAction, amount:
             player.roundBet += callAmount;
             player.totalPotContribution += callAmount;
             if (player.stack === 0) player.isAllIn = true;
-            io.log(`${toTitleCase(player.name)} calls ₹${callAmount}.`);
+            io.log(`${toTitleCase(player.name)} calls ₹${formatAmount(callAmount)}.`);
             break;
         }
         case 'bet':
@@ -320,18 +336,18 @@ export const playerAction = (prev: PokerGameState, action: PlayerAction, amount:
             if (isRaiseAction) {
                 const raiseAmount = amount - newCurrentBet;
                 if (raiseAmount < minBetOrRaiseAmount) {
-                    io.log(`Raise must be by at least ₹${minBetOrRaiseAmount}. Total bet must be at least ₹${newCurrentBet + minBetOrRaiseAmount}.`);
+                    io.log(`Raise must be by at least ₹${formatAmount(minBetOrRaiseAmount)}. Total bet must be at least ₹${formatAmount(newCurrentBet + minBetOrRaiseAmount)}.`);
                     return prev;
                 }
                 newLastRaiseAmount = raiseAmount;
-                io.log(`${toTitleCase(player.name)} raises to ₹${amount} (a raise of ₹${costToPlayer}).`);
+                io.log(`${toTitleCase(player.name)} raises to ₹${formatAmount(amount)} (a raise of ₹${formatAmount(costToPlayer)}).`);
             } else {
                 if (amount < minBetOrRaiseAmount) {
-                    io.log(`Bet must be at least ₹${minBetOrRaiseAmount}.`);
+                    io.log(`Bet must be at least ₹${formatAmount(minBetOrRaiseAmount)}.`);
                     return prev;
                 }
                 newLastRaiseAmount = amount;
-                io.log(`${toTitleCase(player.name)} bets ₹${amount}.`);
+                io.log(`${toTitleCase(player.name)} bets ₹${formatAmount(amount)}.`);
             }
 
             player.stack -= costToPlayer;
@@ -350,7 +366,7 @@ export const playerAction = (prev: PokerGameState, action: PlayerAction, amount:
         case 'all-in': {
             const allInAmount = player.stack;
             const totalBet = player.roundBet + allInAmount;
-            io.log(`${toTitleCase(player.name)} is ALL-IN with their last ₹${allInAmount}.`);
+            io.log(`${toTitleCase(player.name)} is ALL-IN with their last ₹${formatAmount(allInAmount)}.`);
             player.totalPotContribution += allInAmount;
             player.roundBet = totalBet;
             player.stack = 0;
@@ -476,8 +492,8 @@ export const startNewHand = (prev: PokerGameState, io: Io): PokerGameState => {
     const newBigBlindIndex = nextSeat(newSmallBlindIndex, p => activePlayerIds.has(p.id));
     const sbPlayer = newPlayers[newSmallBlindIndex];
     const bbPlayer = newPlayers[newBigBlindIndex];
-    messages.push(`${name(newSmallBlindIndex)} posts small blind of ₹${post(sbPlayer, leveled.smallBlindAmount, true)}.`);
-    messages.push(`${name(newBigBlindIndex)} posts big blind of ₹${post(bbPlayer, leveled.bigBlindAmount, true)}.`);
+    messages.push(`${name(newSmallBlindIndex)} posts small blind of ₹${formatAmount(post(sbPlayer, leveled.smallBlindAmount, true))}.`);
+    messages.push(`${name(newBigBlindIndex)} posts big blind of ₹${formatAmount(post(bbPlayer, leveled.bigBlindAmount, true))}.`);
 
     let currentBet = leveled.bigBlindAmount;
     let lastBlindIndex = newBigBlindIndex;
@@ -498,7 +514,7 @@ export const startNewHand = (prev: PokerGameState, io: Io): PokerGameState => {
     }
     sbPlayer.hasActed = true;
 
-    messages.push(`Total Pot: ₹${newPlayers.reduce((sum, p) => sum + p.totalPotContribution, 0)}`);
+    messages.push(`Total Pot: ₹${formatAmount(newPlayers.reduce((sum, p) => sum + p.totalPotContribution, 0))}`);
     const blinds = { ...base, currentBet, lastRaiseAmount: currentBet, smallBlindIndex: newSmallBlindIndex, bigBlindIndex: newBigBlindIndex, optionHolderId: optionHolder.id };
     // Antes and blinds can put players all-in: nobody left to act, or one player already matching, means showdown.
     const canAct = dealtIn.filter(p => !p.isAllIn);
@@ -594,7 +610,7 @@ export const addPlayer = (prev: PokerGameState, name: string, stack: number, pho
         io.log(`Player ${toTitleCase(name)} joins for ₹${formatAmount(prev.buyIn!)} with ${formatAmount(prev.startingChips!)} chips.`);
         return { ...prev, players: [...prev.players, joined], entrants: [...prev.entrants, entrant(joined, prev.buyIn!)] };
     }
-    io.log(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
+    io.log(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${formatAmount(stack)}.`);
     return { ...prev, players: [...prev.players, newPlayer(newId, name, stack, phoneNumber)] };
 };
 
@@ -651,7 +667,7 @@ export const addChipsToPlayer = (prev: PokerGameState, playerId: number, amount:
         io.log(refused);
         return prev;
     }
-    io.log(`Added ₹${amount} to ${toTitleCase(player.name)}'s stack. Their total buy-in is now ₹${player.totalBuyIn + amount}.`);
+    io.log(`Added ₹${formatAmount(amount)} to ${toTitleCase(player.name)}'s stack. Their total buy-in is now ₹${formatAmount(player.totalBuyIn + amount)}.`);
     return {
         ...prev,
         players: prev.players.map(p => (p.id === playerId ? { ...p, stack: p.stack + amount, totalBuyIn: p.totalBuyIn + amount, rebuys: (p.rebuys ?? 0) + 1 } : p)),
@@ -723,7 +739,7 @@ export const applyStreakWinnings = (prev: PokerGameState, winnerId: number, amou
             .map(p => ({ phone: p.phoneNumber!, name: p.name, winnings: p.id === winnerId ? totalDeducted : -amount })));
     }
 
-    io.log(`Streak Winnings! ${toTitleCase(winner.name)} receives ₹${totalDeducted} (₹${amount} from each of ${payerIds.size} player${payerIds.size === 1 ? '' : 's'}).`);
+    io.log(`Streak Winnings! ${toTitleCase(winner.name)} receives ₹${formatAmount(totalDeducted)} (₹${formatAmount(amount)} from each of ${payerIds.size} player${payerIds.size === 1 ? '' : 's'}).`);
     return { ...prev, players: finalPlayers };
 };
 

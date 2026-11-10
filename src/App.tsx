@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { startSync } from './sync/syncRunner';
+import './utils/feedback'; // loads the sounds at start and unlocks audio on the first touch
 import './App.css';
 
 // Teen Patti Imports

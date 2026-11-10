@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Avatar from './Avatar';
 import { readSavedPlayers } from '../utils/savedPlayers';
 import type { Player, GameState } from '../types/gameTypes';
-import { toTitleCase } from '../utils/formatters';
+import { toTitleCase, formatAmount } from '../utils/formatters';
 import TableView, { ViewToggle } from './TableView';
 import { useStoredState } from '../hooks/useStoredState';
 import { dealerOf } from '../utils/teenPattiRules';
@@ -50,9 +50,9 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
             <h3>Players ({players.length}) <ViewToggle view={view} onChange={setView} /></h3>
             {view === 'table' ? (
                 <TableView
-                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), phone: p.phoneNumber, amount: `₹ ${p.balance}`, status, className, dealer: p.id === dealerId }))}
+                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), phone: p.phoneNumber, amount: `₹ ${formatAmount(p.balance)}`, status, className, dealer: p.id === dealerId }))}
                     saved={saved}
-                    center={<>Pot ₹{gameState.potAmount}<br />Stake ₹{gameState.currentStake}</>}
+                    center={<>Pot ₹{formatAmount(gameState.potAmount)}<br />Stake ₹{formatAmount(gameState.currentStake)}</>}
                 />
             ) : (
             <table>
@@ -71,8 +71,8 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
                             <tr key={p.id} className={className} data-player-id={p.id}>
                                 <td data-label="ID">{p.id}</td>
                                 <td data-label="Name"><Avatar name={p.name} phone={p.phoneNumber} saved={saved} /> {toTitleCase(p.name)}{p.id === dealerId && <span className="dealer-badge">D</span>}</td>
-                                <td data-label="Balance">₹ {p.balance}</td>
-                                <td data-label="Contribution">₹ {contribution}</td>
+                                <td data-label="Balance">₹ {formatAmount(p.balance)}</td>
+                                <td data-label="Contribution">₹ {formatAmount(contribution)}</td>
                                 <td data-label="Status">{status}</td>
                             </tr>
 
@@ -82,7 +82,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
                  <tfoot>
                     <tr>
                         <td colSpan={2}>Net Balance</td>
-                        <td>₹ {netBalance}</td>
+                        <td>₹ {formatAmount(netBalance)}</td>
                         <td colSpan={2}></td>
                     </tr>
                 </tfoot>

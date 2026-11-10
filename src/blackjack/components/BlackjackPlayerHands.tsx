@@ -2,7 +2,7 @@
 // src/blackjack/components/BlackjackPlayerHands.tsx
 import React, { useState } from 'react';
 import type { BlackjackPlayer, HandStatus, PlayerHand, SideResult } from '../types/blackjackGameTypes';
-import { toTitleCase } from '../../utils/formatters';
+import { toTitleCase, formatAmount } from '../../utils/formatters';
 import type { SideKind } from '../engine';
 
 const CHIPS = [10, 50, 100, 500];
@@ -51,7 +51,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
              return (
                 <div className="hand-bet" style={{ fontSize: '1.1rem', color: 'var(--color-glow-cyan)'}}>
                     {/* UPDATED to show wager */}
-                    Bet: <strong>₹{hand.wager}</strong> (Locked)
+                    Bet: <strong>₹{formatAmount(hand.wager)}</strong> (Locked)
                 </div>
             );
         }
@@ -73,7 +73,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                     <button className="btn-success" onClick={() => handleBetSubmit(handIndex)}>Place Bet</button>
                 </div>
                 <div className="chip-row">
-                    {CHIPS.map(chip => <button key={chip} className="btn btn-chip" onClick={() => addChip(chip)}>+₹{chip}</button>)}
+                    {CHIPS.map(chip => <button key={chip} className="btn btn-chip" onClick={() => addChip(chip)}>+₹{formatAmount(chip)}</button>)}
                     <button className="btn btn-error btn-compact" onClick={() => handleBetChange(handIndex, '')}>CLEAR</button>
                     <button className="btn btn-sky btn-compact" onClick={() => handleBetChange(handIndex, String(lastBetForThisHand))}>REPEAT LAST</button>
                 </div>
@@ -90,7 +90,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                 const placed = player.hands[handIndex]?.[kind];
                 return (
                     <div key={kind} className="inline-input-group">
-                        <input type="number" inputMode="decimal" min="0" value={sideAmounts[key] ?? ''} placeholder={`${kind === 'pp' ? 'Perfect Pairs' : '21+3'}${placed ? ` (₹${placed})` : ''}`}
+                        <input type="number" inputMode="decimal" min="0" value={sideAmounts[key] ?? ''} placeholder={`${kind === 'pp' ? 'Perfect Pairs' : '21+3'}${placed ? ` (₹${formatAmount(placed)})` : ''}`}
                             onChange={e => setSideAmounts(prev => ({ ...prev, [key]: e.target.value }))} />
                         <button className="btn-orange" onClick={() => {
                             onPlaceSideBet(player.id, handIndex, kind, Number(sideAmounts[key] || '0') || 0);
@@ -109,7 +109,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                 .filter(([kind]) => hand[kind] && !hand[kind === 'pp' ? 'ppResult' : 't3Result'])
                 .map(([kind, results, title]) => (
                     <div key={kind} className="game-actions">
-                        <span>{title} ₹{hand[kind]}:</span>
+                        <span>{title} ₹{formatAmount(hand[kind]!)}:</span>
                         {results.map(([result, label], i) => (
                             <button key={result} className={`btn ${RESULT_THEMES[i]} btn-compact`} onClick={() => onSettleSideBet(player.id, hand.id, kind, result)}>{label}</button>
                         ))}
@@ -153,17 +153,17 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                             {/* --- UPDATED LOGIC --- */}
                             {hand.wager > 0 && 
                                 <span style={{color: 'var(--color-text-muted)', display: 'block', fontSize: '0.9rem'}}>
-                                    Bet: ₹{hand.wager} {hand.wager !== hand.bet && `(2x${hand.bet})`}
+                                    Bet: ₹{formatAmount(hand.wager)} {hand.wager !== hand.bet && `(2x${hand.bet})`}
                                 </span>
                             }
                             {(hand.pp || hand.t3) &&
                                 <span style={{color: 'var(--color-text-muted)', display: 'block', fontSize: '0.9rem'}}>
-                                    {hand.pp ? `PP ₹${hand.pp}${hand.ppResult ? ` (${hand.ppResult})` : ''} ` : ''}{hand.t3 ? `21+3 ₹${hand.t3}${hand.t3Result ? ` (${hand.t3Result})` : ''}` : ''}
+                                    {hand.pp ? `PP ₹${formatAmount(hand.pp)}${hand.ppResult ? ` (${hand.ppResult})` : ''} ` : ''}{hand.t3 ? `21+3 ₹${formatAmount(hand.t3)}${hand.t3Result ? ` (${hand.t3Result})` : ''}` : ''}
                                 </span>
                             }
                             {hand.insurance &&
                                 <span style={{color: 'var(--color-text-muted)', display: 'block', fontSize: '0.9rem'}}>
-                                    Insurance: ₹{hand.insurance}{hand.insuranceResult && ` (${hand.insuranceResult})`}
+                                    Insurance: ₹{formatAmount(hand.insurance)}{hand.insuranceResult && ` (${hand.insuranceResult})`}
                                 </span>
                             }
                         </div>

@@ -57,6 +57,16 @@ export const derivePlayers = (gameState: Pick<GameState, 'players' | 'foldedPlay
 
 const currentOf = (s: GameState) => derivePlayers(s).currentPlayer;
 
+// Every amount in whole paise after a step: float sums drift (10.1 + 10.1 + 10.1 = 30.299999999999997).
+export const roundMoney = (s: GameState): GameState => ({
+  ...s,
+  potAmount: toPaise(s.potAmount),
+  currentStake: toPaise(s.currentStake),
+  players: s.players.map(p => ({ ...p, balance: toPaise(p.balance) })),
+  roundContributions: new Map([...s.roundContributions].map(([id, amount]) => [id, toPaise(amount)])),
+  departed: s.departed?.map(d => ({ ...d, net: toPaise(d.net) })),
+});
+
 export const advanceTurn = (prev: GameState): GameState => {
   if (!prev.roundActive) return prev;
   const active = prev.players.filter(p => !prev.foldedPlayerIds.has(p.id));
@@ -85,7 +95,7 @@ export const endRound = (prev: GameState, winnerId: number | null, io: Io): Game
 
   if (winner) {
     finalMessages.push(`--- ROUND OVER ---`);
-    finalMessages.push(`Congratulations! ${toTitleCase(winner.name)} won the pot of ₹${prev.potAmount}`);
+    finalMessages.push(`Congratulations! ${toTitleCase(winner.name)} won the pot of ₹${formatAmount(prev.potAmount)}`);
 
     const rows: RawRecord[] = [];
     prev.players.forEach(player => {
@@ -201,8 +211,8 @@ export const startRound = (prev: GameState, startingPlayerIndex: number, chosenB
     messages: [
       ...prev.messages,
       `--- NEW ROUND STARTED ---`,
-      `Collecting Boot Amount: ₹${bootAmount} from ${activePlayersForRound.length} active players.`,
-      `Total Pot: ₹${newPot}.`,
+      `Collecting Boot Amount: ₹${formatAmount(bootAmount)} from ${activePlayersForRound.length} active players.`,
+      `Total Pot: ₹${formatAmount(newPot)}.`,
       `Turn starts with ${toTitleCase(startingPlayer.name)}.`,
       ...potLimitLines(prev.potLimit, newPot),
     ],
@@ -226,8 +236,8 @@ export const playBlind = (prev: GameState, isRaise: boolean, amount: number): Ga
   if (!current || !prev.blindPlayerIds.has(current.id)) return prev;
   const paid = pay(prev, current.id, amount);
   const message = isRaise
-    ? `${toTitleCase(current.name)} raises blind to ₹${amount}. Pot is now ₹${paid.potAmount}.`
-    : `${toTitleCase(current.name)} plays blind for ₹${amount}. Pot is now ₹${paid.potAmount}.`;
+    ? `${toTitleCase(current.name)} raises blind to ₹${formatAmount(amount)}. Pot is now ₹${formatAmount(paid.potAmount)}.`
+    : `${toTitleCase(current.name)} plays blind for ₹${formatAmount(amount)}. Pot is now ₹${formatAmount(paid.potAmount)}.`;
   return advanceTurn({
     ...prev,
     ...paid,
@@ -250,9 +260,10 @@ export const betChaal = (prev: GameState, amount: number): GameState => {
   const current = currentOf(prev);
   if (!current || prev.blindPlayerIds.has(current.id)) return prev;
   const paid = pay(prev, current.id, amount);
-  const newCurrentStake = Math.max(prev.currentStake, Math.floor(amount / 2));
-  const messages = [...prev.messages, `${toTitleCase(current.name)} bets Chaal of ₹${amount}. Pot is now ₹${paid.potAmount}.`];
-  if (newCurrentStake > prev.currentStake) messages.push(`New stake for Blind players is now ₹${newCurrentStake}.`);
+  // Half the chaal, rounded up, is the new blind stake (Gaurav, 10 Nov); a minimum chaal leaves it as it is.
+  const newCurrentStake = amount / 2 > prev.currentStake ? Math.ceil(amount / 2) : prev.currentStake;
+  const messages = [...prev.messages, `${toTitleCase(current.name)} bets Chaal of ₹${formatAmount(amount)}. Pot is now ₹${formatAmount(paid.potAmount)}.`];
+  if (newCurrentStake > prev.currentStake) messages.push(`New stake for Blind players is now ₹${formatAmount(newCurrentStake)}.`);
   messages.push(...potLimitLines(prev.potLimit, paid.potAmount));
   return advanceTurn({ ...prev, ...paid, currentStake: newCurrentStake, lastActorWasBlind: false, messages });
 };
@@ -281,7 +292,7 @@ export const requestShow = (prev: GameState, cost: number): GameState => {
   return {
     ...prev,
     ...paid,
-    messages: [...prev.messages, `A Show is requested for ₹${cost}. Pot is now ₹${paid.potAmount}.`, ...potLimitLines(prev.potLimit, paid.potAmount)],
+    messages: [...prev.messages, `A Show is requested for ₹${formatAmount(cost)}. Pot is now ₹${formatAmount(paid.potAmount)}.`, ...potLimitLines(prev.potLimit, paid.potAmount)],
   };
 };
 
@@ -294,7 +305,7 @@ export const resolveShow = (prev: GameState, loserId: number, io: Io): GameState
 
 export const addPlayer = (prev: GameState, name: string, balance: number, phoneNumber: string, io: Io): GameState => {
   const newId = prev.players.length > 0 ? Math.max(...prev.players.map(p => p.id)) + 1 : 1;
-  io.log(`Player ${toTitleCase(name)} added with balance ₹${balance}.`);
+  io.log(`Player ${toTitleCase(name)} added with balance ₹${formatAmount(balance)}.`);
   return {
     ...prev,
     players: [...prev.players, { id: newId, name: toTitleCase(name), balance, phoneNumber, isTakingBreak: false }],
@@ -351,7 +362,7 @@ export const deductAndDistribute = (prev: GameState, playerId: number, rawAmount
   let shareIndex = 0;
   const updatedPlayers = players.map(p => (p.id === playerId ? { ...p, balance: p.balance - amount } : { ...p, balance: p.balance + shares[shareIndex++] }));
   const leftoverNote = shares.some(s => s !== amountToDistribute) ? ' (leftover to the first players in order)' : '';
-  io.log(`Deducted ₹${amount} from ${toTitleCase(playerToDeduct.name)} and distributed ₹${amountToDistribute} to everyone else${leftoverNote}.`);
+  io.log(`Deducted ₹${formatAmount(amount)} from ${toTitleCase(playerToDeduct.name)} and distributed ₹${formatAmount(amountToDistribute)} to everyone else${leftoverNote}.`);
   return { ...prev, players: updatedPlayers };
 };
 

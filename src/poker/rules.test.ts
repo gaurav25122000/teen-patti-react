@@ -282,3 +282,16 @@ test('the stored settle-through hub carries across hands; a new game clears it; 
     const over = { ...tournament({ addOnPrice: 200, addOnChips: 1500 }), tournamentOver: true };
     assert.deepEqual(newLines(over, go(over, (x, io) => E.takeAddOn(x, 1, io))), ['The tournament is over.']);
 });
+
+test('decimal blinds stay in whole paise: pots, stacks and the log', () => {
+    const r = (s: PokerGameState, fn: (s: PokerGameState, io: Io) => PokerGameState) => runStep(s, fn, () => 0, E.roundMoney).state;
+    let s = r(table(['Asha', 'Raj', 'Dev'], { smallBlindAmount: 0.1, bigBlindAmount: 0.2 }), (x, io) => E.startNewHand(x, io));
+    s = r(s, (x, io) => E.playerAction(x, 'call', 0, io));
+    s = r(s, (x, io) => E.playerAction(x, 'call', 0, io));
+    s = r(s, (x, io) => E.playerAction(x, 'check', 0, io));
+    assert.ok(s.messages.includes('--- End of Betting Round. Total Pot: ₹0.6 ---'));
+    for (let i = 0; i < 9 && s.gameStage !== 'showdown'; i++) s = r(s, (x, io) => E.playerAction(x, 'check', 0, io));
+    assert.equal(s.gameStage, 'showdown');
+    assert.deepEqual(s.pot.map(p => p.amount), [0.6]);
+    assert.deepEqual(stacks(s), [999.8, 999.8, 999.8]);
+});

@@ -30,7 +30,7 @@ const loadStateFromStorage = (): BlackjackGameState | null => {
 export const useBlackjackGame = () => {
     const [gameState, setGameState, addMessage, afterCommit] = useGameState<BlackjackGameState>(() => {
         return loadStateFromStorage() || engine.createInitialBlackjackState();
-    });
+    }, engine.roundMoney);
     const { record, undo, canUndo } = useUndo(gameState, setGameState, gameState.gameStage !== 'betting');
     const io = useEngineIo(addMessage, afterCommit, 'blackjack');
     const step = useCallback((fn: (s: BlackjackGameState, io: Io) => BlackjackGameState) => setGameState(prev => fn(prev, io)), [setGameState, io]);

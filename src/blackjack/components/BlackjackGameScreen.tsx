@@ -8,7 +8,7 @@ import TableSheet from '../../components/TableSheet';
 import { END_GAME_CONFIRM } from '../../utils/archive';
 import BlackjackDealerDisplay from './BlackjackDealerDisplay'; 
 import BlackjackManageModal, { type ModalMode } from './BlackjackManageModal';
-import { toTitleCase } from '../../utils/formatters';
+import { toTitleCase, formatAmount } from '../../utils/formatters';
 import OwingsModal from '../../components/OwingsModal';
 import type { Party } from '../../utils/owingsLogic';
 import { emptyStats, sessionMinutes, summaryLines } from '../../utils/nightStats';
@@ -148,7 +148,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                         {isReadOnly && <div className="badge badge-warning" style={{ marginTop: '0.5rem' }}>SPECTATOR MODE</div>}
             
                         {!isReadOnly && <StreamControls gameState={gameState} gameType="blackjack" style={{ marginTop: '0.5rem' }} onHandedOver={actions.clearGame} />}
-                        {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
+                        {!isReadOnly && canUndo && <button className="btn btn-secondary btn-compact" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
                     </div>
 
                     <BlackjackDealerDisplay dealerNet={dealerNet} />
@@ -184,7 +184,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                 if (gameStage === 'player-turn' && player && hand) {
                     const act = (action: 'hit' | 'stand' | 'double' | 'split' | 'surrender' | 'insurance') => () => actions.handlePlayerAction(action);
                     return <ActionPanel
-                        info={<><strong>{player.name}</strong> · Hand {handIndex + 1} · Bet ₹{hand.wager}</>}
+                        info={<><strong>{player.name}</strong> · Hand {handIndex + 1} · Bet ₹{formatAmount(hand.wager)}</>}
                         buttons={[
                             ...(gameState.allowSurrender ? [{ label: 'SURRENDER', onClick: act('surrender'), theme: 'btn-error', kind: 'fold' as const }] : []),
                             { label: 'DOUBLE', onClick: act('double'), theme: 'btn-accent' },

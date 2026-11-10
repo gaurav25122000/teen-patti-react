@@ -158,7 +158,7 @@ src/
 
       * The highlighted player is the current turn.
       * **Blind players** can `PLAY` (match the current stake), `RAISE` (set a higher amount with the stepper or chips), or `SEE`.
-      * **Seen players** (`CHAAL`) must bet at least double the current stake.
+      * **Seen players** (`CHAAL`) must bet at least double the current stake. A bigger chaal makes the blind stake half of it, rounded up.
       * Any player can `FOLD` or request a `SHOW` (if conditions are met).
 
 4.  **Ending a Round:**

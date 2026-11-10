@@ -115,23 +115,25 @@ const LifetimeWinnings: React.FC = () => {
     return (
         <div className="setup-screen">
             <h2>Lifetime Winnings</h2>
-            <div className="form-group" style={{ alignItems: 'center', gap: '1rem' }}>
-                <label>Enter Phone Numbers (comma-separated):</label>
+            <div className="lookup-form">
+                <label htmlFor="lifetime-phones">Phone numbers, comma-separated</label>
                 <input
+                    id="lifetime-phones"
                     type="text"
                     value={phoneNumbers}
                     onChange={(e) => setPhoneNumbers(e.target.value)}
                     placeholder="e.g., 1234567890, 0987654321"
-                    style={{ width: '100%', maxWidth: '500px', textAlign: 'center' }}
                 />
-                <button className="btn btn-primary" onClick={() => handleFetchWinnings(phoneNumbers)} disabled={loading}>
-                    {loading ? 'Loading...' : 'Get Winnings'}
-                </button>
-                <button className="btn btn-violet" onClick={checkSavedPlayers} disabled={loading}>
-                    Check saved players
-                </button>
+                <div className="setup-actions">
+                    <button className="btn btn-primary" onClick={() => handleFetchWinnings(phoneNumbers)} disabled={loading}>
+                        {loading ? 'Loading...' : 'Get Winnings'}
+                    </button>
+                    <button className="btn btn-violet" onClick={checkSavedPlayers} disabled={loading}>
+                        Check saved players
+                    </button>
+                </div>
+                {error && <p className="form-error">{error}</p>}
             </div>
-            {error && <p style={{ color: 'var(--color-glow-magenta)', textAlign: 'center' }}>{error}</p>}
 
             {winningsData && (
                 <div className="game-actions" style={{ justifyContent: 'center' }}>

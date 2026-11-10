@@ -26,7 +26,7 @@ const storedPoker = (): PokerGameState | null => {
 };
 
 export const usePokerGame = () => {
-    const [gameState, setGameState, addMessage, afterCommit] = useGameState<PokerGameState>(engine.createInitialPokerState);
+    const [gameState, setGameState, addMessage, afterCommit] = useGameState<PokerGameState>(engine.createInitialPokerState, engine.roundMoney);
     const { record, unrecorded, undo: undoStep, canUndo } = useUndo(gameState, setGameState, gameState.gameStage !== 'pre-deal');
     const io = useEngineIo(addMessage, afterCommit, 'poker');
     const step = useCallback((fn: (s: PokerGameState, io: Io) => PokerGameState) => setGameState(prev => fn(prev, io)), [setGameState, io]);

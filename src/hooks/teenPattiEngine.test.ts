@@ -162,3 +162,16 @@ test('an older save that cannot tell about carried-in balances stays unknown thr
     s = go(s, (x, io) => E.endRound(x, 1, io));
     assert.equal(s.carriedIn, undefined);
 });
+
+test('the blind stake after a chaal is half of it, rounded up; a minimum chaal keeps it', () => {
+    const seen = (boot: number) => go(go(E.newGame([player(1, 0), player(2, 0), player(3, 0)]), (x, io) => E.startRound(x, 0, boot, io)), x => E.seeCards(x));
+    assert.equal(go(seen(10), x => E.betChaal(x, 25)).currentStake, 13);
+    assert.equal(go(seen(7.5), x => E.betChaal(x, 15)).currentStake, 7.5);
+    assert.equal(go(seen(7.5), x => E.betChaal(x, 17)).currentStake, 9);
+});
+
+test('decimal amounts stay in whole paise, in the state and the log', () => {
+    const s = runStep(E.newGame([player(1, 0), player(2, 0), player(3, 0)]), (x, io) => E.startRound(x, 0, 10.1, io), () => 0, E.roundMoney).state;
+    assert.equal(s.potAmount, 30.3);
+    assert.ok(s.messages.includes('Total Pot: ₹30.3.'));
+});

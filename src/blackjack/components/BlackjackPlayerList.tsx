@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Avatar from '../../components/Avatar';
 import { readSavedPlayers } from '../../utils/savedPlayers';
 import type { BlackjackPlayer, BlackjackGameState } from '../types/blackjackGameTypes';
-import { toTitleCase } from '../../utils/formatters';
+import { toTitleCase, formatAmount } from '../../utils/formatters';
 
 interface BlackjackPlayerListProps {
     players: BlackjackPlayer[];
@@ -50,10 +50,10 @@ const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, game
                         return (
                             <tr key={p.id} className={isCurrent ? 'current-player' : (p.isTakingBreak ? 'on-break' : '')} data-player-id={p.id}>
                                 <td data-label="Name"><Avatar name={p.name} phone={p.phoneNumber} saved={saved} /> {toTitleCase(p.name)}</td>
-                                <td data-label="Stack / Buy-In">₹ {p.stack} / ₹ {p.totalBuyIn}</td>
+                                <td data-label="Stack / Buy-In">₹ {formatAmount(p.stack)} / ₹ {formatAmount(p.totalBuyIn)}</td>
                                 <td data-label="Status">
                                     {status}
-                                    {totalWager > 0 && ` (Bet: ₹${totalWager})`}
+                                    {totalWager > 0 && ` (Bet: ₹${formatAmount(totalWager)})`}
                                 </td>
                             </tr>
                         );

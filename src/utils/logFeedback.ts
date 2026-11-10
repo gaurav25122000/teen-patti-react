@@ -29,10 +29,11 @@ const PRIORITY: [Sound, RegExp][] = [
     ['fold', /folds|busted|loses|surrenders/],
     ['show', /Show is requested|Calculating final pots/],
     ['see', /sees their cards/],
-    ['deal', /^--- NEW HAND|^BOMB POT/],
+    ['deal', /^--- NEW HAND|^BOMB POT|^--- Dealing the /],
     ['new_round', /^--- NEW ROUND/],
     ['card', /hits|splits/],
-    ['chip', /plays blind|bets Chaal|calls|checks|posts|^Antes|bets ₹|doubles|takes the add-on|^Added ₹|stack/],
+    ['chip', /plays blind|bets Chaal|calls|posts|^Antes|bets ₹|doubles|takes the add-on|takes insurance|pushes\.|^Deducted ₹|^Added ₹|stack/],
+    ['tap', /checks\.|stands\./], // no chips move: a knock
 ];
 
 // One sound per batch: the highest-priority match across the added lines.

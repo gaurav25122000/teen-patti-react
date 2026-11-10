@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { GameState, Player } from '../types/gameTypes';
-import { toTitleCase } from '../utils/formatters';
+import { toTitleCase, formatAmount } from '../utils/formatters';
 import { blindTurnsRefusal, potLimitReached } from '../utils/teenPattiRules';
 import { stepDown, stepUp, teenPattiChips, teenPattiMinBet } from '../utils/quickBets';
 import { readAppSettings } from '../utils/appSettings';
@@ -33,7 +33,7 @@ const TeenPattiPanel: React.FC<TeenPattiPanelProps> = ({ gameState, currentPlaye
     const mustSee = blind ? blindTurnsRefusal(gameState, name, gameState.blindTurns?.[currentPlayer.id] ?? 0) : null;
 
     const bet = () => {
-        if (!(amount >= minBet)) return setError(`Bet must be at least ₹ ${minBet}.`);
+        if (!(amount >= minBet)) return setError(`Bet must be at least ₹ ${formatAmount(minBet)}.`);
         setError(blind ? actions.playBlind(amount > currentStake, amount) : actions.betChaal(amount));
     };
     const fold = () => {
@@ -46,14 +46,14 @@ const TeenPattiPanel: React.FC<TeenPattiPanelProps> = ({ gameState, currentPlaye
         : [
             { label: 'FOLD', onClick: fold, theme: 'btn-error', kind: 'fold' },
             ...(blind ? [{ label: 'SEE', onClick: actions.seeCards, theme: 'btn-orange' }] : []),
-            ...(mustSee ? [] : [{ label: `SHOW ₹${minBet}`, onClick: actions.onShowClick, theme: 'btn-pink', disabled: showDisabled }]),
+            ...(mustSee ? [] : [{ label: `SHOW ₹${formatAmount(minBet)}`, onClick: actions.onShowClick, theme: 'btn-pink', disabled: showDisabled }]),
             { label: 'END BETTING', onClick: actions.onEndBettingClick, theme: 'btn-secondary' },
-            { label: blind ? (amount > currentStake ? `RAISE ₹${amount}` : `PLAY ₹${amount}`) : `CHAAL ₹${amount}`, onClick: bet, theme: 'btn-success', kind: 'primary', disabled: !!mustSee },
+            { label: blind ? (amount > currentStake ? `RAISE ₹${formatAmount(amount)}` : `PLAY ₹${formatAmount(amount)}`) : `CHAAL ₹${formatAmount(amount)}`, onClick: bet, theme: 'btn-success', kind: 'primary', disabled: !!mustSee },
         ];
 
     return (
         <ActionPanel
-            info={<><strong>{name}</strong> · {blind ? 'BLIND' : 'SEEN'} · <span className="panel-stake">Stake ₹{minBet}</span>{timer && <> · ⏱ {timer}</>}</>}
+            info={<><strong>{name}</strong> · {blind ? 'BLIND' : 'SEEN'} · <span className="panel-stake">Stake ₹{formatAmount(minBet)}</span>{timer && <> · ⏱ {timer}</>}</>}
             pot={potAmount}
             stepper={limitReached || mustSee ? undefined : {
                 amount,

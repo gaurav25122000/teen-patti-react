@@ -57,6 +57,10 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
             </div>
             <hr />
             <h3>Start New Game</h3>
+            <details className="table-settings">
+                <summary>Table settings</summary>
+                <SettingsFields fields={TEEN_PATTI_FIELDS} form={settingsForm} onChange={setSettingsForm} />
+            </details>
 
             <SavedPlayerChips
                 formPhones={playerInputs.map(p => p.phoneNumber)}
@@ -65,7 +69,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
             <div>
                     <h4>Enter Player Details:</h4>
                     {playerInputs.map((input, index) => (
-                        <div key={index} style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0', flexWrap: 'wrap' }}>
+                        <div key={index} className="player-setup-row">
                             <input
                                 type="text"
                                 placeholder={`Player ${index + 1} Name`}
@@ -84,16 +88,14 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
                                 value={input.phoneNumber}
                                 onChange={(e) => handlePlayerInputChange(index, 'phoneNumber', e.target.value)}
                             />
-                            {playerInputs.length > 2 && <button className="btn btn-error btn-compact" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayerInputs(rows => rows.filter((_, i) => i !== index))}>✕</button>}
+                            {playerInputs.length > 2 && <button className="btn btn-error btn-compact seat-remove" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayerInputs(rows => rows.filter((_, i) => i !== index))}>✕</button>}
                         </div>
                     ))}
-                    <button className="btn-violet" onClick={() => setPlayerInputs(rows => [...rows, emptySeat])}>Add seat</button>
-                    <details className="table-settings">
-                        <summary>Table settings</summary>
-                        <SettingsFields fields={TEEN_PATTI_FIELDS} form={settingsForm} onChange={setSettingsForm} />
-                    </details>
-                    <button className="btn btn-start rainbow-outline" onClick={handleStartGame} style={{ marginTop: '1rem' }}>Start Game</button>
-                    {error && <p className="form-error">{error}</p>}
+                    <div className="setup-actions">
+                        <button className="btn-violet" onClick={() => setPlayerInputs(rows => [...rows, emptySeat])}>Add seat</button>
+                        <button className="btn btn-start rainbow-outline" onClick={handleStartGame}>Start Game</button>
+                        {error && <p className="form-error">{error}</p>}
+                    </div>
             </div>
         </div>
     );

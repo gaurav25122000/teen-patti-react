@@ -28,7 +28,7 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ info, pot, stepper, error, bu
     };
     return (
         <div className="action-panel">
-            <div className="panel-info">{info}{pot !== undefined && <span className="panel-pot">Pot ₹{pot}</span>}</div>
+            <div className="panel-info">{info}{pot !== undefined && <span className="panel-pot">Pot ₹{formatAmount(pot)}</span>}</div>
             {stepper && (
                 <div className="panel-stepper">
                     <button className="btn btn-step" onClick={press(stepper.onMinus)} aria-label="Less">−</button>

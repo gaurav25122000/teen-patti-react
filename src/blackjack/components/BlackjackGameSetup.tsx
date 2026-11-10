@@ -72,38 +72,36 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
                 onPick={picked => setPlayers(rows => fillRow(rows, picked, emptyRow()))}
             />
             {players.map((p, index) => (
-                <div key={index} className="player-setup-row" style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div key={index} className="player-setup-row">
                     <input
                         type="text"
                         placeholder={`Player ${index + 1} Name`}
                         value={p.name}
                         onChange={e => handlePlayerChange(index, 'name', e.target.value)}
-                        style={{ flexBasis: '200px' }}
                     />
                     <input
                         type="number" inputMode="decimal"
                         placeholder="Starting Stack"
                         value={p.stack}
                         onChange={e => handlePlayerChange(index, 'stack', e.target.value)}
-                         style={{ flexBasis: '120px' }}
                     />
                     <input
                         type="tel"
                         placeholder="10-Digit Phone"
                         value={p.phoneNumber}
                         onChange={(e) => handlePlayerChange(index, 'phoneNumber', e.target.value)}
-                         style={{ flexBasis: '150px' }}
                     />
-                    <label style={{ marginLeft: '1rem' }}>Hands:</label>
-                    <input
-                        type="number"
-                        title="Number of hands to play simultaneously"
-                        min="1"
-                        value={p.numHands}
-                        onChange={(e) => handlePlayerChange(index, 'numHands', e.target.value)}
-                        style={{ flexBasis: '80px' }}
-                    />
-                    {players.length > 1 && <button className="btn btn-error btn-compact" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayers(rows => rows.filter((_, i) => i !== index))}>✕</button>}
+                    <label className="seat-hands">
+                        Hands
+                        <input
+                            type="number"
+                            title="Number of hands to play simultaneously"
+                            min="1"
+                            value={p.numHands}
+                            onChange={(e) => handlePlayerChange(index, 'numHands', e.target.value)}
+                        />
+                    </label>
+                    {players.length > 1 && <button className="btn btn-error btn-compact seat-remove" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayers(rows => rows.filter((_, i) => i !== index))}>✕</button>}
                 </div>
             ))}
             <div className="setup-actions">

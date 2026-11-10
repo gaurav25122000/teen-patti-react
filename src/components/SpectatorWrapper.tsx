@@ -6,11 +6,11 @@ import { useStoredState } from '../hooks/useStoredState';
 import { POKER_STORAGE_KEY } from '../poker/hooks/usePokerGame';
 import { BLACKJACK_STORAGE_KEY } from '../blackjack/hooks/useBlackjackGame';
 import { LOCAL_STORAGE_KEY } from '../constants/gameConstants';
-import { toTitleCase } from '../utils/formatters';
+import { toTitleCase, formatAmount } from '../utils/formatters';
 import { rehydrateState } from '../utils/serialization';
 import { archiveOrWarn } from '../utils/archive';
 import { runStep } from '../utils/engine';
-import { endTournament } from '../poker/engine';
+import { endTournament, roundMoney } from '../poker/engine';
 import { sendWinnings } from '../hooks/useEngineIo';
 import { blackjackSettlement, pokerSettlement, teenPattiSettlement } from '../utils/gameSettlement';
 import type { GameKind } from '../utils/nightStats';
@@ -35,7 +35,7 @@ const archiveReplaced = (kind: GameKind, previous: string | null) => {
         let old = rehydrateState(JSON.parse(previous));
         if (!Array.isArray(old?.players)) return;
         if (kind === 'poker') { // an unfinished tournament is chopped first
-            const ended = runStep(old, endTournament);
+            const ended = runStep(old, endTournament, Date.now, roundMoney);
             sendWinnings(ended.records, 'poker');
             old = ended.state;
         }
@@ -140,7 +140,7 @@ const SpectatorWrapper: React.FC = () => {
                         {players.map(p => <option key={p.id} value={p.name}>{toTitleCase(p.name)}</option>)}
                     </select>
                 </label>
-                {me && <span className="viewer-balance">You: ₹{me.balance ?? me.stack}</span>}
+                {me && <span className="viewer-balance">You: ₹{formatAmount((me.balance ?? me.stack)!)}</span>}
             </div>
             {isMyTurn && <div className="your-turn-banner" role="status">Your turn!</div>}
             {myId !== null && <style>{`[data-player-id="${myId}"] { outline: 2px solid var(--color-glow-lime); outline-offset: -2px; }`}</style>}

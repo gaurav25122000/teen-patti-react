@@ -26,7 +26,12 @@ test('one sound per batch, by priority', () => {
     assert.equal(soundFor(['Rebuys closed after level 2.']), 'error');
     assert.equal(soundFor(['--- NEW HAND (#3) ---', 'Blinds up: level 2, ₹20/₹40.', 'Raj posts small blind of ₹20.']), 'level_up');
     assert.equal(soundFor(['--- NEW HAND (#3) ---', 'Raj posts small blind of ₹20.']), 'deal');
-    assert.equal(soundFor(['Asha (Hand 1) stands.']), null);
+    assert.equal(soundFor(['Asha (Hand 1) stands.']), 'tap');
+    assert.equal(soundFor(['Raj checks.']), 'tap');
+    assert.equal(soundFor(['--- End of Betting Round. Total Pot: ₹60 ---', '--- Dealing the Flop ---', 'Action starts with Raj.']), 'deal');
+    assert.equal(soundFor(['Asha (Hand 1) takes insurance for ₹5.']), 'chip');
+    assert.equal(soundFor(['Asha (Hand 1) pushes.']), 'chip');
+    assert.equal(soundFor(['Deducted ₹30 from Asha and distributed ₹15 to everyone else.']), 'chip');
     assert.equal(soundFor(['Asha (Hand 1) hits.']), 'card');
     assert.equal(soundFor([UNDO_LINE]), 'undo');
     assert.equal(soundFor(['Pot limit reached: pick the winner.']), 'alarm');

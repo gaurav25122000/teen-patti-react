@@ -96,7 +96,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
     return (
         <>
             {!isStreaming && (
-                <button className="btn-sm btn-outline-info" style={style} onClick={handleStartStream}>
+                <button className="btn btn-pink btn-compact" style={style} onClick={handleStartStream}>
                     Start Live Stream
                 </button>
             )}
@@ -104,9 +104,9 @@ const StreamControls: React.FC<StreamControlsProps> = ({ gameState, gameType, st
             {isStreaming && (
                 <div style={{ ...style, display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
                     <span className="badge badge-success">LIVE ({viewerCount})</span>
-                    <button className="btn-sm btn-outline-secondary" onClick={() => setShowStreamModal(true)}>Link</button>
-                    {viewerCount > 0 && <button className="btn-sm btn-outline-secondary" onClick={() => setShowHandoverModal(true)}>Hand over</button>}
-                    <button className="btn-sm btn-outline-danger" onClick={handleStopStream}>Stop</button>
+                    <button className="btn btn-secondary btn-compact" onClick={() => setShowStreamModal(true)}>Link</button>
+                    {viewerCount > 0 && <button className="btn btn-secondary btn-compact" onClick={() => setShowHandoverModal(true)}>Hand over</button>}
+                    <button className="btn btn-danger btn-compact" onClick={handleStopStream}>Stop</button>
                 </div>
             )}
 

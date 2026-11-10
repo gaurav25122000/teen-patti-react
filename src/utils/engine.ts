@@ -14,10 +14,11 @@ export interface Io {
     now: () => number;
 }
 
-// Runs one step outside React (tests and simulations), placing written lines as useGameState does.
-export const runStep = <S extends { messages: string[] }>(prev: S, step: (s: S, io: Io) => S, now: () => number = () => 0) => {
+// Runs one step outside React (tests and simulations), placing written lines and rounding money as useGameState does.
+export const runStep = <S extends { messages: string[] }>(prev: S, step: (s: S, io: Io) => S, now: () => number = () => 0, roundMoney?: (s: S) => S) => {
     const written: string[] = [];
     const records: RawRecord[] = [];
-    const next = step(prev, { log: line => written.push(line), records: rows => records.push(...rows), now });
+    const stepped = step(prev, { log: line => written.push(line), records: rows => records.push(...rows), now });
+    const next = roundMoney && stepped !== prev ? roundMoney(stepped) : stepped;
     return { state: written.length ? { ...next, messages: mergeLog(prev.messages, next.messages, written) } : next, records };
 };

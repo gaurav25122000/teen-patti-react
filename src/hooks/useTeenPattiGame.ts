@@ -20,7 +20,7 @@ export const derivePlayers = engine.derivePlayers;
 export const useTeenPattiGame = () => {
   const [gameState, setGameState, log, afterCommit] = useGameState<GameState>(() => {
     return loadStateFromLocalStorage() || engine.createInitialGameState();
-  });
+  }, engine.roundMoney);
 
   const { record, undo, canUndo } = useUndo(gameState, setGameState, gameState.roundActive);
   const io = useEngineIo(log, afterCommit, 'teen-patti');

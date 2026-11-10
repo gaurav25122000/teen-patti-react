@@ -23,11 +23,12 @@ export const bulkUpdateWinnings = async (records: WinningsRecord[]): Promise<voi
         return; // Don't make an API call if there's nothing to update
     }
     try {
-        await fetch(`${FUNCTIONS_URL}/bulkUpdateWinnings`, {
+        const response = await fetch(`${FUNCTIONS_URL}/bulkUpdateWinnings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ records }), // Send the array inside a 'records' property
         });
+        if (!response.ok) console.error(`Lifetime Winnings rejected ${records.length} rows: HTTP ${response.status}`);
     } catch (error) {
         console.error("Failed to bulk update winnings via Netlify Function:", error);
     }

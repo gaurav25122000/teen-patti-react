@@ -7,6 +7,7 @@ import { biggestWin, emptyStats, partialStats, recordRound, statsNames } from '.
 import { partyKey } from '../utils/owingsLogic.ts';
 import { cleanPhone } from '../utils/savedPlayers.ts';
 import { depart, departureNote, tooFewToRemove } from '../utils/departures.ts';
+import { toPaise } from '../utils/money.ts';
 
 // Side bet payouts (x:1) by result.
 export const PAIR_PAYS: Partial<Record<SideResult, number>> = { mixed: 6, coloured: 12, perfect: 25 };
@@ -26,6 +27,32 @@ const sideNet = (h: PlayerHand, kind: SideKind) => {
 };
 // Money a hand has on the table before the deal: its bet and side bets.
 const placedOn = (h: PlayerHand) => h.bet + (h.pp ?? 0) + (h.t3 ?? 0);
+
+// Blackjack pays 3:2 (or 6:5) on the whole stake, doubled or split too (Gaurav, 10 Nov), to the paisa.
+const blackjackWin = (s: Pick<BlackjackGameState, 'blackjackPayout'>, wager: number) =>
+    toPaise(s.blackjackPayout === '3to2' ? (wager * 3) / 2 : (wager * 6) / 5);
+// Surrender gives back half the bet, to the paisa; the house keeps the rest.
+const surrenderBack = (bet: number) => toPaise(bet / 2);
+
+// Every amount in whole paise after a step: float sums drift (10.1 + 10.1 + 10.1 = 30.299999999999997).
+export const roundMoney = (s: BlackjackGameState): BlackjackGameState => ({
+    ...s,
+    dealerNet: toPaise(s.dealerNet),
+    players: s.players.map(p => ({
+        ...p,
+        stack: toPaise(p.stack),
+        totalBuyIn: toPaise(p.totalBuyIn),
+        hands: p.hands.map(h => ({
+            ...h,
+            bet: toPaise(h.bet),
+            wager: toPaise(h.wager),
+            ...(h.insurance === undefined ? {} : { insurance: toPaise(h.insurance) }),
+            ...(h.pp === undefined ? {} : { pp: toPaise(h.pp) }),
+            ...(h.t3 === undefined ? {} : { t3: toPaise(h.t3) }),
+        })),
+    })),
+    departed: s.departed?.map(d => ({ ...d, net: toPaise(d.net) })),
+});
 
 // A player's chips counting bets still on the table (open wagers, unresolved insurance and side bets).
 export const chipsWithBets = (p: BlackjackPlayer) => p.stack + p.hands.reduce((sum, h) =>
@@ -155,7 +182,7 @@ export const newBlackjackGame = (players: { name: string; stack: number; phoneNu
             isTakingBreak: false,
             lastBets: Array(p.numHands).fill(initial.minBet),
         })),
-        messages: [`Game setup with ${players.length} players. Bets are locked to ₹${initial.minBet}. Click DEAL to play or CHANGE BETS to unlock.`]
+        messages: [`Game setup with ${players.length} players. Bets are locked to ₹${formatAmount(initial.minBet)}. Click DEAL to play or CHANGE BETS to unlock.`]
     };
     return game.bankerEvery ? withBanker(game, nextBanker(game.players)) : game;
 };
@@ -352,12 +379,13 @@ const endRoundAndPay = (endState: BlackjackGameState, io: Io): BlackjackGameStat
     const finalPlayers = endState.players.map(p => {
         let roundNet = 0;
         const newLastBets = new Map<number, number>();
-        p.hands.forEach((h, i) => {
-            if (h.bet > 0) newLastBets.set(i, h.bet);
+        p.hands.forEach(h => {
+            // Keyed by the dealt hand's own number: split hands and unbet seats shift the list.
+            if (h.bet > 0 && h.id.includes('-hand-')) newLastBets.set(handNumber(h.id) - 1, h.bet);
             if (h.status === 'win') roundNet += h.wager;
-            else if (h.status === 'blackjack') roundNet += (endState.blackjackPayout === '3to2' ? h.bet * 1.5 : h.bet * 1.2); // pays on the original bet
+            else if (h.status === 'blackjack') roundNet += blackjackWin(endState, h.wager);
             else if (h.status === 'lose' || h.status === 'busted') roundNet -= h.wager;
-            else if (h.status === 'surrendered') roundNet -= h.bet / 2;
+            else if (h.status === 'surrendered') roundNet -= h.bet - surrenderBack(h.bet);
             // Insurance pays 2:1, settled separately from the hand
             if (h.insuranceResult === 'won') roundNet += h.insurance! * 2;
             else if (h.insuranceResult === 'lost') roundNet -= h.insurance!;
@@ -465,9 +493,9 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
                 return prev;
             }
             io.log(`${label} surrenders.`);
-            updateStack(player.stack + hand.bet / 2); // half the original bet back
+            updateStack(player.stack + surrenderBack(hand.bet));
             updateHand({ status: 'surrendered' });
-            houseGain += hand.bet / 2;
+            houseGain += hand.bet - surrenderBack(hand.bet);
             break;
         case 'insurance': {
             if (!prev.insurance) {
@@ -478,12 +506,12 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
                 io.log("Insurance is offered once per hand, before hitting.");
                 return prev;
             }
-            const insurance = hand.bet / 2;
+            const insurance = toPaise(hand.bet / 2);
             if (player.stack < insurance) {
                 io.log("Not enough stack for insurance.");
                 return prev;
             }
-            io.log(`${label} takes insurance for ₹${insurance}.`);
+            io.log(`${label} takes insurance for ₹${formatAmount(insurance)}.`);
             updateStack(player.stack - insurance);
             updateHand({ insurance });
             break;
@@ -513,25 +541,20 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
 };
 
 export const setHandStatus = (prev: BlackjackGameState, playerId: number, handId: string, status: HandStatus, io: Io): BlackjackGameState => {
+    // Only a hand still open at the dealer's turn: marking it again must not pay twice.
+    const open = prev.players.find(p => p.id === playerId)?.hands.find(h => h.id === handId);
+    if (prev.gameStage !== 'dealer-turn' || (open?.status !== 'stand' && open?.status !== 'playing')) return prev;
     let playerWonAmount: number | null = null; // the total amount added to the stack
     let dealerNetChange = 0;
-    let finalStatus = status;
-    let handBet = 0; // the original bet
     let handWager = 0; // the total at risk (bet, or 2x when doubled)
 
     const newPlayers = prev.players.map(p => {
         if (p.id !== playerId) return p;
         const hands = p.hands.map(h => {
             if (h.id !== handId) return h;
-            handBet = h.bet;
             handWager = h.wager;
-            if (h.status === 'surrendered') {
-                playerWonAmount = 0; // already settled at the surrender
-                finalStatus = 'surrendered';
-                return h;
-            }
             if (status === 'blackjack') {
-                const winAmount = handBet * (prev.blackjackPayout === '3to2' ? 1.5 : 1.2);
+                const winAmount = blackjackWin(prev, handWager);
                 playerWonAmount = handWager + winAmount;
                 dealerNetChange = -winAmount;
             } else if (status === 'win') {
@@ -543,7 +566,7 @@ export const setHandStatus = (prev: BlackjackGameState, playerId: number, handId
             } else if (status === 'push') {
                 playerWonAmount = handWager;
             }
-            return { ...h, status: finalStatus };
+            return { ...h, status: status };
         });
         return { ...p, hands, stack: p.stack + (playerWonAmount ?? 0) };
     });
@@ -552,12 +575,11 @@ export const setHandStatus = (prev: BlackjackGameState, playerId: number, handId
         const player = prev.players.find(p => p.id === playerId)!;
         const label = `${player.name} (Hand ${handNumber(handId)})`;
         const won: number = playerWonAmount;
-        if (finalStatus === 'blackjack') io.log(`${label} has BLACKJACK! Wins ₹${won - handWager}`);
-        else if (finalStatus === 'win') io.log(`${label} wins ₹${won - handWager}`);
-        else if (finalStatus === 'push') io.log(`${label} pushes.`);
-        else if (finalStatus === 'lose') io.log(`${label} loses ₹${handWager}`);
-        else if (finalStatus === 'busted') io.log(`${label} busted and loses ₹${handWager}`);
-        else if (finalStatus === 'surrendered') io.log(`${label} surrendered and loses ₹${handBet / 2}`);
+        if (status === 'blackjack') io.log(`${label} has BLACKJACK! Wins ₹${formatAmount(won - handWager)}`);
+        else if (status === 'win') io.log(`${label} wins ₹${formatAmount(won - handWager)}`);
+        else if (status === 'push') io.log(`${label} pushes.`);
+        else if (status === 'lose') io.log(`${label} loses ₹${formatAmount(handWager)}`);
+        else if (status === 'busted') io.log(`${label} busted and loses ₹${formatAmount(handWager)}`);
     }
 
     return finishIfSettled({ ...prev, ...toHouse(prev, newPlayers, dealerNetChange) }, io);
@@ -574,11 +596,11 @@ export const settleInsurance = (prev: BlackjackGameState, dealerHasBlackjack: bo
             if (dealerHasBlackjack) {
                 stack += h.insurance * 3;
                 dealerNetChange -= h.insurance * 2;
-                io.log(`${p.name} (Hand ${handNumber(h.id)}) insurance pays ₹${h.insurance * 2}.`);
+                io.log(`${p.name} (Hand ${handNumber(h.id)}) insurance pays ₹${formatAmount(h.insurance * 2)}.`);
                 return { ...h, insuranceResult: 'won' as const };
             }
             dealerNetChange += h.insurance;
-            io.log(`${p.name} (Hand ${handNumber(h.id)}) loses insurance of ₹${h.insurance}.`);
+            io.log(`${p.name} (Hand ${handNumber(h.id)}) loses insurance of ₹${formatAmount(h.insurance)}.`);
             return { ...h, insuranceResult: 'lost' as const };
         });
         return { ...p, stack, hands };
@@ -592,7 +614,7 @@ export const addPlayer = (prev: BlackjackGameState, name: string, stack: number,
         return prev;
     }
     const newId = prev.players.length > 0 ? Math.max(...prev.players.map(p => p.id)) + 1 : 1;
-    io.log(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
+    io.log(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${formatAmount(stack)}.`);
     return {
         ...prev,
         players: [...prev.players, {
@@ -632,7 +654,7 @@ export const addChipsToPlayer = (prev: BlackjackGameState, playerId: number, amo
         ...prev,
         players: prev.players.map(p => {
             if (p.id !== playerId) return p;
-            io.log(`Added ₹${amount} to ${toTitleCase(p.name)}'s stack. Total buy-in: ₹${p.totalBuyIn + amount}.`);
+            io.log(`Added ₹${formatAmount(amount)} to ${toTitleCase(p.name)}'s stack. Total buy-in: ₹${formatAmount(p.totalBuyIn + amount)}.`);
             return { ...p, stack: p.stack + amount, totalBuyIn: p.totalBuyIn + amount };
         }),
     };

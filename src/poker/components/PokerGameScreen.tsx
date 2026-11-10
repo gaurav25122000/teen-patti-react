@@ -212,7 +212,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             {isReadOnly && <div className="badge badge-warning" style={{ marginTop: '0.5rem' }}>SPECTATOR MODE</div>}
             
             {!isReadOnly && <StreamControls gameState={gameState} gameType="poker" style={{ marginTop: '0.5rem' }} onHandedOver={actions.clearGame} />}
-            {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
+            {!isReadOnly && canUndo && <button className="btn btn-secondary btn-compact" style={{ marginTop: '0.5rem' }} onClick={undo}>↩ Undo</button>}
             {levelText && (
                 <div className="blind-clock">
                     <span>{levelText}</span>
@@ -355,8 +355,8 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             </div>
             {selectedWinnerIds.size > 1 && (
                 <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', textAlign: 'center' }}>
-                    <p style={{ margin: 0, fontSize: '0.95em', color: '#aaa' }}>Pot Total: <strong style={{ color: '#fff' }}>₹{currentPot.amount}</strong></p>
-                    <p style={{ margin: '4px 0 0 0', fontWeight: 'bold', color: '#4CAF50' }}>Split: ₹{Math.floor(currentPot.amount / selectedWinnerIds.size)} each</p>
+                    <p style={{ margin: 0, fontSize: '0.95em', color: '#aaa' }}>Pot Total: <strong style={{ color: '#fff' }}>₹{formatAmount(currentPot.amount)}</strong></p>
+                    <p style={{ margin: '4px 0 0 0', fontWeight: 'bold', color: '#4CAF50' }}>Split: ₹{formatAmount(Math.floor(currentPot.amount / selectedWinnerIds.size))} each</p>
                 </div>
             )}
         </div>;
@@ -375,7 +375,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                     {renderStageDisplay()}
                     {gameStage !== 'pre-deal' && (
                         <div className="pot-display">
-                            <h2>Total Pot: ₹ {players.reduce((sum, p) => sum + p.totalPotContribution, 0)}</h2>
+                            <h2>Total Pot: ₹ {formatAmount(players.reduce((sum, p) => sum + p.totalPotContribution, 0))}</h2>
                         </div>
                     )}
                 </div>
@@ -393,7 +393,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 />
             ) : gameStage === 'pre-deal' && !gameState.bust?.awaiting.length && (
                 <ActionPanel
-                    info={<>Between hands · Blinds ₹{gameState.smallBlindAmount}/₹{gameState.bigBlindAmount}{gameState.bombNext ? ' · Next hand is a bomb pot' : ''}</>}
+                    info={<>Between hands · Blinds ₹{formatAmount(gameState.smallBlindAmount)}/₹{formatAmount(gameState.bigBlindAmount)}{gameState.bombNext ? ' · Next hand is a bomb pot' : ''}</>}
                     buttons={[
                         { label: 'ADD PLAYER', onClick: () => setModalMode('addPlayer'), theme: 'btn-violet' },
                         { label: '☰ TABLE', onClick: () => setShowTable(true), theme: 'btn-sky' },

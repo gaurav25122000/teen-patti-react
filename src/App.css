@@ -39,9 +39,10 @@ body {
   overflow-x: hidden;
 }
 
-/* The body is a flex box: without this the app shrinks to its content. */
+/* The body is a flex box: without these the app shrinks to its content and floats mid-screen. */
 #root {
   width: 100%;
+  align-self: flex-start;
 }
 
 .app-container {
@@ -471,7 +472,8 @@ h1 {
 }
 
 .round-controls input[type="number"],
-.setup-screen input {
+.setup-screen input:not([type="checkbox"]):not([type="radio"]),
+.setup-screen select {
   background-color: var(--color-bg);
   border: 2px solid var(--color-text-muted);
   border-radius: 6px;
@@ -484,7 +486,8 @@ h1 {
 }
 
 .round-controls input[type="number"]:focus,
-.setup-screen input:focus {
+.setup-screen input:not([type="checkbox"]):not([type="radio"]):focus,
+.setup-screen select:focus {
   outline: none;
   border-color: var(--color-glow-cyan);
   box-shadow: 0 0 10px var(--color-glow-cyan);
@@ -1502,14 +1505,147 @@ h1 {
   font-size: 0.75em;
   font-weight: 700;
 }
+/* Setup and settings forms: labels above fields, in a grid that fills the width. */
+.table-settings {
+  margin: 1rem 0;
+  padding: 0 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+}
 .table-settings summary {
   cursor: pointer;
-  margin: 1rem 0 0.5rem;
-  font-weight: 600;
+  padding: 0.85rem 0;
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--color-glow-cyan);
+}
+.settings-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px 16px;
+  margin: 0.75rem 0;
+}
+.settings-fields .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+.settings-fields .form-group label {
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.settings-fields input,
+.settings-fields select {
+  width: 100%;
+  min-height: 44px;
 }
 .settings-toggle {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0.5rem 0;
+  align-self: end;
+  gap: 0.6rem;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 12px;
+  border: 2px solid var(--color-text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.settings-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-glow-lime);
+}
+/* Cash game / Tournament */
+.mode-switch {
+  display: flex;
+  gap: 3px;
+  width: fit-content;
+  margin: 0 auto 1rem;
+  padding: 3px;
+  border: 2px solid var(--color-glow-cyan);
+  border-radius: 999px;
+}
+.mode-switch label {
+  padding: 8px 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.mode-switch label:has(input:checked) {
+  background: var(--color-glow-cyan);
+  color: #000;
+}
+.mode-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+/* A seat: name, money and phone share the row and wrap on a phone. */
+.player-setup-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.player-setup-row input {
+  flex: 1 1 110px;
+  min-width: 0;
+}
+.player-setup-row input[type="text"] {
+  flex: 2 1 160px;
+}
+.seat-hands {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+}
+.player-setup-row .seat-hands input {
+  flex: 0 0 72px;
+  width: 72px;
+}
+.btn.btn-compact.seat-remove {
+  min-width: 44px;
+  min-height: 44px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+}
+.setup-screen .setup-actions {
+  justify-content: center;
+  margin-top: 1rem;
+}
+.setup-actions .form-error {
+  flex-basis: 100%;
+  text-align: center;
+}
+/* One field with its label above and its buttons below (Lifetime Winnings, joining a Sync group). */
+.lookup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 640px;
+  margin: 1rem auto;
+}
+.lookup-form label {
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.lookup-form input {
+  width: 100%;
+  min-height: 48px;
+}
+.setup-screen .lookup-form .setup-actions {
+  margin: 0;
 }

@@ -127,3 +127,43 @@ test('surrender can be turned off, with the same refusal as insurance', () => {
     const s = deal(table(['Asha'], { allowSurrender: false }));
     assert.deepEqual(newLines(s, act(s, 'surrender')), ['Surrender is off at this table.']);
 });
+
+// Steps that round money to whole paise, as the app does after every update.
+const paid = (s: BlackjackGameState, fn: (s: BlackjackGameState, io: Io) => BlackjackGameState) => runStep(s, fn, () => 0, E.roundMoney);
+
+test('blackjack pays 3:2 on the whole stake, doubled too; 6:5 to the paisa', () => {
+    const doubled = mark(act(deal(table(['Asha'])), 'double'), 1, 'blackjack'); // ₹10 doubled to ₹20
+    assert.equal(doubled.state.players[0].stack, 1030);
+    assert.equal(doubled.state.dealerNet, -30);
+    assert.deepEqual(doubled.records.map(r => r.winnings), [30]);
+    assert.ok(doubled.state.messages.includes('Asha (Hand 1) has BLACKJACK! Wins ₹30'));
+    const sixFive = act(deal(bet(unlock(table(['Asha'], { blackjackPayout: '6to5' })), 1, 12.34)), 'stand');
+    const end = paid(sixFive, (x, io) => E.setHandStatus(x, 1, x.players[0].hands[0].id, 'blackjack', io)).state;
+    assert.equal(end.players[0].stack, 1014.81);
+    assert.equal(end.dealerNet, -14.81);
+});
+
+test("a settled hand is never paid twice, and nothing is marked before the dealer's turn", () => {
+    const s = mark(act(act(deal(table(['Asha', 'Raj'])), 'stand'), 'stand'), 1, 'win').state;
+    assert.equal(s.gameStage, 'dealer-turn');
+    assert.equal(go(s, (x, io) => E.setHandStatus(x, 1, x.players[0].hands[0].id, 'lose', io)), s);
+    const early = deal(table(['Asha']));
+    assert.equal(go(early, (x, io) => E.setHandStatus(x, 1, x.players[0].hands[0].id, 'win', io)), early);
+});
+
+test('repeat bets follow each dealt hand after a split', () => {
+    let s = unlock(E.newBlackjackGame([{ name: 'Asha', stack: 1000, phoneNumber: '9000000001', numHands: 2 }], BASE));
+    s = go(go(s, (x, io) => E.placeBet(x, 1, 0, 20, io)), (x, io) => E.placeBet(x, 1, 1, 50, io));
+    s = act(act(act(act(deal(s), 'split'), 'stand'), 'stand'), 'stand'); // Hand 1, its split, Hand 2
+    for (const hand of s.players[0].hands) s = go(s, (x, io) => E.setHandStatus(x, 1, hand.id, 'push', io));
+    assert.equal(s.gameStage, 'betting');
+    assert.deepEqual(s.players[0].lastBets, [20, 50]);
+});
+
+test('insurance and surrender halves are whole paise, and the books still balance', () => {
+    const s = bet(unlock(table(['Asha'])), 1, 12.35);
+    assert.equal(act(deal(s), 'insurance').players[0].hands[0].insurance, 6.18); // rounded where it is worked out, not later
+    const end = paid(deal(s), (x, io) => E.playerAction(x, 'surrender', io)).state;
+    assert.equal(end.players[0].stack, 993.83);
+    assert.equal(end.dealerNet, 6.17);
+});

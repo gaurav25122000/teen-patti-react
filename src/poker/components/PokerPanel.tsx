@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { PokerGameState, PokerPlayer } from '../types/pokerGameTypes';
 import type { PlayerAction } from '../engine';
-import { toTitleCase } from '../../utils/formatters';
+import { toTitleCase, formatAmount } from '../../utils/formatters';
 import { pokerChips, stepDown, stepUp } from '../../utils/quickBets';
 import { readAppSettings } from '../../utils/appSettings';
 import ActionPanel, { type PanelButton } from '../../components/ActionPanel';
@@ -41,19 +41,19 @@ const PokerPanel: React.FC<PokerPanelProps> = ({ gameState, currentPlayer, timer
         onAction('fold');
     };
     const call: PanelButton = facingAllInCall
-        ? { label: `ALL-IN ₹${callAmount}`, onClick: () => onAction('call'), theme: 'btn-accent rainbow-outline' }
-        : canCheck ? { label: 'CHECK', onClick: () => onAction('check'), theme: 'btn-primary' } : { label: `CALL ₹${callAmount}`, onClick: () => onAction('call'), theme: 'btn-primary' };
+        ? { label: `ALL-IN ₹${formatAmount(callAmount)}`, onClick: () => onAction('call'), theme: 'btn-accent rainbow-outline' }
+        : canCheck ? { label: 'CHECK', onClick: () => onAction('check'), theme: 'btn-primary' } : { label: `CALL ₹${formatAmount(callAmount)}`, onClick: () => onAction('call'), theme: 'btn-primary' };
 
     const buttons: PanelButton[] = [
         { label: 'FOLD', onClick: fold, theme: 'btn-error', kind: 'fold' },
         ...(canRaise ? [call] : []),
-        ...(facingAllInCall || p.canOnlyCall ? [] : [{ label: `ALL-IN ₹${p.stack}`, onClick: () => onAction('all-in'), theme: 'btn-accent rainbow-outline' }]),
-        canRaise ? { label: `${currentBet > 0 ? 'RAISE' : 'BET'} ₹${amount}`, onClick: raise, theme: 'btn-success', kind: 'primary' } : { ...call, kind: 'primary' },
+        ...(facingAllInCall || p.canOnlyCall ? [] : [{ label: `ALL-IN ₹${formatAmount(p.stack)}`, onClick: () => onAction('all-in'), theme: 'btn-accent rainbow-outline' }]),
+        canRaise ? { label: `${currentBet > 0 ? 'RAISE' : 'BET'} ₹${formatAmount(amount)}`, onClick: raise, theme: 'btn-success', kind: 'primary' } : { ...call, kind: 'primary' },
     ];
 
     return (
         <ActionPanel
-            info={<><strong>{name}</strong> · {gameState.gameStage.toUpperCase()} · <span className="panel-stake">To call ₹{canCheck ? 0 : callAmount}</span> · Stack ₹{p.stack}{timer && <> · ⏱ {timer}</>}</>}
+            info={<><strong>{name}</strong> · {gameState.gameStage.toUpperCase()} · <span className="panel-stake">To call ₹{formatAmount(canCheck ? 0 : callAmount)}</span> · Stack ₹{formatAmount(p.stack)}{timer && <> · ⏱ {timer}</>}</>}
             pot={pot}
             stepper={canRaise ? {
                 amount,

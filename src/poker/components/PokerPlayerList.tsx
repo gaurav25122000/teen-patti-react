@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import Avatar from '../../components/Avatar';
 import { readSavedPlayers } from '../../utils/savedPlayers';
 import type { PokerPlayer, PokerGameState } from '../types/pokerGameTypes';
-import { toTitleCase } from '../../utils/formatters';
+import { toTitleCase, formatAmount } from '../../utils/formatters';
 import TableView, { ViewToggle } from '../../components/TableView';
 import { useStoredState } from '../../hooks/useStoredState';
 
@@ -43,9 +43,9 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
             <h3>Players ({players.length}) <ViewToggle view={view} onChange={setView} /></h3>
             {view === 'table' ? (
                 <TableView
-                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), phone: p.phoneNumber, amount: `₹ ${p.stack}`, status: [status.trim(), p.roundBet > 0 ? `Bet ₹${p.roundBet}` : ''].filter(Boolean).join(' · '), className }))}
+                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), phone: p.phoneNumber, amount: `₹ ${formatAmount(p.stack)}`, status: [status.trim(), p.roundBet > 0 ? `Bet ₹${formatAmount(p.roundBet)}` : ''].filter(Boolean).join(' · '), className }))}
                     saved={saved}
-                    center={<>{toTitleCase(gameStage)}<br />Pot ₹{totalPot}</>}
+                    center={<>{toTitleCase(gameStage)}<br />Pot ₹{formatAmount(totalPot)}</>}
                 />
             ) : (
             <table>
@@ -65,9 +65,9 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                                     <Avatar name={p.name} phone={p.phoneNumber} saved={saved} /> {toTitleCase(p.name)} {status}
                                     <span style={{ marginLeft: '8px', opacity: p.winningStreak > 0 ? 1 : 0.7 }} title="Winning Streak">🔥 {p.winningStreak}</span>
                                 </td>
-                                <td data-label="Stack / Buy-In">₹ {p.stack} / ₹ {p.totalBuyIn}</td>
-                                <td data-label="Round Bet">₹ {p.roundBet}</td>
-                                <td data-label="Pot Contribution">₹ {p.totalPotContribution}</td>
+                                <td data-label="Stack / Buy-In">₹ {formatAmount(p.stack)} / ₹ {formatAmount(p.totalBuyIn)}</td>
+                                <td data-label="Round Bet">₹ {formatAmount(p.roundBet)}</td>
+                                <td data-label="Pot Contribution">₹ {formatAmount(p.totalPotContribution)}</td>
                             </tr>
                         );
                     })}

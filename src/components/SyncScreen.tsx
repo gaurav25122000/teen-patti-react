@@ -56,9 +56,12 @@ const SyncScreen: React.FC = () => {
                     <div className="setup-actions">
                         <button className="btn btn-primary" onClick={create}>CREATE GROUP</button>
                     </div>
-                    <div className="saved-form">
-                        <input type="text" placeholder="Paste a group code or link" value={joinInput} onChange={e => setJoinInput(e.target.value)} />
-                        <button className="btn btn-success" onClick={join}>JOIN</button>
+                    <div className="lookup-form">
+                        <label htmlFor="sync-join">Join a group</label>
+                        <input id="sync-join" type="text" placeholder="Paste a group code or link" value={joinInput} onChange={e => setJoinInput(e.target.value)} />
+                        <div className="setup-actions">
+                            <button className="btn btn-success" onClick={join}>JOIN</button>
+                        </div>
                     </div>
                 </>
             )}

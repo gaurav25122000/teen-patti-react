@@ -12,7 +12,7 @@ import OwingsModal from './OwingsModal';
 import InteractionModal from './InteractionModal';
 import EntityManager from './EntityManager';
 import type { Party } from '../utils/owingsLogic';
-import { toTitleCase } from '../utils/formatters';
+import { toTitleCase, formatAmount } from '../utils/formatters';
 import { emptyStats, sessionMinutes, summaryLines } from '../utils/nightStats';
 import { teenPattiSettlement } from '../utils/gameSettlement';
 import { bootRefusal, nextBoot, potLimitReached } from '../utils/teenPattiRules';
@@ -250,7 +250,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                         const refusal = actions.requestShow(cost);
                         if (refusal) return setFormError(refusal);
                         actions.resolveShow(parseInt(selectedPlayerId, 10));
-                        addMessage(`${toTitleCase(requester!.name)} pays ₹ ${cost} for Show with ${toTitleCase(target!.name)}.`);
+                        addMessage(`${toTitleCase(requester!.name)} pays ₹ ${formatAmount(cost)} for Show with ${toTitleCase(target!.name)}.`);
                         closeModal();
                     };
                     break;
@@ -360,7 +360,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                         {isReadOnly && <div className="badge badge-warning" style={{ alignSelf: 'center', marginBottom: '1rem' }}>SPECTATOR MODE</div>}
                         
                         {!isReadOnly && <StreamControls gameState={gameState} gameType="teen-patti" style={{ marginBottom: '1rem' }} onHandedOver={actions.clearGame} />}
-                        {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginBottom: '1rem', alignSelf: 'center' }} onClick={undo}>↩ Undo</button>}
+                        {!isReadOnly && canUndo && <button className="btn btn-secondary btn-compact" style={{ marginBottom: '1rem', alignSelf: 'center' }} onClick={undo}>↩ Undo</button>}
 
                     </div>
                     <div className="side-panel-container">
@@ -381,7 +381,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
             ) : !roundActive && (
                 <ActionPanel
                     error={interaction === 'idle' ? formError : null}
-                    info={<>Between rounds{gameState.roundInitialBootAmount ? ` · Boot ₹${gameState.roundInitialBootAmount}` : ''}</>}
+                    info={<>Between rounds{gameState.roundInitialBootAmount ? ` · Boot ₹${formatAmount(gameState.roundInitialBootAmount)}` : ''}</>}
                     buttons={[
                         { label: 'ADD PLAYER', onClick: () => setInteraction('addingPlayer'), theme: 'btn-violet' },
                         { label: '☰ TABLE', onClick: () => setShowTable(true), theme: 'btn-sky' },

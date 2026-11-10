@@ -60,7 +60,7 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
     return (
         <div className="setup-screen">
             <h2>Texas Hold'em Setup</h2>
-            <div className="form-group" style={{ flexDirection: 'row', justifyContent: 'center', gap: '1rem' }}>
+            <div className="mode-switch" role="radiogroup" aria-label="Game type">
                 <label><input type="radio" name="poker-mode" checked={!tournament} onChange={() => setForm({ ...form, tournament: '' })} /> Cash game</label>
                 <label><input type="radio" name="poker-mode" checked={tournament} onChange={() => setForm({ ...form, tournament: 'on' })} /> Tournament</label>
             </div>
@@ -75,7 +75,7 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
                 onPick={picked => setPlayers(rows => fillRow(rows, picked, { name: '', stack: '1000', phoneNumber: '' }))}
             />
             {players.map((p, index) => (
-                <div key={index} className="player-setup-row" style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0', flexWrap: 'wrap' }}>
+                <div key={index} className="player-setup-row">
                     <input
                         type="text"
                         placeholder={`Player ${index + 1} Name`}
@@ -94,7 +94,7 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
                         value={p.phoneNumber}
                         onChange={(e) => handlePlayerChange(index, 'phoneNumber', e.target.value)}
                     />
-                    {players.length > 1 && <button className="btn btn-error btn-compact" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayers(rows => rows.filter((_, i) => i !== index))}>✕</button>}
+                    {players.length > 1 && <button className="btn btn-error btn-compact seat-remove" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayers(rows => rows.filter((_, i) => i !== index))}>✕</button>}
                 </div>
             ))}
             <div className="setup-actions">
