@@ -779,10 +779,96 @@ h1 {
 }
 
 /* --- 9. Responsive Design --- */
-@media (max-width: 900px) {
+/* Two columns from 700 px (players or table left, log and notes right); narrower stacks them. */
+@media (max-width: 699px) {
   .game-screen {
     flex-direction: column;
   }
+}
+
+/* Non-game screens stay a readable width. */
+.setup-screen {
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+/* --- Docked action panel and Table sheet --- */
+.action-panel {
+  position: sticky;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: var(--color-surface);
+  border-top: 2px solid var(--color-glow-cyan);
+  border-radius: 12px 12px 0 0;
+}
+.panel-info {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.panel-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.panel-stepper input {
+  width: 6.5em;
+  min-height: 44px;
+  font-size: 16px;
+  text-align: center;
+}
+.panel-step,
+.panel-chip {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 14px;
+}
+.panel-error {
+  margin: 0;
+  color: #ff6b6b;
+  font-size: 13px;
+}
+.panel-buttons {
+  display: flex;
+  gap: 8px;
+}
+.panel-button {
+  flex: 1;
+  min-height: 48px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.panel-button.fold {
+  flex: 0 0 auto;
+  background: #b3261e;
+  color: #fff;
+}
+.panel-button.primary {
+  flex: 1.5;
+  background: var(--color-glow-lime);
+  color: #000;
+}
+.sheet-group h4 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+.sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  font-size: 15px;
+  text-align: left;
 }
 
 @media (max-width: 600px) {

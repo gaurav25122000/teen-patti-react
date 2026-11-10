@@ -15,15 +15,9 @@ interface GameSetupProps {
 }
 
 const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => {
-    const [numPlayersInput, setNumPlayersInput] = useState("2");
-    const [playerInputs, setPlayerInputs] = useState<{ name: string; balance: string; phoneNumber: string; }[]>([]);
+    const emptySeat = { name: '', balance: '0', phoneNumber: '' };
+    const [playerInputs, setPlayerInputs] = useState<{ name: string; balance: string; phoneNumber: string; }[]>([emptySeat, emptySeat]);
     const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
-
-    const handleConfirmNumPlayers = () => {
-        const num = parseInt(numPlayersInput);
-        if (isNaN(num) || num < 2) return alert("Please enter at least 2 players.");
-        setPlayerInputs(Array(num).fill({ name: "", balance: "0", phoneNumber: "" }));
-    };
 
     const handlePlayerInputChange = (index: number, field: 'name' | 'balance' | 'phoneNumber', value: string) => {
         setPlayerInputs(prev => {
@@ -36,7 +30,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
     const handleStartGame = () => {
         const newPlayers: Player[] = [];
         for (const [index, input] of playerInputs.entries()) {
-            const balance = parseInt(input.balance, 10);
+            const balance = Number(input.balance);
             if (!input.name.trim() || isNaN(balance)) {
                 return alert(`Invalid name or balance for Player ${index + 1}.`);
             }
@@ -63,22 +57,11 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
             <hr />
             <h3>Start New Game</h3>
 
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
-                <label>Number of Players (min 2): </label>
-                <input
-                    type="number"
-                    min="2"
-                    value={numPlayersInput}
-                    onChange={(e) => setNumPlayersInput(e.target.value)}
-                />
-                <button className="btn-primary" onClick={handleConfirmNumPlayers}>Confirm</button>
-            </div>
             <SavedPlayerChips
                 formPhones={playerInputs.map(p => p.phoneNumber)}
-                onPick={picked => setPlayerInputs(rows => fillRow(rows, picked, { name: '', balance: '0', phoneNumber: '' }))}
+                onPick={picked => setPlayerInputs(rows => fillRow(rows, picked, emptySeat))}
             />
-            {playerInputs.length > 0 && (
-                <div>
+            <div>
                     <h4>Enter Player Details:</h4>
                     {playerInputs.map((input, index) => (
                         <div key={index} style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0', flexWrap: 'wrap' }}>
@@ -89,7 +72,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
                                 onChange={(e) => handlePlayerInputChange(index, 'name', e.target.value)}
                             />
                             <input
-                                type="number"
+                                type="number" inputMode="decimal"
                                 placeholder="Balance"
                                 value={input.balance}
                                 onChange={(e) => handlePlayerInputChange(index, 'balance', e.target.value)}
@@ -100,15 +83,16 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
                                 value={input.phoneNumber}
                                 onChange={(e) => handlePlayerInputChange(index, 'phoneNumber', e.target.value)}
                             />
+                            {playerInputs.length > 2 && <button className="btn-sm" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayerInputs(rows => rows.filter((_, i) => i !== index))}>✕</button>}
                         </div>
                     ))}
+                    <button className="btn-secondary" onClick={() => setPlayerInputs(rows => [...rows, emptySeat])}>Add seat</button>
                     <details className="table-settings">
                         <summary>Table settings</summary>
                         <SettingsFields fields={TEEN_PATTI_FIELDS} form={settingsForm} onChange={setSettingsForm} />
                     </details>
                     <button className="btn btn-start rainbow-outline" onClick={handleStartGame} style={{ marginTop: '1rem' }}>Start Game</button>
-                </div>
-            )}
+            </div>
         </div>
     );
 };

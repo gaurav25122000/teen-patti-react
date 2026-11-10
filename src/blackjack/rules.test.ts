@@ -105,3 +105,11 @@ test('turning the banker on keeps the house total, changing N restarts the count
     assert.equal(off.bankerId, undefined);
     assert.deepEqual(newLines(on, go({ ...on, gameStage: 'dealer-turn' }, (x, io) => E.applySettings(x, BASE, io))), ['Settings can only change between rounds.']);
 });
+
+test('a locked repeat bet is brought within the current table limits', () => {
+    const s = table(['Asha', 'Raj']);
+    const tighter = go(s, (x, io) => E.applySettings(x, { ...BASE, minBet: 20, maxBet: 100 }, io));
+    assert.deepEqual(deal(tighter).players.map(p => p.hands[0].bet), [20, 20]);
+    const big = { ...tighter, players: tighter.players.map(p => ({ ...p, lastBets: [500] })) };
+    assert.deepEqual(deal(big).players.map(p => [p.hands[0].bet, p.stack]), [[100, 900], [100, 900]]);
+});

@@ -239,6 +239,10 @@ export const settleSideBet = (prev: BlackjackGameState, playerId: number, handId
     return finishIfSettled({ ...prev, ...toHouse(prev, players, ratio ? -bet * ratio : bet) }, io);
 };
 
+// A locked hand repeats its last bet, brought within the table's current limits.
+const repeatBet = (s: BlackjackGameState, p: BlackjackPlayer, i: number) =>
+    Math.min(s.maxBet, Math.max(s.minBet, p.lastBets[i] || p.lastBets[0] || s.minBet));
+
 export const startRound = (prev: BlackjackGameState, io: Io): BlackjackGameState => {
     let activePlayerFound = false;
     let totalHands = 0;
@@ -246,7 +250,7 @@ export const startRound = (prev: BlackjackGameState, io: Io): BlackjackGameState
 
     const newPlayers = prev.players.map(p => {
         if (p.id === prev.bankerId) return { ...p, stack: p.stack + p.hands.reduce((sum, h) => sum + placedOn(h), 0), hands: [] };
-        const totalLastBet = p.lastBets.slice(0, p.initialHandsCount).reduce((a, b) => a + b, 0);
+        const totalLastBet = p.lastBets.slice(0, p.initialHandsCount).reduce((sum, _, i) => sum + repeatBet(prev, p, i), 0);
         const placed = p.hands.some(h => h.bet > 0); // unlocked bets already came out of the stack
         if (p.isTakingBreak || (prev.isBettingLocked ? p.stack < totalLastBet : !placed && p.stack < prev.minBet)) {
             if (p.isTakingBreak) io.log(`${p.name} is on break.`);
@@ -261,7 +265,7 @@ export const startRound = (prev: BlackjackGameState, io: Io): BlackjackGameState
             // Locked: each hand bets its last bet while the stack lasts.
             let playerStack = p.stack;
             currentHands = currentHands.map((h, i) => {
-                const betAmount = p.lastBets[i] || p.lastBets[0] || prev.minBet;
+                const betAmount = repeatBet(prev, p, i);
                 if (playerStack >= betAmount) {
                     playerStack -= betAmount;
                     activePlayerFound = true;

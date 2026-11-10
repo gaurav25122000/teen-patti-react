@@ -5,8 +5,9 @@ import { useTeenPattiGame } from '../hooks/useTeenPattiGame';
 import PlayerList from './PlayerList';
 import ActionLog from './ActionLog';
 import Notes from './Notes';
-import GameControls from './GameControls';
-import RoundControls from './RoundControls';
+import TeenPattiPanel from './TeenPattiPanel';
+import ActionPanel from './ActionPanel';
+import TableSheet from './TableSheet';
 import OwingsModal from './OwingsModal';
 import InteractionModal from './InteractionModal';
 import EntityManager from './EntityManager';
@@ -26,6 +27,8 @@ import Celebration from './Celebration';
 import LogFeedback from './LogFeedback';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { readAppSettings } from '../utils/appSettings';
+import { clockText, useTurnTimer } from '../hooks/useTurnTimer';
+import { END_GAME_CONFIRM } from '../utils/archive';
 
 // --- SVG Icons ---
 const IconTrophy = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9a9 9 0 119 0zM16.5 18.75a9 9 0 00-9 0m9 0a9 9 0 01-9 0m9 0v-4.5A3.375 3.375 0 0012 10.5h-1.5a3.375 3.375 0 00-3.375 3.375v4.5m5.906-9.043c.124.083.242.172.355.267.112.096.22.2.322.308.1.107.196.22.286.338a3.743 3.743 0 01.286.338c.107.112.208.228.308.347.1.118.19.242.27.375M8.094 9.457c.124-.083.242-.172.355-.267.112-.096.22-.2.322-.308.1-.107.196-.22.286-.338a3.743 3.743 0 00.286-.338c.107-.112.208-.228.308-.347.1-.118.19-.242.27-.375" /></svg>;
@@ -46,7 +49,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     const { gameState, activePlayers, currentPlayer, precedingPlayer, addMessage, actions, undo, canUndo } = gameHook;
 
     const [interaction, setInteraction] = useState<InteractionType>('idle');
+    const [showTable, setShowTable] = useState(false);
     useWakeLock(readAppSettings().keepAwake);
+    const timerLeft = useTurnTimer(isReadOnly ? undefined : gameState.turnTimer,
+        gameState.roundActive && currentPlayer ? `${gameState.roundsStarted ?? 0}:${currentPlayer.id}` : null, toTitleCase(currentPlayer?.name ?? ''));
+    const blinds = gameState.blindPlayerIds;
+    const showDisabled = !currentPlayer || !precedingPlayer || activePlayers.length < 2
+        || (blinds.has(precedingPlayer.id) && !blinds.has(currentPlayer.id) && activePlayers.length !== 2);
+    const { players, roundActive } = gameState;
+    const canStartRound = !roundActive && players.length >= 2 && (!!gameState.roundInitialBootAmount || gameState.lastWinnerId === null);
+    const endGame = () => { if (window.confirm(END_GAME_CONFIRM)) onShowSetup(); };
     const [showOwings, setShowOwings] = useState(false);
     const [showEntityManager, setShowEntityManager] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -179,12 +191,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
         switch (interaction) {
             case 'gettingBoot':
                 title = 'Set Boot Amount'; theme = 'default'; icon = <IconCash />;
-                body = <div className="form-group"><label htmlFor="boot-amount">Enter amount</label><input id="boot-amount" type="number" value={bootAmount} onChange={e => setBootAmount(e.target.value)} min="1" autoFocus /></div>;
+                body = <div className="form-group"><label htmlFor="boot-amount">Enter amount</label><input id="boot-amount" type="number" inputMode="decimal" value={bootAmount} onChange={e => setBootAmount(e.target.value)} min="1" autoFocus /></div>;
                 confirmText = "Set & Continue";
                 primaryAction = () => {
-                    const refusal = bootRefusal(gameState, nextBoot(gameState, parseInt(bootAmount, 10)));
+                    const refusal = bootRefusal(gameState, nextBoot(gameState, Number(bootAmount)));
                     if (refusal) return alert(refusal);
-                    if (parseInt(bootAmount, 10) > 0) {
+                    if (Number(bootAmount) > 0) {
                         setInteraction('gettingStartPlayer');
                     } else {
                         alert('Invalid boot amount.');
@@ -202,7 +214,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 primaryAction = () => {
                     const playerIndex = gameState.players.findIndex(p => p.id === parseInt(startPlayerId, 10));
                     if (playerIndex > -1) {
-                        actions.startRound(playerIndex, parseInt(bootAmount, 10));
+                        actions.startRound(playerIndex, Number(bootAmount));
                         closeModal();
                     }
                 };
@@ -253,7 +265,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 body = (
                     <>
                         <div className="form-group"><label>Name</label><input type="text" value={addPlayerName} onChange={e => setAddPlayerName(e.target.value)} /></div>
-                        <div className="form-group"><label>Balance</label><input type="number" value={addPlayerBalance} onChange={e => setAddPlayerBalance(e.target.value)} /></div>
+                        <div className="form-group"><label>Balance</label><input type="number" inputMode="decimal" value={addPlayerBalance} onChange={e => setAddPlayerBalance(e.target.value)} /></div>
                         <div className="form-group"><label>Phone Number</label><input type="tel" value={addPlayerPhone} onChange={e => setAddPlayerPhone(e.target.value)} placeholder="10 digits" /></div>
                     </>
                 );
@@ -264,7 +276,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     }
                     const taken = phoneInUse(gameState.players, addPlayerPhone);
                     if (taken) return alert(taken);
-                    actions.addPlayer(addPlayerName, parseInt(addPlayerBalance, 10) || 0, addPlayerPhone.trim());
+                    actions.addPlayer(addPlayerName, Number(addPlayerBalance) || 0, addPlayerPhone.trim());
                     closeModal();
                 };
                 break;
@@ -323,7 +335,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
             case 'deductAndDistribute':
                 title = "Deduct & Distribute"; theme = 'danger'; icon = <IconCash />;
-                body = <><div className="form-group"><label>Deduct from</label><select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div><div className="form-group"><label>Amount</label><input type="number" value={deductAmount} onChange={e => setDeductAmount(Number(e.target.value))} /></div></>;
+                body = <><div className="form-group"><label>Deduct from</label><select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div><div className="form-group"><label>Amount</label><input type="number" inputMode="decimal" value={deductAmount} onChange={e => setDeductAmount(Number(e.target.value))} /></div></>;
                 primaryAction = () => {
                     if (deductAmount > 0) actions.deductAndDistribute(parseInt(selectedPlayerId, 10), deductAmount);
                     closeModal();
@@ -352,33 +364,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                         {!isReadOnly && <StreamControls gameState={gameState} gameType="teen-patti" style={{ marginBottom: '1rem' }} onHandedOver={actions.clearGame} />}
                         {!isReadOnly && canUndo && <button className="btn-sm btn-outline-secondary" style={{ marginBottom: '1rem', alignSelf: 'center' }} onClick={undo}>↩ Undo</button>}
 
-                    <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
-                        <GameControls
-                            gameState={gameState}
-                            onStartRound={handleStartRound}
-                            onChangeBoot={() => setInteraction('gettingBoot')}
-                            onAddPlayer={() => setInteraction('addingPlayer')}
-                            onRemovePlayer={() => setInteraction('removingPlayer')}
-                            onReorderPlayers={() => setInteraction('reorderingPlayers')}
-                            onDeductAndDistribute={() => setInteraction('deductAndDistribute')}
-                            onShowOwings={handleShowOwings}
-                            onShowSetup={onShowSetup}
-                            onManageEntities={() => setShowEntityManager(true)}
-                            onTogglePlayerBreak={() => setInteraction('toggleBreak')}
-                            onSettings={() => setInteraction('settings')}
-                        />
-                    </div>
-                    {gameState.roundActive && currentPlayer && (
-                        <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
-                            <RoundControls
-                                gameState={gameState}
-                                currentPlayer={currentPlayer}
-                                precedingPlayer={precedingPlayer}
-                                activePlayers={activePlayers}
-                                actions={{ ...actions, onShowClick: handleShowClick, onEndBettingClick: () => setInteraction('selectingWinner') }}
-                            />
-                        </div>
-                    )}
                     </div>
                     <div className="side-panel-container">
                         <Notes roundActive={gameState.roundActive} />
@@ -386,6 +371,47 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     </div>
                 </div>
             </div>
+
+            {!isReadOnly && (roundActive && currentPlayer ? (
+                <TeenPattiPanel
+                    key={`${gameState.roundsStarted ?? 0}:${currentPlayer.id}:${gameState.currentStake}:${blinds.has(currentPlayer.id)}`}
+                    gameState={gameState}
+                    currentPlayer={currentPlayer}
+                    showDisabled={showDisabled}
+                    timer={timerLeft === null ? null : clockText(timerLeft)}
+                    actions={{ ...actions, onShowClick: handleShowClick, onEndBettingClick: () => setInteraction('selectingWinner') }}
+                />
+            ) : !roundActive && (
+                <ActionPanel
+                    info={<>Between rounds{gameState.roundInitialBootAmount ? ` · Boot ₹${gameState.roundInitialBootAmount}` : ''}</>}
+                    buttons={[
+                        { label: 'ADD PLAYER', onClick: () => setInteraction('addingPlayer') },
+                        { label: '☰ TABLE', onClick: () => setShowTable(true) },
+                        { label: 'START', onClick: handleStartRound, kind: 'primary', disabled: !canStartRound },
+                    ]}
+                />
+            ))}
+
+            {showTable && (
+                <TableSheet onClose={() => setShowTable(false)} groups={[
+                    ['Players', [
+                        { icon: '➕', label: 'Add player', onClick: () => setInteraction('addingPlayer') },
+                        ...(players.length > 2 ? [{ icon: '➖', label: 'Remove player', onClick: () => setInteraction('removingPlayer') }] : []),
+                        { icon: '☕', label: 'Break', onClick: () => setInteraction('toggleBreak') },
+                        ...(players.length >= 2 ? [{ icon: '↕', label: 'Reorder', onClick: () => setInteraction('reorderingPlayers') }] : []),
+                    ]],
+                    ['Money', [
+                        { icon: '💰', label: 'Settlement', onClick: handleShowOwings },
+                        ...(players.length >= 2 ? [{ icon: '⇄', label: 'Deduct & distribute', onClick: () => setInteraction('deductAndDistribute') }] : []),
+                    ]],
+                    ['Game', [
+                        { icon: '⚙', label: 'Settings', onClick: () => setInteraction('settings') },
+                        ...(players.length >= 2 ? [{ icon: '₹', label: 'Change boot', onClick: () => setInteraction('gettingBoot') }] : []),
+                        { icon: '👥', label: 'Groups', onClick: () => setShowEntityManager(true) },
+                        { icon: '⏹', label: 'End game', onClick: endGame },
+                    ]],
+                ]} />
+            )}
 
             {renderModal()}
 

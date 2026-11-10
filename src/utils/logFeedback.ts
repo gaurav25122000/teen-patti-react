@@ -23,7 +23,7 @@ export const toastLine = (added: string[]): string | null => {
 const PRIORITY: [Sound, RegExp][] = [
     ['error', /^ERROR: |^Can only|must see|^Max (chaal|blind bet)|^Boot is above|already playing|^Keep at least|needs more chips|^(Minimum|Maximum) bet|^Settings can only|has used all|^Rebuys closed|already took the add-on|^Add-ons are open|^Buy-in must|^Players leave a tournament|^No valid bets|^Not enough|off in tournaments/],
     ['win', /won the pot|wins? the pot|win\(s\) the pot|has BLACKJACK!|\) wins ₹|Streak Winnings!/],
-    ['alarm', /^Pot limit|^Time.s up/],
+    ['alarm', /^Pot limit/],
     ['level_up', /^Blinds up/],
     ['raise', /raises|all-in|ALL-IN|straddles/],
     ['fold', /folds|busted|loses|surrenders/],

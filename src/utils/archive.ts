@@ -7,3 +7,6 @@ export const archiveOrWarn = (...args: Parameters<typeof archiveGame>) => {
     const failed = archiveGame(...args);
     if (failed) showToast({ text: failed.message, copyText: historyShareText(failed.entry, readSavedPlayers()) });
 };
+
+// The same End game confirmation in every game.
+export const END_GAME_CONFIRM = 'End this game? It will be saved to History.';

@@ -5,6 +5,7 @@ import { throughTransfers, type Party, type Transaction } from '../utils/owingsL
 import InteractionModal from './InteractionModal';
 import ShareButtons from './ShareButtons';
 import PayLink from './PayLink';
+import Avatar from './Avatar';
 import { loadSavedPlayers } from '../utils/savedPlayers';
 import { isUnbalanced, shareText, upiFor } from '../utils/settlement';
 import { GAME_LABELS, type GameKind } from '../utils/nightStats';
@@ -50,9 +51,9 @@ const OwingsContent: React.FC<Omit<OwingsModalProps, 'isOpen'>> = ({ onClose, tr
                         const upi = upiFor(t.toPhone, saved);
                         return (
                             <li key={index}>
-                                <span className="from">{t.from}</span>
+                                <span className="from"><Avatar name={t.from} /> {t.from}</span>
                                 <span className="arrow">→</span>
-                                <span className="to">{t.to}</span>
+                                <span className="to"><Avatar name={t.to} phone={t.toPhone ?? undefined} saved={saved} /> {t.to}</span>
                                 <span className="amount">₹ {t.amount.toFixed(2)}</span>
                                 {upi && <PayLink upi={upi} payee={t.to} amount={t.amount} onNoApp={setPayNote} />}
                             </li>

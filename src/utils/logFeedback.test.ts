@@ -30,5 +30,6 @@ test('one sound per batch, by priority', () => {
     assert.equal(soundFor(['Asha (Hand 1) hits.']), 'card');
     assert.equal(soundFor([UNDO_LINE]), 'undo');
     assert.equal(soundFor(['Pot limit reached: pick the winner.']), 'alarm');
+    assert.equal(soundFor(["Time's up, Raj."]), null);
     assert.equal(soundFor([]), null);
 });

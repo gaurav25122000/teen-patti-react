@@ -1,5 +1,7 @@
 import React from 'react';
 import './TableView.css';
+import Avatar from './Avatar';
+import type { SavedPlayer } from '../utils/savedPlayers';
 
 export interface Seat {
     id: number;
@@ -8,15 +10,17 @@ export interface Seat {
     status: string;
     className: string;
     dealer?: boolean;
+    phone?: string;
 }
 
 interface TableViewProps {
     seats: Seat[];
     center: React.ReactNode;
+    saved: SavedPlayer[]; // for each seat's avatar
 }
 
 // Seats around an oval, first seat at the bottom, going clockwise.
-const TableView: React.FC<TableViewProps> = ({ seats, center }) => (
+const TableView: React.FC<TableViewProps> = ({ seats, center, saved }) => (
     <div className="table-view">
         <div className="table-felt">
             <div className="table-center">{center}</div>
@@ -30,7 +34,7 @@ const TableView: React.FC<TableViewProps> = ({ seats, center }) => (
                     className={`table-seat ${seat.className}`}
                     style={{ left: `${50 + 44 * Math.cos(angle)}%`, top: `${50 + 42 * Math.sin(angle)}%` }}
                 >
-                    <div className="seat-name">{seat.name}{seat.dealer && <span className="dealer-badge">D</span>}</div>
+                    <div className="seat-name"><Avatar name={seat.name} phone={seat.phone} saved={saved} /> {seat.name}{seat.dealer && <span className="dealer-badge">D</span>}</div>
                     <div className="seat-amount">{seat.amount}</div>
                     {seat.status && <div className="seat-status">{seat.status}</div>}
                 </div>

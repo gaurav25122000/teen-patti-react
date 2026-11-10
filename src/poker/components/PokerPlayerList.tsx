@@ -1,5 +1,7 @@
 // src/poker/components/PokerPlayerList.tsx
-import React from 'react';
+import React, { useState } from 'react';
+import Avatar from '../../components/Avatar';
+import { readSavedPlayers } from '../../utils/savedPlayers';
 import type { PokerPlayer, PokerGameState } from '../types/pokerGameTypes';
 import { toTitleCase } from '../../utils/formatters';
 import TableView, { ViewToggle } from '../../components/TableView';
@@ -11,6 +13,7 @@ interface PokerPlayerListProps {
 }
 
 const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState }) => {
+    const [saved] = useState(() => readSavedPlayers());
     const { dealerButtonIndex, smallBlindIndex, bigBlindIndex, activePlayerIndex, gameStage } = gameState;
     const [view, setView] = useStoredState('seatView', 'list');
 
@@ -40,7 +43,8 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
             <h3>Players ({players.length}) <ViewToggle view={view} onChange={setView} /></h3>
             {view === 'table' ? (
                 <TableView
-                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), amount: `₹ ${p.stack}`, status: [status.trim(), p.roundBet > 0 ? `Bet ₹${p.roundBet}` : ''].filter(Boolean).join(' · '), className }))}
+                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), phone: p.phoneNumber, amount: `₹ ${p.stack}`, status: [status.trim(), p.roundBet > 0 ? `Bet ₹${p.roundBet}` : ''].filter(Boolean).join(' · '), className }))}
+                    saved={saved}
                     center={<>{toTitleCase(gameStage)}<br />Pot ₹{totalPot}</>}
                 />
             ) : (
@@ -58,7 +62,7 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                         return (
                             <tr key={p.id} className={className} data-player-id={p.id}>
                                 <td data-label="Name">
-                                    {toTitleCase(p.name)} {status}
+                                    <Avatar name={p.name} phone={p.phoneNumber} saved={saved} /> {toTitleCase(p.name)} {status}
                                     <span style={{ marginLeft: '8px', opacity: p.winningStreak > 0 ? 1 : 0.3 }} title="Winning Streak">🔥 {p.winningStreak}</span>
                                 </td>
                                 <td data-label="Stack / Buy-In">₹ {p.stack} / ₹ {p.totalBuyIn}</td>

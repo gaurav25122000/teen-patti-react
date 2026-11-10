@@ -32,7 +32,7 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
             .filter(p => p.name.trim() !== '')
             .map(p => ({ 
                 name: toTitleCase(p.name), 
-                stack: parseInt(p.stack) || 0, 
+                stack: Number(p.stack) || 0, 
                 phoneNumber: p.phoneNumber.trim(),
                 numHands: parseInt(p.numHands) || 1,
                 isTakingBreak: false // Ensure this is initialized
@@ -82,7 +82,7 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
                         style={{ flexBasis: '200px' }}
                     />
                     <input
-                        type="number"
+                        type="number" inputMode="decimal"
                         placeholder="Starting Stack"
                         value={p.stack}
                         onChange={e => handlePlayerChange(index, 'stack', e.target.value)}
@@ -104,10 +104,11 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
                         onChange={(e) => handlePlayerChange(index, 'numHands', e.target.value)}
                         style={{ flexBasis: '80px' }}
                     />
+                    {players.length > 1 && <button className="btn-sm" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayers(rows => rows.filter((_, i) => i !== index))}>✕</button>}
                 </div>
             ))}
             <div className="setup-actions">
-                <button className="btn-secondary" onClick={addPlayerField}>Add Another Player</button>
+                <button className="btn-secondary" onClick={addPlayerField}>Add seat</button>
                 <button className="btn btn-start rainbow-outline" onClick={handleStart}>Start Blackjack Game</button>
             </div>
         </div>

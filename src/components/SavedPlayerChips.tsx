@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { chipPlayers, readSavedPlayers, type SavedPlayer } from '../utils/savedPlayers';
+import Avatar from './Avatar';
 
 interface SavedPlayerChipsProps {
     formPhones: string[]; // phones already in the form are hidden
@@ -13,7 +14,7 @@ const SavedPlayerChips: React.FC<SavedPlayerChipsProps> = ({ formPhones, onPick 
     return (
         <div className="saved-chips">
             {chips.map(p => (
-                <button key={p.phone} type="button" className="saved-chip" onClick={() => onPick(p)}>{p.name}</button>
+                <button key={p.phone} type="button" className="saved-chip" onClick={() => onPick(p)}><Avatar name={p.name} phone={p.phone} saved={saved} /> {p.name}</button>
             ))}
         </div>
     );

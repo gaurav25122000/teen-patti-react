@@ -107,6 +107,16 @@ export const usePokerGame = () => {
     const pauseBlindClock = useCallback(() => setGameState(prev => engine.pauseBlindClock(prev, Date.now())), [setGameState]);
     const resumeBlindClock = useCallback(() => setGameState(prev => engine.resumeBlindClock(prev, Date.now())), [setGameState]);
 
+    // Ends the game: an unfinished tournament is chopped, the game goes to History, and the table empties.
+    const endGame = useCallback(() => {
+        setGameState(prev => {
+            const ended = engine.endTournament(prev, { ...io, log: () => {} }); // the log goes with the game
+            afterCommit(() => archiveOrWarn('poker', ended.stats, pokerSettlement(ended)));
+            return engine.createInitialPokerState();
+        });
+        localStorage.removeItem(POKER_STORAGE_KEY);
+    }, [setGameState, io, afterCommit]);
+
     // Empties the game and its saved copy (used after handing the game to another phone).
     const clearGame = useCallback(() => {
         localStorage.removeItem(POKER_STORAGE_KEY);
@@ -119,10 +129,10 @@ export const usePokerGame = () => {
     }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame,
         takeAddOn, toggleBombNext, applySettings, bustChoice]);
 
-    // PAUSE and RESUME are not undo steps.
+    // Not undo steps: PAUSE, RESUME, and CHOP and End game, whose winnings and History entry are already out.
     const recordedActions = useMemo(
-        () => ({ ...record(actions), pauseBlindClock: unrecorded(pauseBlindClock), resumeBlindClock: unrecorded(resumeBlindClock), chop: unrecorded(chop) }),
-        [record, unrecorded, actions, pauseBlindClock, resumeBlindClock, chop]
+        () => ({ ...record(actions), pauseBlindClock: unrecorded(pauseBlindClock), resumeBlindClock: unrecorded(resumeBlindClock), chop: unrecorded(chop), endGame: unrecorded(endGame) }),
+        [record, unrecorded, actions, pauseBlindClock, resumeBlindClock, chop, endGame]
     );
     const autoAwardPot = useMemo(() => unrecorded(awardPot), [unrecorded, awardPot]);
 

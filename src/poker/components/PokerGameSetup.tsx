@@ -34,7 +34,7 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
     const handleStart = () => {
         const finalPlayers = players
             .filter(p => p.name.trim() !== '')
-            .map(p => ({ name: toTitleCase(p.name), stack: parseInt(p.stack) || 0, phoneNumber: p.phoneNumber.trim() }));
+            .map(p => ({ name: toTitleCase(p.name), stack: Number(p.stack) || 0, phoneNumber: p.phoneNumber.trim() }));
 
         if (finalPlayers.length < 2) {
             alert("Please add at least 2 players.");
@@ -83,7 +83,7 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
                         onChange={e => handlePlayerChange(index, 'name', e.target.value)}
                     />
                     {!tournament && <input
-                        type="number"
+                        type="number" inputMode="decimal"
                         placeholder="Starting Stack"
                         value={p.stack}
                         onChange={e => handlePlayerChange(index, 'stack', e.target.value)}
@@ -94,10 +94,11 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
                         value={p.phoneNumber}
                         onChange={(e) => handlePlayerChange(index, 'phoneNumber', e.target.value)}
                     />
+                    {players.length > 1 && <button className="btn-sm" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayers(rows => rows.filter((_, i) => i !== index))}>✕</button>}
                 </div>
             ))}
             <div className="setup-actions">
-                <button className="btn-secondary" onClick={addPlayerField}>Add Another Player</button>
+                <button className="btn-secondary" onClick={addPlayerField}>Add seat</button>
                 <button className="btn btn-start rainbow-outline" onClick={handleStart}>Start Poker Game</button>
             </div>
         </div>

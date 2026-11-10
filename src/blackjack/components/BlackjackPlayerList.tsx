@@ -1,6 +1,8 @@
 // teen-patti-react/src/blackjack/components/BlackjackPlayerList.tsx
 // src/blackjack/components/BlackjackPlayerList.tsx
-import React from 'react';
+import React, { useState } from 'react';
+import Avatar from '../../components/Avatar';
+import { readSavedPlayers } from '../../utils/savedPlayers';
 import type { BlackjackPlayer, BlackjackGameState } from '../types/blackjackGameTypes';
 import { toTitleCase } from '../../utils/formatters';
 
@@ -10,6 +12,7 @@ interface BlackjackPlayerListProps {
 }
 
 const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, gameState }) => {
+    const [saved] = useState(() => readSavedPlayers());
     const { currentPlayerId, gameStage } = gameState;
 
     return (
@@ -46,7 +49,7 @@ const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, game
 
                         return (
                             <tr key={p.id} className={isCurrent ? 'current-player' : (p.isTakingBreak ? 'on-break' : '')} data-player-id={p.id}>
-                                <td data-label="Name">{toTitleCase(p.name)}</td>
+                                <td data-label="Name"><Avatar name={p.name} phone={p.phoneNumber} saved={saved} /> {toTitleCase(p.name)}</td>
                                 <td data-label="Stack / Buy-In">₹ {p.stack} / ₹ {p.totalBuyIn}</td>
                                 <td data-label="Status">
                                     {status}

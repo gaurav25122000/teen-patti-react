@@ -3,7 +3,9 @@ import type { useBlackjackGame } from '../hooks/useBlackjackGame';
 import BlackjackPlayerList from './BlackjackPlayerList';
 import BlackjackPlayerHands from './BlackjackPlayerHands';
 import ActionLog from '../../components/ActionLog';
-import BlackjackGameControls from './BlackjackGameControls'; 
+import ActionPanel from '../../components/ActionPanel';
+import TableSheet from '../../components/TableSheet';
+import { END_GAME_CONFIRM } from '../../utils/archive';
 import BlackjackDealerDisplay from './BlackjackDealerDisplay'; 
 import BlackjackManageModal, { type ModalMode } from './BlackjackManageModal';
 import { toTitleCase } from '../../utils/formatters';
@@ -36,6 +38,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
 
     const [modalMode, setModalMode] = useState<ModalMode>('none');
     useWakeLock(readAppSettings().keepAwake);
+    const [showTable, setShowTable] = useState(false);
     const [showOwings, setShowOwings] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [parties, setParties] = useState<Party[]>([]);
@@ -86,7 +89,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     
     // --- ADDED: Handler for new button ---
     const handleShowSetup = () => {
-        if (window.confirm("Are you sure you want to end this game and start a new one?")) {
+        if (window.confirm(END_GAME_CONFIRM)) {
             actions.setupNewGame(); // 1. Clears the hook state
             onShowSetupRequest();   // 2. Tells lobby to change view
         }
@@ -132,20 +135,6 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                     <BlackjackDealerDisplay dealerNet={dealerNet} />
                     {banker && <p style={{ textAlign: 'center' }}>Banker: <strong>{banker.name}</strong> ({(gameState.bankerRounds ?? 0) + 1} of {gameState.bankerEvery} rounds)</p>}
 
-                    {gameStage === 'betting' && (
-                        <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
-                            <BlackjackGameControls
-                                onStartRound={actions.startRound}
-                                onShowModal={handleShowModal}
-                                onShowOwings={handleShowOwings}
-                                onUnlockBets={actions.unlockAllBets} 
-                                isBettingLocked={isBettingLocked} 
-                                isDealDisabled={isDealDisabled}
-                                onShowSetup={handleShowSetup}
-                            />
-                            <button className="btn-secondary" onClick={openSettings}>Settings</button>
-                        </div>
-                    )}
                     
                     {/* --- REMOVED "Settle Bets" button --- */}
                     {gameStage === 'dealer-turn' && (
@@ -176,11 +165,9 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                                     isBettingLocked={isBettingLocked} 
                                     onPlaceBet={actions.placeBet}
                                     isBanker={player.id === gameState.bankerId}
-                                    insurance={gameState.insurance}
                                     sideBets={gameState.sideBets}
                                     onPlaceSideBet={actions.placeSideBet}
                                     onSettleSideBet={actions.settleSideBet}
-                                    onPlayerAction={actions.handlePlayerAction}
                                     onSetHandStatus={actions.setHandStatus}
                                     onUnlockBet={actions.unlockAllBets} 
                                 />
@@ -190,6 +177,55 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                 </div>
             </div>
             
+            {!isReadOnly && (() => {
+                const player = players.find(p => p.id === currentPlayerId);
+                const handIndex = player?.hands.findIndex(h => h.id === currentHandId) ?? -1;
+                const hand = player?.hands[handIndex];
+                if (gameStage === 'player-turn' && player && hand) {
+                    const act = (action: 'hit' | 'stand' | 'double' | 'split' | 'surrender' | 'insurance') => () => actions.handlePlayerAction(action);
+                    return <ActionPanel
+                        info={<><strong>{player.name}</strong> · Hand {handIndex + 1} · Bet ₹{hand.wager}</>}
+                        buttons={[
+                            ...(gameState.allowSurrender ? [{ label: 'SURRENDER', onClick: act('surrender'), kind: 'fold' as const }] : []),
+                            { label: 'DOUBLE', onClick: act('double') },
+                            { label: 'SPLIT', onClick: act('split') },
+                            ...(gameState.insurance ? [{ label: 'INSURANCE', onClick: act('insurance') }] : []),
+                            { label: 'STAND', onClick: act('stand') },
+                            { label: 'HIT', onClick: act('hit'), kind: 'primary' as const },
+                        ]}
+                    />;
+                }
+                if (gameStage === 'betting') {
+                    return <ActionPanel
+                        info={<>Between rounds · {isBettingLocked ? 'Bets locked to the last amounts' : 'Place a bet on every hand'}</>}
+                        buttons={[
+                            ...(isBettingLocked ? [{ label: 'CHANGE BETS', onClick: actions.unlockAllBets }] : []),
+                            { label: 'ADD PLAYER', onClick: () => handleShowModal('addPlayer') },
+                            { label: '☰ TABLE', onClick: () => setShowTable(true) },
+                            { label: 'DEAL', onClick: actions.startRound, kind: 'primary' as const, disabled: !isBettingLocked && isDealDisabled },
+                        ]}
+                    />;
+                }
+                return gameStage === 'dealer-turn' ? <ActionPanel info="Dealer's turn: settle every hand." buttons={[]} /> : null;
+            })()}
+
+            {showTable && (
+                <TableSheet onClose={() => setShowTable(false)} groups={[
+                    ['Players', [
+                        { icon: '➕', label: 'Add player', onClick: () => handleShowModal('addPlayer') },
+                        { icon: '➖', label: 'Remove player', onClick: () => handleShowModal('removePlayer') },
+                        { icon: '☕', label: 'Break', onClick: () => handleShowModal('toggleBreak') },
+                        { icon: '✋', label: 'Hands per player', onClick: () => handleShowModal('updateHands') },
+                        { icon: '₹', label: 'Rebuy', onClick: () => handleShowModal('addChips') },
+                    ]],
+                    ['Money', [{ icon: '💰', label: 'Settlement', onClick: handleShowOwings }]],
+                    ['Game', [
+                        { icon: '⚙', label: 'Settings', onClick: openSettings },
+                        { icon: '⏹', label: 'End game', onClick: handleShowSetup },
+                    ]],
+                ]} />
+            )}
+
             <BlackjackManageModal
                 isOpen={modalMode !== 'none'}
                 mode={modalMode}

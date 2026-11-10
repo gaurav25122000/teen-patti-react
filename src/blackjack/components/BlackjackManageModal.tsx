@@ -69,7 +69,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
             title = "Add New Player";
             body = <>
                 <div className="form-group"><label>Player Name</label><input type="text" value={addPlayerName} onChange={e => setAddPlayerName(e.target.value)} /></div>
-                <div className="form-group"><label>Starting Stack</label><input type="number" value={addPlayerStack} onChange={e => setAddPlayerStack(e.target.value)} /></div>
+                <div className="form-group"><label>Starting Stack</label><input type="number" inputMode="decimal" value={addPlayerStack} onChange={e => setAddPlayerStack(e.target.value)} /></div>
                 <div className="form-group"><label>Phone Number</label><input type="tel" value={addPlayerPhone} onChange={e => setAddPlayerPhone(e.target.value)} placeholder="10 digits" /></div>
                 <div className="form-group"><label>Number of Hands</label><input type="number" min="1" value={addPlayerNumHands} onChange={e => setAddPlayerNumHands(e.target.value)} /></div>
             </>;
@@ -80,7 +80,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
                 }
                 const taken = phoneInUse(players, addPlayerPhone);
                 if (taken) return alert(taken);
-                onAddPlayer(addPlayerName, parseInt(addPlayerStack, 10), addPlayerPhone.trim(), parseInt(addPlayerNumHands, 10));
+                onAddPlayer(addPlayerName, Number(addPlayerStack), addPlayerPhone.trim(), parseInt(addPlayerNumHands, 10));
                 onClose();
             };
             break;
@@ -99,11 +99,11 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
             title = "Add Chips (Rebuy)";
             body = <>
                 <div className="form-group"><label>Select Player</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{playerOptions}</select></div>
-                <div className="form-group"><label>Amount to Add</label><input type="number" value={addChipsAmount} onChange={e => setAddChipsAmount(e.target.value)} /></div>
+                <div className="form-group"><label>Amount to Add</label><input type="number" inputMode="decimal" value={addChipsAmount} onChange={e => setAddChipsAmount(e.target.value)} /></div>
             </>;
             confirmAction = () => {
                 if (!managePlayerId) return alert("Please select a player.");
-                onAddChips(parseInt(managePlayerId, 10), parseInt(addChipsAmount, 10));
+                onAddChips(parseInt(managePlayerId, 10), Number(addChipsAmount));
                 onClose();
             };
             break;

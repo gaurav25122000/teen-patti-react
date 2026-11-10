@@ -7,6 +7,7 @@ import { readSavedPlayers } from '../utils/savedPlayers';
 import { isUnbalanced, upiFor } from '../utils/settlement';
 import ShareButtons from './ShareButtons';
 import PayLink from './PayLink';
+import Avatar from './Avatar';
 
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
@@ -54,7 +55,7 @@ const HistoryScreen: React.FC = () => {
                 <p>{when(open.endedAt)}</p>
                 <ul className="owings-list">
                     {open.nets.map((n, i) => (
-                        <li key={i}><span className="from">{n.name}</span><span className="amount">{signedAmount(n.net)}</span></li>
+                        <li key={i}><span className="from"><Avatar name={n.name} /> {n.name}</span><span className="amount">{signedAmount(n.net)}</span></li>
                     ))}
                 </ul>
                 <h4>Settlement</h4>
