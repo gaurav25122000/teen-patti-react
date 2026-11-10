@@ -457,7 +457,7 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
         }
         case 'surrender':
             if (!prev.allowSurrender) {
-                io.log("Surrender is not allowed.");
+                io.log("Surrender is off at this table.");
                 return prev;
             }
             if (hand.hasHit) {

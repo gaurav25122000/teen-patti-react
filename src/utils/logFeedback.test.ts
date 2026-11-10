@@ -40,7 +40,7 @@ test('turn lines of every game are skipped, and this round\'s refusals sound as 
     assert.equal(toastLine(['--- Dealing the Flop ---', 'Action starts with Raj.']), '--- Dealing the Flop ---');
     for (const line of ['Asha is the banker this round.', 'Late entry is closed: a player is already out.', 'The tournament is over.',
         'Side bets can be at most ₹1000.', "Place the hand's bet first.", 'Insurance is off at this table.', 'Asha does not have enough chips.',
-        'Cannot bet more than your stack.', 'Raj is out of chips.']) {
+        'Cannot bet more than your stack.', 'Raj is out of chips.', 'Surrender is off at this table.']) {
         assert.equal(soundFor([line]), 'error', line);
     }
 });

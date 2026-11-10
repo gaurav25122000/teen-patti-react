@@ -122,3 +122,8 @@ test('two splits in the same moment get distinct hands, and the round still reac
     s = act(act(act(s, 'stand'), 'stand'), 'stand');
     assert.equal(s.gameStage, 'dealer-turn');
 });
+
+test('surrender can be turned off, with the same refusal as insurance', () => {
+    const s = deal(table(['Asha'], { allowSurrender: false }));
+    assert.deepEqual(newLines(s, act(s, 'surrender')), ['Surrender is off at this table.']);
+});
