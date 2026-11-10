@@ -9,6 +9,9 @@ import { LOCAL_STORAGE_KEY } from '../constants/gameConstants';
 import { toTitleCase } from '../utils/formatters';
 import { rehydrateState } from '../utils/serialization';
 import { archiveOrWarn } from '../utils/archive';
+import { runStep } from '../utils/engine';
+import { endTournament } from '../poker/engine';
+import { sendWinnings } from '../hooks/useEngineIo';
 import { blackjackSettlement, pokerSettlement, teenPattiSettlement } from '../utils/gameSettlement';
 import type { GameKind } from '../utils/nightStats';
 import PokerGameScreen from '../poker/components/PokerGameScreen';
@@ -29,8 +32,13 @@ const SETTLEMENTS = { 'teen-patti': teenPattiSettlement, poker: pokerSettlement,
 const archiveReplaced = (kind: GameKind, previous: string | null) => {
     if (!previous) return;
     try {
-        const old = rehydrateState(JSON.parse(previous));
+        let old = rehydrateState(JSON.parse(previous));
         if (!Array.isArray(old?.players)) return;
+        if (kind === 'poker') { // an unfinished tournament is chopped first
+            const ended = runStep(old, endTournament);
+            sendWinnings(ended.records, 'poker');
+            old = ended.state;
+        }
         archiveOrWarn(kind, old.stats, SETTLEMENTS[kind](old));
     } catch (err) {
         console.error('Could not archive the replaced game:', err);

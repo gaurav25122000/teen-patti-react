@@ -35,7 +35,7 @@ const SettingsFields: React.FC<SettingsFieldsProps> = ({ fields, form, onChange 
             return (
                 <div className="form-group" key={f.key}>
                     <label htmlFor={id}>{f.label}</label>
-                    <input id={id} type="text" inputMode={f.kind === 'count' ? 'numeric' : 'decimal'} placeholder="Off"
+                    <input id={id} type="text" inputMode={f.kind === 'count' ? 'numeric' : f.kind === 'text' ? 'text' : 'decimal'} placeholder={f.placeholder ?? 'Off'}
                         value={form[f.key] ?? ''} onChange={e => set(e.target.value)} />
                 </div>
             );

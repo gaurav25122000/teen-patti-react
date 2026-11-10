@@ -11,6 +11,7 @@ import { rememberPlayers } from '../../utils/savedPlayers';
 import { toTitleCase } from '../../utils/formatters';
 import * as engine from '../engine';
 import type { Io } from '../../utils/engine';
+import type { PokerSettings } from '../../utils/gameSettings';
 
 export const POKER_STORAGE_KEY = 'pokerGameState';
 
@@ -63,16 +64,18 @@ export const usePokerGame = () => {
         }
     }, [gameState]);
 
-    const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }, levelMinutes?: number) => {
-        const next = engine.newPokerGame(players, blinds, levelMinutes, Date.now());
+    const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string }[], settings: PokerSettings) => {
+        const next = engine.newPokerGame(players, settings, Date.now());
         setGameState(prev => {
-            const previous = prev.players.length > 0 ? prev : storedPoker();
+            const stored = prev.players.length > 0 ? prev : storedPoker();
+            // An unfinished tournament is chopped first; its log goes nowhere, its winnings rows still go out.
+            const previous = stored && engine.endTournament(stored, { ...io, log: () => {} });
             afterCommit(() => { if (previous) archiveOrWarn('poker', previous.stats, pokerSettlement(previous)); });
             return next;
         });
         const full = rememberPlayers(next.players.map(p => ({ name: p.name, phone: p.phoneNumber })));
         if (full) addMessage(full);
-    }, [setGameState, afterCommit, addMessage]);
+    }, [setGameState, afterCommit, addMessage, io]);
 
     const handlePlayerAction = useCallback((action: engine.PlayerAction, amount = 0) => step((s, io) => engine.playerAction(s, action, amount, io)), [step]);
     const startNewHand = useCallback(() => step((s, io) => engine.startNewHand(s, io)), [step]);
@@ -96,6 +99,11 @@ export const usePokerGame = () => {
     const addChipsToPlayer = useCallback((playerId: number, amount: number) => step((s, io) => engine.addChipsToPlayer(s, playerId, amount, io)), [step]);
     const togglePlayerBreak = useCallback((playerId: number) => step((s, io) => engine.togglePlayerBreak(s, playerId, io)), [step]);
     const applyStreakWinnings = useCallback((winnerId: number, amount: number) => step((s, io) => engine.applyStreakWinnings(s, winnerId, amount, io)), [step]);
+    const bustChoice = useCallback((playerId: number, rebuy: boolean) => step((s, io) => engine.bustChoice(s, playerId, rebuy, io)), [step]);
+    const chop = useCallback(() => step((s, io) => engine.chop(s, io)), [step]);
+    const takeAddOn = useCallback((playerId: number) => step((s, io) => engine.takeAddOn(s, playerId, io)), [step]);
+    const toggleBombNext = useCallback(() => step((s, io) => engine.toggleBombNext(s, io)), [step]);
+    const applySettings = useCallback((settings: PokerSettings) => step((s, io) => engine.applySettings(s, settings, Date.now(), io)), [step]);
     const pauseBlindClock = useCallback(() => setGameState(prev => engine.pauseBlindClock(prev, Date.now())), [setGameState]);
     const resumeBlindClock = useCallback(() => setGameState(prev => engine.resumeBlindClock(prev, Date.now())), [setGameState]);
 
@@ -106,13 +114,15 @@ export const usePokerGame = () => {
     }, [setGameState]);
 
     const actions = useMemo(() => ({
-        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame
-    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame]);
+        setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame,
+        takeAddOn, toggleBombNext, applySettings, bustChoice,
+    }), [setupGame, startNewHand, handlePlayerAction, awardPot, loadGame, addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, applyStreakWinnings, clearGame,
+        takeAddOn, toggleBombNext, applySettings, bustChoice]);
 
     // PAUSE and RESUME are not undo steps.
     const recordedActions = useMemo(
-        () => ({ ...record(actions), pauseBlindClock: unrecorded(pauseBlindClock), resumeBlindClock: unrecorded(resumeBlindClock) }),
-        [record, unrecorded, actions, pauseBlindClock, resumeBlindClock]
+        () => ({ ...record(actions), pauseBlindClock: unrecorded(pauseBlindClock), resumeBlindClock: unrecorded(resumeBlindClock), chop: unrecorded(chop) }),
+        [record, unrecorded, actions, pauseBlindClock, resumeBlindClock, chop]
     );
     const autoAwardPot = useMemo(() => unrecorded(awardPot), [unrecorded, awardPot]);
 

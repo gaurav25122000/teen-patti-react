@@ -38,8 +38,8 @@ const PokerLobby: React.FC<PokerLobbyProps> = ({ pokerHook, onInteractionChange 
         case 'intro':
             return <PokerIntroScreen onStartNew={() => setPokerStep('setup')} onLoadGame={handleLoadPokerGame} />;
         case 'setup':
-            return <PokerGameSetup onStartGame={(players, blinds, levelMinutes) => {
-                pokerActions.setupGame(players, blinds, levelMinutes);
+            return <PokerGameSetup onStartGame={(players, settings) => {
+                pokerActions.setupGame(players, settings);
                 setPokerStep('game');
             }} />;
         case 'game':

@@ -3,16 +3,23 @@ import React, { useState } from 'react';
 import { toTitleCase } from '../../utils/formatters';
 import { duplicatePhone, fillRow } from '../../utils/savedPlayers';
 import SavedPlayerChips from '../../components/SavedPlayerChips';
+import SettingsFields from '../../components/SettingsFields';
+import { parsePoker, type PokerSettings } from '../../utils/gameSettings';
+import { pokerFields } from '../../utils/settingsFields';
+import { buyInRefusal } from '../engine';
 
 interface PokerGameSetupProps {
-    onStartGame: (players: { name: string, stack: number, phoneNumber: string }[], blinds: { sb: number, bb: number }, levelMinutes?: number) => void;
+    onStartGame: (players: { name: string, stack: number, phoneNumber: string }[], settings: PokerSettings) => void;
 }
+
+// Always shown: the blinds, and in a tournament the buy-in and starting chips. The rest sits in "Table settings".
+const SHOWN = ['smallBlindAmount', 'bigBlindAmount', 'buyIn', 'startingChips'];
 
 const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
     const [players, setPlayers] = useState([{ name: '', stack: '1000', phoneNumber: '' }]);
-    const [sb, setSb] = useState('10');
-    const [bb, setBb] = useState('20');
-    const [levelMinutes, setLevelMinutes] = useState('');
+    const [form, setForm] = useState<Record<string, string>>({ smallBlindAmount: '10', bigBlindAmount: '20', buyIn: '500', startingChips: '1000' });
+    const tournament = form.tournament === 'on';
+    const fields = pokerFields(tournament);
 
     const handlePlayerChange = (index: number, field: 'name' | 'stack' | 'phoneNumber', value: string) => {
         const newPlayers = [...players];
@@ -42,33 +49,26 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
         const dup = duplicatePhone(finalPlayers.map(p => p.phoneNumber));
         if (dup) return alert(`Two players have the phone ${dup}.`);
 
-        const blinds = { sb: parseInt(sb), bb: parseInt(bb) };
-        if (isNaN(blinds.sb) || isNaN(blinds.bb) || blinds.sb <= 0 || blinds.bb <= 0) {
-            alert("Blinds must be positive numbers.");
-            return;
-        }
+        const settings = parsePoker(form);
+        if (typeof settings === 'string') return alert(settings);
+        const limit = tournament ? null : finalPlayers.map(p => buyInRefusal(settings, p.stack)).find(Boolean);
+        if (limit) return alert(limit);
 
-        const minutes = levelMinutes.trim() ? Number(levelMinutes) : undefined;
-        if (minutes !== undefined && !(Number.isInteger(minutes) && minutes >= 1 && minutes <= 240)) {
-            return alert("Blind level must be 1 to 240 minutes.");
-        }
-
-        onStartGame(finalPlayers, blinds, minutes);
+        onStartGame(finalPlayers, settings);
     };
 
     return (
         <div className="setup-screen">
             <h2>Texas Hold'em Setup</h2>
             <div className="form-group" style={{ flexDirection: 'row', justifyContent: 'center', gap: '1rem' }}>
-                <label>Small Blind:</label>
-                <input type="number" value={sb} onChange={e => setSb(e.target.value)} />
-                <label>Big Blind:</label>
-                <input type="number" value={bb} onChange={e => setBb(e.target.value)} />
+                <label><input type="radio" name="poker-mode" checked={!tournament} onChange={() => setForm({ ...form, tournament: '' })} /> Cash game</label>
+                <label><input type="radio" name="poker-mode" checked={tournament} onChange={() => setForm({ ...form, tournament: 'on' })} /> Tournament</label>
             </div>
-            <div className="form-group" style={{ flexDirection: 'row', justifyContent: 'center', gap: '1rem' }}>
-                <label htmlFor="level-minutes">Blind level (minutes):</label>
-                <input id="level-minutes" type="number" min="1" max="240" placeholder="Off" value={levelMinutes} onChange={e => setLevelMinutes(e.target.value)} />
-            </div>
+            <SettingsFields fields={fields.filter(f => SHOWN.includes(f.key))} form={form} onChange={setForm} />
+            <details className="table-settings">
+                <summary>Table settings</summary>
+                <SettingsFields fields={fields.filter(f => !SHOWN.includes(f.key))} form={form} onChange={setForm} />
+            </details>
             <hr />
             <SavedPlayerChips
                 formPhones={players.map(p => p.phoneNumber)}
@@ -82,12 +82,12 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
                         value={p.name}
                         onChange={e => handlePlayerChange(index, 'name', e.target.value)}
                     />
-                    <input
+                    {!tournament && <input
                         type="number"
                         placeholder="Starting Stack"
                         value={p.stack}
                         onChange={e => handlePlayerChange(index, 'stack', e.target.value)}
-                    />
+                    />}
                     <input
                         type="tel"
                         placeholder="10-Digit Phone"

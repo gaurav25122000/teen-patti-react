@@ -1,9 +1,11 @@
 // Poker game steps as pure functions: the hook runs them inside setGameState, tests run them directly.
-import type { PokerGameState, PokerPlayer, GameStage, Pot } from './types/pokerGameTypes.ts';
+import type { Entrant, PokerGameState, PokerPlayer, GameStage, Pot } from './types/pokerGameTypes.ts';
 import type { Io, RawRecord } from '../utils/engine.ts';
 import { calculatePots } from './utils/pokerLogic.ts';
-import { toTitleCase } from '../utils/formatters.ts';
-import { splitEvenly } from '../utils/money.ts';
+import { formatAmount, toTitleCase } from '../utils/formatters.ts';
+import { MID_ROUND, pokerChange, type PokerSettings } from '../utils/gameSettings.ts';
+import { splitEvenly, toPaise } from '../utils/money.ts';
+import { defaultPayouts, GO_OUT, LATE_ENTRY_CLOSED, ordinal, outOfChips, poolPaise, prizeTable, seatFromDealer, STREAK_OFF, TOURNAMENT_OVER } from './tournament.ts';
 import { foldOutLine, foldOutStreak, handCandidate, handNets, nextStreak, potLine } from './utils/streak.ts';
 import { pauseClock, resumeClock, startClock, tickLevel } from './utils/blindLevels.ts';
 import { emptyStats, partialStats, recordRound, statsNames } from '../utils/nightStats.ts';
@@ -56,20 +58,156 @@ const newPlayer = (id: number, name: string, stack: number, phoneNumber?: string
     isTakingBreak: false, canOnlyCall: false, winningStreak: 0, roundWinnings: 0,
 });
 
-export const newPokerGame = (
-    players: { name: string; stack: number; phoneNumber: string }[],
-    blinds: { sb: number; bb: number },
-    levelMinutes: number | undefined,
-    now: number
-): PokerGameState => ({
-    ...createInitialPokerState(),
-    ...startClock(levelMinutes, now),
-    players: players.map((p, i) => newPlayer(i + 1, p.name, p.stack, p.phoneNumber)),
-    smallBlindAmount: blinds.sb,
-    bigBlindAmount: blinds.bb,
-    dealerButtonIndex: -1,
-    messages: [`Game setup with ${players.length} players. Blinds are ${blinds.sb}/${blinds.bb}. Click 'Start Next Hand' to begin.`]
+// "Tournament: ₹B for C chips." then the tournament items as a Settings line.
+const tournamentSetupLines = (t: PokerSettings) => {
+    const cash = { ...t, buyIn: undefined, startingChips: undefined, addOnPrice: undefined, addOnChips: undefined, payouts: undefined };
+    return [`Tournament: ₹${formatAmount(t.buyIn!)} for ${formatAmount(t.startingChips!)} chips.`, pokerChange(cash, t)!];
+};
+
+const entrant = (p: PokerPlayer, paid: number): Entrant => ({ id: p.id, name: p.name, phone: p.phoneNumber, paid, chips: p.stack });
+
+// In a tournament everyone starts with the starting chips for the buy-in; setup stacks are ignored.
+export const newPokerGame = (players: { name: string; stack: number; phoneNumber: string }[], settings: PokerSettings, now: number): PokerGameState => {
+    const seated = players.map((p, i) => newPlayer(i + 1, p.name, settings.tournament ? settings.startingChips! : p.stack, p.phoneNumber));
+    return {
+        ...createInitialPokerState(),
+        ...settings,
+        ...startClock(settings.levelMinutes, now),
+        players: seated,
+        entrants: settings.tournament ? seated.map(p => entrant(p, settings.buyIn!)) : undefined,
+        dealerButtonIndex: -1,
+        messages: [
+            `Game setup with ${players.length} players. Blinds are ${settings.smallBlindAmount}/${settings.bigBlindAmount}. Click 'Start Next Hand' to begin.`,
+            ...(settings.tournament ? tournamentSetupLines(settings) : []),
+        ],
+    };
+};
+
+export const pokerSettingsOf = (s: PokerGameState): PokerSettings => ({
+    smallBlindAmount: s.smallBlindAmount, bigBlindAmount: s.bigBlindAmount, levelMinutes: s.levelMinutes, ante: s.ante, straddle: s.straddle,
+    turnTimer: s.turnTimer, maxRebuys: s.maxRebuys, rebuyUntilLevel: s.rebuyUntilLevel, addOnAmount: s.addOnAmount,
+    minBuyIn: s.minBuyIn, maxBuyIn: s.maxBuyIn, bombEvery: s.bombEvery, bombAmount: s.bombAmount,
+    tournament: s.tournament, buyIn: s.buyIn, startingChips: s.startingChips, addOnPrice: s.addOnPrice, addOnChips: s.addOnChips, payouts: s.payouts,
 });
+
+// Setup stacks, joining stacks and rebuys must sit within the buy-in limits.
+export const buyInRefusal = (s: Pick<PokerSettings, 'minBuyIn' | 'maxBuyIn'>, amount: number) =>
+    s.minBuyIn !== undefined && amount < s.minBuyIn ? `Buy-in must be at least ₹${formatAmount(s.minBuyIn)}.`
+        : s.maxBuyIn !== undefined && amount > s.maxBuyIn ? `Buy-in must be at most ₹${formatAmount(s.maxBuyIn)}.` : null;
+
+// Between hands only. Changing the level minutes restarts the current level now; clearing them stops the clock.
+export const applySettings = (prev: PokerGameState, settings: PokerSettings, now: number, io: Io): PokerGameState => {
+    if (prev.gameStage !== 'pre-deal') {
+        io.log(MID_ROUND);
+        return prev;
+    }
+    const line = pokerChange(pokerSettingsOf(prev), settings);
+    const clock = settings.levelMinutes === prev.levelMinutes ? {}
+        : { levelEndsAt: settings.levelMinutes ? now + settings.levelMinutes * 60_000 : undefined, pausedRemainingMs: undefined };
+    return { ...prev, ...settings, tournament: prev.tournament, ...clock, messages: line ? [...prev.messages, line] : prev.messages };
+};
+
+export const toggleBombNext = (prev: PokerGameState, io: Io): PokerGameState => {
+    if (prev.gameStage !== 'pre-deal' || prev.bombAmount === undefined) return prev;
+    io.log(prev.bombNext ? 'Next hand is no longer a bomb pot.' : 'Next hand is a bomb pot.');
+    return { ...prev, bombNext: !prev.bombNext };
+};
+
+// --- Tournament ---
+const say = (s: PokerGameState, ...lines: string[]): PokerGameState => ({ ...s, messages: [...s.messages, ...lines] });
+const payoutsOf = (s: PokerGameState) => s.payouts ?? defaultPayouts(s.entrants!.length);
+const paidMore = (entrants: Entrant[], id: number, money: number, chips: number) =>
+    entrants.map(e => (e.id === id ? { ...e, paid: toPaise(e.paid + money), chips: e.chips + chips } : e));
+
+// One Lifetime Winnings row per entrant once the tournament ends: prize less money paid.
+const tournamentRecords = (entrants: Entrant[], io: Io) => io.records(entrants
+    .filter(e => e.phone && Math.abs(e.prize! - e.paid) >= 0.005)
+    .map(e => ({ phone: e.phone!, name: e.name, winnings: toPaise(e.prize! - e.paid) })));
+
+const finishTournament = (s: PokerGameState, io: Io): PokerGameState => {
+    const winner = s.players.find(p => p.stack > 0)!;
+    const table = prizeTable(poolPaise(s.entrants!), payoutsOf(s), s.entrants!.length);
+    const entrants = s.entrants!.map(e => {
+        const place = e.id === winner.id ? 1 : e.place!;
+        return { ...e, place, prize: (table[place - 1] ?? 0) / 100 };
+    });
+    const paidPlaces = entrants.filter(e => e.prize > 0).sort((a, b) => a.place - b.place);
+    tournamentRecords(entrants, io);
+    return say({ ...s, entrants, tournamentOver: true },
+        `Tournament over: ${paidPlaces.map(e => `${ordinal(e.place)} ${e.name} ₹${formatAmount(e.prize)}`).join(', ')}`);
+};
+
+// Places for the last hand's busted players, best first: place = players still in + 1.
+const placeBusted = (s: PokerGameState, io: Io): PokerGameState => {
+    const ranked = s.bust!.ranked;
+    const stillIn = s.players.filter(p => p.stack > 0).length;
+    const placeOf = new Map(ranked.map((id, i) => [id, stillIn + 1 + i]));
+    const entrants = s.entrants!.map(e => (placeOf.has(e.id) ? { ...e, place: placeOf.get(e.id) } : e));
+    const lines = ranked.map(id => `${s.entrants!.find(e => e.id === id)!.name} is out in ${ordinal(placeOf.get(id)!)} place.`);
+    const next = say({ ...s, entrants, bust: undefined }, ...lines);
+    return stillIn === 1 ? finishTournament(next, io) : next;
+};
+
+// After a tournament hand: who went to 0, ranked by chips at the start of the hand, then seat left of the dealer.
+const tournamentHandEnd = (s: PokerGameState, startChips: Map<number, number>, io: Io): PokerGameState => {
+    if (!s.entrants) return s;
+    const start = (id: number) => startChips.get(id) ?? 0;
+    const busted = s.players.filter(p => start(p.id) > 0 && p.stack === 0)
+        .sort((a, b) => start(b.id) - start(a.id) || seatFromDealer(s, a.id) - seatFromDealer(s, b.id));
+    if (busted.length === 0) return s;
+    const next = { ...s, bust: { ranked: busted.map(p => p.id), awaiting: busted.filter(p => !rebuyLimit(s, p)).map(p => p.id) } };
+    return next.bust.awaiting.length ? next : placeBusted(next, io);
+};
+
+// The bust prompt's REBUY (₹B for the starting chips) or OUT.
+export const bustChoice = (prev: PokerGameState, playerId: number, rebuy: boolean, io: Io): PokerGameState => {
+    const bust = prev.bust;
+    const player = prev.players.find(p => p.id === playerId);
+    if (!bust?.awaiting.includes(playerId) || !player) return prev;
+    let s: PokerGameState = { ...prev, bust: { ...bust, awaiting: bust.awaiting.filter(id => id !== playerId) } };
+    if (rebuy) {
+        const chips = prev.startingChips!;
+        s = say({
+            ...s,
+            players: s.players.map(p => (p.id === playerId ? { ...p, stack: p.stack + chips, totalBuyIn: p.totalBuyIn + chips, rebuys: (p.rebuys ?? 0) + 1 } : p)),
+            entrants: paidMore(s.entrants!, playerId, prev.buyIn!, chips),
+            bust: { ranked: bust.ranked.filter(id => id !== playerId), awaiting: s.bust!.awaiting },
+        }, `${player.name} rebuys: ₹${formatAmount(prev.buyIn!)} for ${formatAmount(chips)} chips.`);
+    }
+    return s.bust!.awaiting.length ? s : placeBusted(s, io);
+};
+
+// Ends early: decided places get their prize; the rest goes by chips, floored, leftover to the chip leader (first-listed on a tie).
+export const chop = (prev: PokerGameState, io: Io): PokerGameState => {
+    if (!prev.entrants || prev.tournamentOver) return prev;
+    if (prev.gameStage !== 'pre-deal' || prev.bust) {
+        io.log('Can only chop between hands.');
+        return prev;
+    }
+    const s = prev;
+    const pool = poolPaise(s.entrants!);
+    const table = prizeTable(pool, payoutsOf(s), s.entrants!.length);
+    const decided = (e: Entrant) => (e.place === undefined ? 0 : table[e.place - 1] ?? 0);
+    const rest = pool - s.entrants!.reduce((sum, e) => sum + decided(e), 0);
+    const remaining = s.players.filter(p => p.stack > 0).sort((a, b) => b.stack - a.stack);
+    const chips = remaining.reduce((sum, p) => sum + p.stack, 0);
+    const shares = remaining.map(p => Math.floor((rest * p.stack) / chips));
+    shares[0] += rest - shares.reduce((a, b) => a + b, 0);
+    const shareOf = new Map(remaining.map((p, i) => [p.id, shares[i]]));
+    const entrants = s.entrants!.map(e => ({ ...e, prize: (e.place === undefined ? shareOf.get(e.id) ?? 0 : decided(e)) / 100 }));
+    tournamentRecords(entrants, io);
+    return say({ ...s, entrants, tournamentOver: true, chopOrder: remaining.map(p => p.id) },
+        `Chop: ${remaining.map((p, i) => `${p.name} ₹${formatAmount(shares[i] / 100)}`).join(', ')}`);
+};
+
+// A tournament replaced or ended unfinished: the hand's chips go back, open bust prompts go out, then it is chopped.
+export const endTournament = (prev: PokerGameState, io: Io): PokerGameState => {
+    if (!prev.entrants || prev.tournamentOver) return prev;
+    const players = prev.players.map(p => ({ ...p, stack: p.stack + p.totalPotContribution - p.roundWinnings, totalPotContribution: 0, roundWinnings: 0 }));
+    const between: PokerGameState = { ...prev, gameStage: 'pre-deal', pot: [], players };
+    const placed = between.bust ? placeBusted({ ...between, bust: { ...between.bust, awaiting: [] } }, io) : between;
+    return placed.tournamentOver ? placed : chop(placed, io);
+};
 
 const advanceToNextStageOrShowdown = (currentState: PokerGameState, io: Io): PokerGameState => {
     const currentTotalPot = currentState.players.reduce((sum, p) => sum + p.totalPotContribution, 0);
@@ -106,7 +244,7 @@ const endOfHand = (winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameS
         const winnings = p.id === winner.id ? totalPot - p.totalPotContribution : -p.totalPotContribution;
         if (winnings !== 0) rows.push({ phone: p.phoneNumber, name: p.name, winnings });
     });
-    io.records(rows);
+    if (!prevGameState.entrants) io.records(rows); // tournament chips are never money
 
     const finalPlayers = updatedPlayers.map(p => {
         const playerWithReset = { ...p, roundBet: 0, totalPotContribution: 0, inHand: false, isAllIn: false, hasActed: false, canOnlyCall: false };
@@ -117,20 +255,22 @@ const endOfHand = (winner: PokerPlayer, updatedPlayers: PokerPlayer[], prevGameS
     const finalWinner = finalPlayers.find(p => p.id === winner.id)!;
     const nets = handNets(updatedPlayers.map(p => ({ ...p, roundWinnings: p.id === winner.id ? totalPot : 0 })));
 
-    return {
-        ...createInitialPokerState(),
-        players: finalPlayers.map(p => ({ ...p, roundWinnings: 0 })), // Reset round winnings
-        dealerButtonIndex: prevGameState.dealerButtonIndex,
-        smallBlindAmount: prevGameState.smallBlindAmount,
-        bigBlindAmount: prevGameState.bigBlindAmount,
-        levelMinutes: prevGameState.levelMinutes,
-        blindLevel: prevGameState.blindLevel,
-        levelEndsAt: prevGameState.levelEndsAt,
-        pausedRemainingMs: prevGameState.pausedRemainingMs,
-        departed: prevGameState.departed,
+    // Back between hands; settings, the clock, departures and counters carry on.
+    return tournamentHandEnd({
+        ...prevGameState,
+        players: finalPlayers.map(p => ({ ...p, roundWinnings: 0 })),
+        gameStage: 'pre-deal',
+        pot: [],
+        currentBet: 0,
+        lastRaiserId: null,
+        lastRaiseAmount: null,
+        activePlayerIndex: -1,
+        smallBlindIndex: -1,
+        bigBlindIndex: -1,
+        optionHolderId: undefined,
         stats: recordRound(prevGameState.stats ?? emptyStats(), nets, handCandidate(updatedPlayers, updatedPlayers.find(p => p.id === winner.id)), statsNames(updatedPlayers)),
         messages: [...prevGameState.messages, `--- HAND OVER ---`, foldOutLine(toTitleCase(winner.name), totalPot, winner.totalPotContribution, finalWinner.stack)],
-    };
+    }, new Map(updatedPlayers.map(p => [p.id, p.stack + p.totalPotContribution])), io);
 };
 
 export const playerAction = (prev: PokerGameState, action: PlayerAction, amount: number, io: Io): PokerGameState => {
@@ -252,7 +392,8 @@ export const playerAction = (prev: PokerGameState, action: PlayerAction, amount:
     const allBetsMatched = activeBettors.every(p => p.roundBet === newCurrentBet);
     const allHaveActed = activeBettors.every(p => p.hasActed);
 
-    if (allBetsMatched && allHaveActed) {
+    // One player left who can act and already matches: nobody could answer them, so no option either.
+    if (allBetsMatched && (allHaveActed || activeBettors.length <= 1)) {
         return advanceToNextStageOrShowdown({ ...prev, players, currentBet: newCurrentBet, lastRaiseAmount: newLastRaiseAmount }, io);
     }
 
@@ -266,71 +407,107 @@ export const playerAction = (prev: PokerGameState, action: PlayerAction, amount:
     return { ...prev, players, currentBet: newCurrentBet, lastRaiseAmount: newLastRaiseAmount, activePlayerIndex: nextIndex };
 };
 
+// Antes and blinds (and a straddle), or a bomb pot straight to the flop. The dealer button always moves.
 export const startNewHand = (prev: PokerGameState, io: Io): PokerGameState => {
+    if (prev.tournamentOver) {
+        io.log(TOURNAMENT_OVER);
+        return prev;
+    }
+    if (prev.bust?.awaiting.length) {
+        io.log(outOfChips(prev.players.find(p => p.id === prev.bust!.awaiting[0])!.name));
+        return prev;
+    }
     const playersWithChips = prev.players.filter(p => p.stack > 0 && !p.isTakingBreak);
     if (playersWithChips.length < 2) {
         io.log("Not enough active players with stacks to start a hand.");
         return prev;
     }
     const { state: leveled, line: levelLine } = tickLevel(prev, io.now());
+    const handNumber = (prev.handNumber ?? 0) + 1;
+    const bomb = prev.bombAmount !== undefined && (!!prev.bombNext || (!!prev.bombEvery && handNumber % prev.bombEvery === 0));
     const activePlayerIds = new Set(playersWithChips.map(p => p.id));
+    const n = prev.players.length;
 
     let newDealerIndex = prev.dealerButtonIndex;
-    do { newDealerIndex = (newDealerIndex + 1) % prev.players.length; } while (!activePlayerIds.has(prev.players[newDealerIndex].id));
-
-    let newSmallBlindIndex = newDealerIndex;
-    do { newSmallBlindIndex = (newSmallBlindIndex + 1) % prev.players.length; } while (!activePlayerIds.has(prev.players[newSmallBlindIndex].id));
-
-    let newBigBlindIndex = newSmallBlindIndex;
-    do { newBigBlindIndex = (newBigBlindIndex + 1) % prev.players.length; } while (!activePlayerIds.has(prev.players[newBigBlindIndex].id));
+    do { newDealerIndex = (newDealerIndex + 1) % n; } while (!activePlayerIds.has(prev.players[newDealerIndex].id));
 
     const newPlayers = prev.players.map(p => ({
-        ...p,
-        inHand: activePlayerIds.has(p.id),
-        isAllIn: false,
-        roundBet: 0,
-        totalPotContribution: 0,
-        hasActed: false,
-        canOnlyCall: false
+        ...p, inHand: activePlayerIds.has(p.id), isAllIn: false, roundBet: 0, totalPotContribution: 0, hasActed: false, canOnlyCall: false,
     }));
-
-    const sbPlayer = newPlayers[newSmallBlindIndex];
-    const sbAmount = Math.min(leveled.smallBlindAmount, sbPlayer.stack);
-    sbPlayer.stack -= sbAmount; sbPlayer.roundBet = sbAmount; sbPlayer.totalPotContribution = sbAmount;
-    if (sbPlayer.stack === 0) sbPlayer.isAllIn = true;
-
-    const bbPlayer = newPlayers[newBigBlindIndex];
-    const bbAmount = Math.min(leveled.bigBlindAmount, bbPlayer.stack);
-    bbPlayer.stack -= bbAmount; bbPlayer.roundBet = bbAmount; bbPlayer.totalPotContribution = bbAmount;
-    if (bbPlayer.stack === 0) bbPlayer.isAllIn = true;
-
-    let firstToActIndex = newBigBlindIndex;
-    do { firstToActIndex = (firstToActIndex + 1) % prev.players.length; } while (!newPlayers[firstToActIndex].inHand);
-
-    newPlayers[newSmallBlindIndex].hasActed = true;
-
-    return {
-        ...leveled,
-        players: newPlayers,
-        gameStage: 'pre-flop',
-        pot: [],
-        currentBet: leveled.bigBlindAmount,
-        lastRaiseAmount: leveled.bigBlindAmount,
-        activePlayerIndex: firstToActIndex,
-        dealerButtonIndex: newDealerIndex,
-        smallBlindIndex: newSmallBlindIndex,
-        bigBlindIndex: newBigBlindIndex,
-        messages: [
-            ...prev.messages,
-            `--- NEW HAND (#${prev.dealerButtonIndex + 2}) ---`,
-            ...(levelLine ? [levelLine] : []),
-            `Dealer button is on ${toTitleCase(newPlayers[newDealerIndex].name)}.`,
-            `${toTitleCase(sbPlayer.name)} posts small blind of ₹${sbAmount}.`,
-            `${toTitleCase(bbPlayer.name)} posts big blind of ₹${bbAmount}.`,
-            `Total Pot: ₹${sbAmount + bbAmount}`,
-            `Action is on ${toTitleCase(newPlayers[firstToActIndex].name)}.`,
-        ],
+    const dealtIn = newPlayers.filter(p => p.inHand);
+    const name = (i: number) => toTitleCase(newPlayers[i].name);
+    // The next seat after `from` that `ok` accepts (one always exists here).
+    const nextSeat = (from: number, ok: (p: PokerPlayer) => boolean) => {
+        let i = from;
+        do { i = (i + 1) % n; } while (!ok(newPlayers[i]));
+        return i;
     };
+    // Puts up to `amount` from the stack into the pot; live money also counts as this street's bet.
+    const post = (p: PokerPlayer, amount: number, live: boolean) => {
+        const paid = Math.min(amount, p.stack);
+        p.stack -= paid;
+        p.totalPotContribution += paid;
+        if (live) p.roundBet += paid;
+        if (p.stack === 0) p.isAllIn = true;
+        return paid;
+    };
+    const messages = [...prev.messages, `--- NEW HAND (#${handNumber}) ---`, ...(levelLine ? [levelLine] : []), `Dealer button is on ${name(newDealerIndex)}.`];
+    const base = { ...leveled, players: newPlayers, pot: [], dealerButtonIndex: newDealerIndex, handNumber, bombNext: false, messages };
+
+    if (bomb) {
+        dealtIn.forEach(p => post(p, prev.bombAmount!, false));
+        messages.push(`BOMB POT: ₹${formatAmount(prev.bombAmount!)} from ${dealtIn.length} players. Straight to the flop.`);
+        const flop = { ...base, currentBet: 0, lastRaiseAmount: leveled.bigBlindAmount, smallBlindIndex: -1, bigBlindIndex: -1, optionHolderId: undefined };
+        if (dealtIn.filter(p => !p.isAllIn).length < 2) {
+            messages.push("All betting is complete. Calculating final pots for showdown.");
+            return { ...flop, gameStage: 'showdown', pot: calculatePots(newPlayers), activePlayerIndex: -1 };
+        }
+        const first = nextSeat(newDealerIndex, p => p.inHand && !p.isAllIn);
+        messages.push(`Action starts with ${name(first)}.`);
+        return { ...flop, gameStage: 'flop', activePlayerIndex: first };
+    }
+
+    if (prev.ante) {
+        dealtIn.forEach(p => post(p, prev.ante!, false));
+        messages.push(`Antes: ₹${formatAmount(prev.ante)} from ${dealtIn.length} players.`);
+    }
+    const newSmallBlindIndex = nextSeat(newDealerIndex, p => activePlayerIds.has(p.id));
+    const newBigBlindIndex = nextSeat(newSmallBlindIndex, p => activePlayerIds.has(p.id));
+    const sbPlayer = newPlayers[newSmallBlindIndex];
+    const bbPlayer = newPlayers[newBigBlindIndex];
+    messages.push(`${name(newSmallBlindIndex)} posts small blind of ₹${post(sbPlayer, leveled.smallBlindAmount, true)}.`);
+    messages.push(`${name(newBigBlindIndex)} posts big blind of ₹${post(bbPlayer, leveled.bigBlindAmount, true)}.`);
+
+    let currentBet = leveled.bigBlindAmount;
+    let lastBlindIndex = newBigBlindIndex;
+    let optionHolder = bbPlayer;
+    if (prev.straddle && dealtIn.length >= 3) {
+        const straddleIndex = nextSeat(newBigBlindIndex, p => p.inHand);
+        const straddler = newPlayers[straddleIndex];
+        const amount = 2 * leveled.bigBlindAmount;
+        if (straddler.stack > amount) {
+            post(straddler, amount, true);
+            currentBet = amount;
+            lastBlindIndex = straddleIndex;
+            optionHolder = straddler;
+            messages.push(`${name(straddleIndex)} straddles ₹${formatAmount(amount)}.`);
+        } else {
+            messages.push(`No straddle this hand: ${name(straddleIndex)} is short.`);
+        }
+    }
+    sbPlayer.hasActed = true;
+
+    messages.push(`Total Pot: ₹${newPlayers.reduce((sum, p) => sum + p.totalPotContribution, 0)}`);
+    const blinds = { ...base, currentBet, lastRaiseAmount: currentBet, smallBlindIndex: newSmallBlindIndex, bigBlindIndex: newBigBlindIndex, optionHolderId: optionHolder.id };
+    // Antes and blinds can put players all-in: nobody left to act, or one player already matching, means showdown.
+    const canAct = dealtIn.filter(p => !p.isAllIn);
+    if (canAct.length === 0 || (canAct.length === 1 && canAct[0].roundBet >= Math.max(...dealtIn.map(p => p.roundBet)))) {
+        messages.push("All betting is complete. Calculating final pots for showdown.");
+        return { ...blinds, gameStage: 'showdown', pot: calculatePots(newPlayers), activePlayerIndex: -1 };
+    }
+    const firstToActIndex = nextSeat(lastBlindIndex, p => p.inHand && !p.isAllIn);
+    messages.push(`Action is on ${name(firstToActIndex)}.`);
+    return { ...blinds, gameStage: 'pre-flop', activePlayerIndex: firstToActIndex };
 };
 
 export const awardPot = (prev: PokerGameState, potIndex: number, winnerIds: number[], io: Io): PokerGameState => {
@@ -369,9 +546,10 @@ export const awardPot = (prev: PokerGameState, potIndex: number, winnerIds: numb
         const winnings = after.roundWinnings - before.totalPotContribution;
         if (winnings !== 0) rows.push({ phone: before.phoneNumber, name: before.name, winnings });
     });
-    io.records(rows);
+    if (!prev.entrants) io.records(rows);
 
-    return {
+    const startChips = new Map(newPlayers.map(p => [p.id, p.stack - p.roundWinnings + p.totalPotContribution]));
+    return tournamentHandEnd({
         ...prev,
         players: newPlayers.map(p => ({
             ...p,
@@ -388,7 +566,7 @@ export const awardPot = (prev: PokerGameState, potIndex: number, winnerIds: numb
         gameStage: 'pre-deal',
         activePlayerIndex: -1,
         stats: recordRound(prev.stats ?? emptyStats(), handNets(newPlayers), handCandidate(newPlayers), statsNames(newPlayers)),
-    };
+    }, startChips, io);
 };
 
 export const addPlayer = (prev: PokerGameState, name: string, stack: number, phoneNumber: string, io: Io): PokerGameState => {
@@ -396,7 +574,25 @@ export const addPlayer = (prev: PokerGameState, name: string, stack: number, pho
         io.log("Can only add players between hands.");
         return prev;
     }
+    if (prev.tournamentOver) {
+        io.log(TOURNAMENT_OVER);
+        return prev;
+    }
+    const limit = prev.entrants ? null : buyInRefusal(prev, stack);
+    if (limit) {
+        io.log(limit);
+        return prev;
+    }
     const newId = prev.players.length > 0 ? Math.max(...prev.players.map(p => p.id)) + 1 : 1;
+    if (prev.entrants) {
+        if (prev.bust || prev.entrants.some(e => e.place !== undefined)) {
+            io.log(LATE_ENTRY_CLOSED); // places count the players still in, so the field is fixed from the first bust
+            return prev;
+        }
+        const joined = newPlayer(newId, name, prev.startingChips!, phoneNumber);
+        io.log(`Player ${toTitleCase(name)} joins for ₹${formatAmount(prev.buyIn!)} with ${formatAmount(prev.startingChips!)} chips.`);
+        return { ...prev, players: [...prev.players, joined], entrants: [...prev.entrants, entrant(joined, prev.buyIn!)] };
+    }
     io.log(`Player ${toTitleCase(name)} has been added with a buy-in of ₹${stack}.`);
     return { ...prev, players: [...prev.players, newPlayer(newId, name, stack, phoneNumber)] };
 };
@@ -412,6 +608,15 @@ export const removePlayer = (prev: PokerGameState, playerId: number, io: Io): Po
         io.log(tooFewToRemove(1));
         return prev;
     }
+    if (prev.entrants) {
+        // An entrant who is out keeps their place, payment and prize; anyone else goes out first.
+        if (prev.entrants.find(e => e.id === playerId)?.place === undefined) {
+            io.log(GO_OUT);
+            return prev;
+        }
+        io.log(`Player ${toTitleCase(leaver.name)} has been removed from the game.`);
+        return { ...prev, players: prev.players.filter(p => p.id !== playerId) };
+    }
     const net = leaver.stack - leaver.totalBuyIn;
     io.log(`Player ${toTitleCase(leaver.name)} has been removed from the game.${departureNote(net)}`);
     return {
@@ -421,19 +626,60 @@ export const removePlayer = (prev: PokerGameState, playerId: number, io: Io): Po
     };
 };
 
+// Why a player may not rebuy (count limit, or level cut-off with a blind clock), or null.
+const rebuyLimit = (s: PokerGameState, player: PokerPlayer) => {
+    if (s.maxRebuys !== undefined && (player.rebuys ?? 0) >= s.maxRebuys) return `${toTitleCase(player.name)} has used all ${s.maxRebuys} rebuys.`;
+    if (s.rebuyUntilLevel !== undefined && s.levelMinutes && s.blindLevel > s.rebuyUntilLevel) return `Rebuys closed after level ${s.rebuyUntilLevel}.`;
+    return null;
+};
+
+// Why a cash rebuy is refused (limits above, then buy-in limits), or null.
+export const rebuyRefusal = (s: PokerGameState, player: PokerPlayer, amount: number) => rebuyLimit(s, player) ?? buyInRefusal(s, amount);
+
+// A rebuy (Manage Rebuys): adds chips and buy-in, and counts toward the rebuy limit.
 export const addChipsToPlayer = (prev: PokerGameState, playerId: number, amount: number, io: Io): PokerGameState => {
-    if (amount <= 0) return prev;
+    if (amount <= 0 || prev.entrants) return prev; // tournament rebuys go through the bust prompt
     if (prev.gameStage !== 'pre-deal') {
         io.log("Can only add chips between hands.");
         return prev;
     }
+    const player = prev.players.find(p => p.id === playerId);
+    if (!player) return prev;
+    const refused = rebuyRefusal(prev, player, amount);
+    if (refused) {
+        io.log(refused);
+        return prev;
+    }
+    io.log(`Added ₹${amount} to ${toTitleCase(player.name)}'s stack. Their total buy-in is now ₹${player.totalBuyIn + amount}.`);
     return {
         ...prev,
-        players: prev.players.map(p => {
-            if (p.id !== playerId) return p;
-            io.log(`Added ₹${amount} to ${toTitleCase(p.name)}'s stack. Their total buy-in is now ₹${p.totalBuyIn + amount}.`);
-            return { ...p, stack: p.stack + amount, totalBuyIn: p.totalBuyIn + amount };
-        }),
+        players: prev.players.map(p => (p.id === playerId ? { ...p, stack: p.stack + amount, totalBuyIn: p.totalBuyIn + amount, rebuys: (p.rebuys ?? 0) + 1 } : p)),
+    };
+};
+
+// Why an add-on is refused, or null: once per player, and only in level L+1 when rebuys close after level L.
+export const addOnRefusal = (s: PokerGameState, player: PokerPlayer) => {
+    if (player.tookAddOn) return `${toTitleCase(player.name)} already took the add-on.`;
+    if (s.rebuyUntilLevel !== undefined && s.levelMinutes && s.blindLevel !== s.rebuyUntilLevel + 1) return `Add-ons are open in level ${s.rebuyUntilLevel + 1}.`;
+    return null;
+};
+
+// Cash: A chips for ₹A. Tournament: K chips for ₹P, for players still in.
+export const takeAddOn = (prev: PokerGameState, playerId: number, io: Io): PokerGameState => {
+    const player = prev.players.find(p => p.id === playerId);
+    const price = prev.entrants ? prev.addOnPrice : prev.addOnAmount;
+    const chips = prev.entrants ? prev.addOnChips : prev.addOnAmount;
+    if (!player || !price || !chips || prev.entrants?.find(e => e.id === playerId)?.place !== undefined) return prev;
+    const refused = prev.tournamentOver ? TOURNAMENT_OVER : prev.gameStage !== 'pre-deal' ? "Can only add chips between hands." : addOnRefusal(prev, player);
+    if (refused) {
+        io.log(refused);
+        return prev;
+    }
+    io.log(`${toTitleCase(player.name)} takes the add-on: ₹${formatAmount(price)}${prev.entrants ? ` for ${formatAmount(chips)} chips` : ''}.`);
+    return {
+        ...prev,
+        players: prev.players.map(p => (p.id === playerId ? { ...p, stack: p.stack + chips, totalBuyIn: p.totalBuyIn + chips, tookAddOn: true } : p)),
+        entrants: prev.entrants && paidMore(prev.entrants, playerId, price, chips),
     };
 };
 
@@ -449,6 +695,10 @@ export const togglePlayerBreak = (prev: PokerGameState, playerId: number, io: Io
 
 export const applyStreakWinnings = (prev: PokerGameState, winnerId: number, amount: number, io: Io): PokerGameState => {
     if (amount <= 0) return prev;
+    if (prev.entrants) {
+        io.log(STREAK_OFF);
+        return prev;
+    }
     if (prev.gameStage !== 'pre-deal') {
         io.log("Can only give streak winnings between hands.");
         return prev;

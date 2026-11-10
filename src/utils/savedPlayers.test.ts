@@ -123,9 +123,10 @@ test('tombstones do not count toward the 200 cap', () => {
     assert.equal(upsertPlayers(full, [{ name: 'New', phone: '8000000000' }], NOW).refused, 0);
 });
 
-test('avatar: own colour, else phone digits mod 12; initials of the first two words; one emoji only', () => {
-    assert.equal(avatarColor({ phone: '9000000001' }), 10);
-    assert.equal(avatarColor({ phone: '9000000001', color: 3 }), 3);
+test('avatar: own colour, else phone digits (or the name code units) mod 12; initials of the first two words; one emoji only', () => {
+    assert.equal(avatarColor({ name: 'Asha', phone: '9000000001' }), 10);
+    assert.equal(avatarColor({ name: 'Asha', phone: '9000000001', color: 3 }), 3);
+    assert.equal(avatarColor({ name: 'Asha', phone: ' ' }), 9); // 65+115+104+97 = 381
     assert.equal(initials('Asha'), 'A');
     assert.equal(initials(' raj kumar singh '), 'RK');
     assert.equal(isOneEmoji('🃏'), true);

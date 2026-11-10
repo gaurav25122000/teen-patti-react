@@ -15,8 +15,14 @@ export interface SavedPlayer {
 export const AVATAR_COLORS = ['#00C6FF', '#FF416C', '#00F260', '#FDC830', '#B388FF', '#FF9100', '#18FFFF', '#FF80AB', '#69F0AE', '#FFD740', '#8C9EFF', '#FF6E40'];
 
 // The player's colour index: their own, else the sum of the phone's digits mod 12.
-export const avatarColor = (p: { phone: string; color?: number }) =>
-    p.color ?? [...p.phone].reduce((sum, d) => sum + (Number(d) || 0), 0) % AVATAR_COLORS.length;
+// Phone digit sum, or without a phone the name's UTF-16 code units, mod 12.
+export const avatarColor = (p: { name: string; phone: string; color?: number }) => {
+    if (p.color !== undefined) return p.color;
+    const sum = p.phone.trim()
+        ? [...p.phone].reduce((total, d) => total + (Number(d) || 0), 0)
+        : Array.from({ length: p.name.length }, (_, i) => p.name.charCodeAt(i)).reduce((a, b) => a + b, 0);
+    return sum % AVATAR_COLORS.length;
+};
 
 export const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('');
 

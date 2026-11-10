@@ -27,6 +27,12 @@ export interface PokerSettings {
     maxBuyIn?: number;
     bombEvery?: number; // hands
     bombAmount?: number;
+    tournament?: boolean; // chosen at setup
+    buyIn?: number;
+    startingChips?: number;
+    addOnPrice?: number;
+    addOnChips?: number;
+    payouts?: number[]; // percentages; blank uses the defaults by entrants
 }
 
 export interface BlackjackSettings {
@@ -91,22 +97,38 @@ export const parsePoker = (form: Form): PokerSettings | string => {
     const bb = num(form.bigBlindAmount);
     if (sb === null || bb === null || sb === undefined || bb === undefined || sb <= 0 || bb <= 0) return 'Blinds must be positive numbers.';
     if (bb < sb) return 'Big blind must be at least the small blind.';
+    const tournament = form.tournament === 'on';
     const r = readFields(form, [
         ['levelMinutes', inRange(1, 240), 'Blind level must be 1 to 240 minutes.'],
         ['ante', positive, AMOUNT],
         ['turnTimer', inRange(5, 300), TIMER],
         ['maxRebuys', wholeAtLeast1, COUNT],
         ['rebuyUntilLevel', wholeAtLeast1, COUNT],
-        ['addOnAmount', positive, AMOUNT],
-        ['minBuyIn', positive, AMOUNT],
-        ['maxBuyIn', positive, AMOUNT],
         ['bombEvery', wholeAtLeast1, COUNT],
         ['bombAmount', positive, AMOUNT],
+        ...(tournament
+            ? [['buyIn', positive, AMOUNT], ['startingChips', positive, AMOUNT], ['addOnPrice', positive, AMOUNT], ['addOnChips', positive, AMOUNT]] as [string, Check, string][]
+            : [['addOnAmount', positive, AMOUNT], ['minBuyIn', positive, AMOUNT], ['maxBuyIn', positive, AMOUNT]] as [string, Check, string][]),
     ]);
     if (typeof r === 'string') return r;
     if (r.minBuyIn !== undefined && r.maxBuyIn !== undefined && r.minBuyIn > r.maxBuyIn) return "Min buy-in can't be more than max buy-in.";
     if ((r.bombEvery === undefined) !== (r.bombAmount === undefined)) return 'Bomb pot needs both the hands and the amount.';
-    return { ...r, smallBlindAmount: sb, bigBlindAmount: bb, straddle: form.straddle === 'on' };
+    const settings = { ...r, smallBlindAmount: sb, bigBlindAmount: bb, straddle: form.straddle === 'on' };
+    if (!tournament) return settings;
+    if (r.buyIn === undefined || r.startingChips === undefined) return AMOUNT;
+    if ((r.addOnPrice === undefined) !== (r.addOnChips === undefined)) return 'Add-on needs both the price and the chips.';
+    const payouts = parsePayouts(form.payouts);
+    if (payouts === null) return 'Payouts must add up to 100%.';
+    return { ...settings, tournament: true, payouts };
+};
+
+// "50, 30, 20": each above 0, summing to 100. Blank is undefined (the defaults); bad input is null.
+const parsePayouts = (text: string | undefined): number[] | undefined | null => {
+    if (!(text ?? '').trim()) return undefined;
+    const pcts = text!.split(',').map(t => num(t));
+    if (pcts.some(p => p === null || p === undefined || p <= 0)) return null;
+    const list = pcts as number[];
+    return Math.abs(list.reduce((a, b) => a + b, 0) - 100) < 1e-9 ? list : null;
 };
 
 export const parseBlackjack = (form: Form): BlackjackSettings | string => {
@@ -159,6 +181,10 @@ const POKER_ITEMS: Item<PokerSettings>[] = [
     opt('minBuyIn', 'min buy-in', v => `min buy-in ${money(v)}`),
     opt('maxBuyIn', 'max buy-in', v => `max buy-in ${money(v)}`),
     { keys: ['bombEvery', 'bombAmount'], off: 'bomb pot', text: s => (s.bombEvery && s.bombAmount ? `bomb pot ${money(s.bombAmount)} every ${s.bombEvery} hands` : null) },
+    opt('buyIn', 'buy-in', v => `buy-in ${money(v)}`),
+    opt('startingChips', 'starting chips', v => `starting chips ${formatAmount(v)}`),
+    { keys: ['addOnPrice', 'addOnChips'], off: 'add-on', text: s => (s.addOnPrice && s.addOnChips ? `add-on ${money(s.addOnPrice)} for ${formatAmount(s.addOnChips)} chips` : null) },
+    { keys: ['payouts'], off: 'payouts', text: s => (s.payouts ? `payouts ${s.payouts.join('/')}%` : null) },
 ];
 
 const BLACKJACK_ITEMS: Item<BlackjackSettings>[] = [
@@ -173,7 +199,7 @@ const BLACKJACK_ITEMS: Item<BlackjackSettings>[] = [
 ];
 
 const changeLine = <S,>(items: Item<S>[], before: S, after: S): string | null => {
-    const changed = items.filter(item => item.keys.some(k => before[k] !== after[k])).map(item => item.text(after) ?? `${item.off} off`);
+    const changed = items.filter(item => item.keys.some(k => JSON.stringify(before[k]) !== JSON.stringify(after[k]))).map(item => item.text(after) ?? `${item.off} off`);
     return changed.length ? `Settings: ${changed.join(', ')}` : null;
 };
 

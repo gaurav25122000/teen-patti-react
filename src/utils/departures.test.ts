@@ -48,7 +48,7 @@ test('teen patti: departures survive the round reset', () => {
 });
 
 test('poker: the leaver\'s stack minus buy-in is kept, and departures survive a fold-out', () => {
-    let s = PK.newPokerGame([1, 2, 3].map(i => ({ name: `P${i}`, stack: 100, phoneNumber: String(9000000000 + i) })), { sb: 5, bb: 10 }, undefined, 0);
+    let s = PK.newPokerGame([1, 2, 3].map(i => ({ name: `P${i}`, stack: 100, phoneNumber: String(9000000000 + i) })), { smallBlindAmount: 5, bigBlindAmount: 10 }, 0);
     s = { ...s, players: s.players.map(p => (p.id === 3 ? { ...p, stack: 160 } : p.id === 1 ? { ...p, stack: 40 } : p)) };
     const { state } = runStep(s, (x, io) => PK.removePlayer(x, 3, io));
     assert.deepEqual(state.departed, [{ name: 'P3', phone: '9000000003', net: 60 }]);

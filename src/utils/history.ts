@@ -11,6 +11,7 @@ interface SettlementParts {
     transactions: Transaction[];
     carried: boolean | undefined; // someone started or joined with a balance (undefined: an older save can't tell)
     offBy?: number; // nets that no transfer covers; the summary says so
+    tournament?: string; // poker tournament prizes line
 }
 
 export interface HistoryEntry {
@@ -92,7 +93,7 @@ export const buildEntry = (game: GameKind, stats: NightStats, s: SettlementParts
     game,
     nets: playerNets(s.people),
     transactions: s.transactions.map(t => ({ ...t, paid: false })),
-    summary: summaryLines(stats, s.people, game, s.carried, s.offBy),
+    summary: summaryLines(stats, s.people, game, s.carried, s.offBy, s.tournament),
     updatedAt: now.getTime(),
 });
 

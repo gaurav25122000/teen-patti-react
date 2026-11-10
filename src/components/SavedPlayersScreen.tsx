@@ -52,7 +52,7 @@ const SavedPlayersScreen: React.FC = () => {
         if (persist(deleteEntry(all, p.phone), 'delete') && editingPhone === p.phone) reset();
     };
 
-    const shownColor = form.color ?? (form.phone.trim() ? avatarColor({ phone: form.phone.trim() }) : undefined);
+    const shownColor = form.color ?? (form.phone.trim() ? avatarColor({ name: form.name, phone: form.phone.trim() }) : undefined);
 
     return (
         <div className="setup-screen">

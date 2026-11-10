@@ -55,6 +55,11 @@ export const calculatePots = (players: PokerPlayer[]): Pot[] => {
     }
 
 
-    // Filter out empty pots
-    return pots.filter(p => p.amount > 0);
+    // Folded money above every live player's level has nobody to win it: it joins the pot below.
+    const won: Pot[] = [];
+    for (const pot of pots.filter(p => p.amount > 0)) {
+        if (pot.eligiblePlayers.size === 0 && won.length > 0) won[won.length - 1].amount += pot.amount;
+        else won.push(pot);
+    }
+    return won;
 };

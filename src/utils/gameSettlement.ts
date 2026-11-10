@@ -4,11 +4,14 @@ import type { Departure } from './departures.ts';
 import type { PokerGameState } from '../poker/types/pokerGameTypes.ts';
 import type { BlackjackGameState } from '../blackjack/types/blackjackGameTypes.ts';
 import { chipsWithBets } from '../blackjack/engine.ts';
+import { IN_PROGRESS, tournamentLine } from '../poker/tournament.ts';
 
 // Final Owings and history entries start from these nets. Chips still in play go back to their owners:
 // Teen Patti's pot, a Poker hand's pot (less pots already paid), Blackjack's unsettled bets.
 
-const settle = (players: OwingsPlayer[], entities: Entity[] = [], carried: boolean | undefined = false) => ({ ...settleParties(players, entities), carried });
+// notice: shown instead of transfers; tournament: the summary's prizes line.
+const settle = (players: OwingsPlayer[], entities: Entity[] = [], carried: boolean | undefined = false, extra: { notice?: string; tournament?: string } = {}) =>
+    ({ ...settleParties(players, entities), carried, ...extra });
 
 export type Settlement = ReturnType<typeof settle>;
 
@@ -28,9 +31,15 @@ export const teenPattiSettlement = (state: Pick<GameState, 'players' | 'entities
     return settle([...players, ...leavers(state.departed)], state.entities, state.carriedIn);
 };
 
-// Mid-hand, pots already paid out this hand are taken back too.
-export const pokerSettlement = (state: Pick<PokerGameState, 'players' | 'departed'>) =>
-    settle([...state.players.map(p => ({ ...p, stack: p.stack + p.totalPotContribution - (p.roundWinnings ?? 0) })), ...leavers(state.departed)]);
+// Mid-hand, pots already paid out this hand are taken back too. A tournament settles prizes less money paid, once over.
+export const pokerSettlement = (state: Pick<PokerGameState, 'players' | 'departed' | 'entrants' | 'tournamentOver' | 'chopOrder'>) => {
+    if (state.entrants) {
+        return state.tournamentOver
+            ? settle(state.entrants.map(e => ({ name: e.name, phoneNumber: e.phone, stack: e.prize, totalBuyIn: e.paid })), [], false, { tournament: tournamentLine(state.entrants, state.chopOrder) })
+            : settle([], [], false, { notice: IN_PROGRESS });
+    }
+    return settle([...state.players.map(p => ({ ...p, stack: p.stack + p.totalPotContribution - (p.roundWinnings ?? 0) })), ...leavers(state.departed)]);
+};
 
 // The house is in the transactions and people, not in the player nets.
 export const blackjackSettlement = (state: Pick<BlackjackGameState, 'players' | 'dealerNet' | 'departed'>) => settle([

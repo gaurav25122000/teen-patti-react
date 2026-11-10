@@ -54,7 +54,8 @@ export const recordRound = (
 // people: the settlement's people (the house is ignored for winner and loser). Labels come from
 // partyLabels over the people first, then stats names for anyone no longer at the table.
 // carried: true, false, or undefined for an older Teen Patti save that can't tell.
-export const summaryLines = (stats: NightStats, people: Person[], game: GameKind, carried: boolean | undefined, offBy = 0): string[] => {
+// tournament: the prizes line; a tournament's biggest pot is in chips.
+export const summaryLines = (stats: NightStats, people: Person[], game: GameKind, carried: boolean | undefined, offBy = 0, tournament?: string): string[] => {
     const labels = partyLabels([
         ...people.map(p => ({ key: p.key, name: p.title, phone: p.phone })),
         ...Object.entries(stats.names ?? {}).map(([key, name]) => ({ key, name, phone: phoneOfKey(key) })),
@@ -62,7 +63,8 @@ export const summaryLines = (stats: NightStats, people: Person[], game: GameKind
     const lines: string[] = [];
     if (stats.partial) lines.push("Stats start from the app update; earlier rounds aren't counted.");
     if (stats.biggest) {
-        lines.push(`${game === 'blackjack' ? 'Biggest win' : 'Biggest pot'}: ₹${formatAmount(stats.biggest.amount)} (${labels[stats.biggest.key]})`);
+        const amount = tournament ? `${formatAmount(stats.biggest.amount)} chips` : `₹${formatAmount(stats.biggest.amount)}`;
+        lines.push(`${game === 'blackjack' ? 'Biggest win' : 'Biggest pot'}: ${amount} (${labels[stats.biggest.key]})`);
     }
     const mostWins = Math.max(0, ...Object.values(stats.wins));
     if (mostWins >= 1) {
@@ -80,6 +82,7 @@ export const summaryLines = (stats: NightStats, people: Person[], game: GameKind
     }
     if (winner) lines.push(`Biggest winner: ${labels[winner.key]} +₹${formatAmount(winner.net)}`);
     if (loser) lines.push(`Biggest loser: ${labels[loser.key]} -₹${formatAmount(-loser.net)}`);
+    if (tournament) lines.push(tournament);
     if (carried) lines.push('Includes balances carried into this game.');
     if (carried === undefined) lines.push('May include balances carried into this game.');
     if (Math.abs(offBy) >= 0.005) lines.push(`Balances are off by ${offBy > 0 ? '+' : '-'}₹${formatAmount(Math.abs(offBy))}: settle the difference by hand.`);

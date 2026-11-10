@@ -15,6 +15,11 @@ import { phoneInUse } from '../../utils/savedPlayers';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
 import Celebration from '../../components/Celebration';
+import SettingsFields from '../../components/SettingsFields';
+import { parsePoker } from '../../utils/gameSettings';
+import { pokerFields, toForm } from '../../utils/settingsFields';
+import { pokerSettingsOf } from '../engine';
+import { formatAmount } from '../../utils/formatters';
 
 interface PokerGameScreenProps {
     pokerHook: ReturnType<typeof usePokerGame>;
@@ -22,7 +27,7 @@ interface PokerGameScreenProps {
     isReadOnly?: boolean;
 }
 
-type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown' | 'owings' | 'toggleBreak' | 'streakWinnings';
+type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'showdown' | 'owings' | 'toggleBreak' | 'streakWinnings' | 'settings' | 'addOn' | 'chop';
 
 const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteractionChange, isReadOnly = false }) => {
     const { gameState, actions, autoAwardPot, undo, canUndo } = pokerHook;
@@ -40,6 +45,11 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const [streakAmount, setStreakAmount] = useState('50');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
+    const [owingsNotice, setOwingsNotice] = useState<string | undefined>();
+    const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
+    const tournament = !!gameState.entrants;
+    const isOut = (id: number) => gameState.entrants?.find(e => e.id === id)?.place !== undefined;
+    const hasAddOn = tournament ? !!gameState.addOnPrice : !!gameState.addOnAmount;
     const [now, setNow] = useState(() => Date.now());
 
     // The blind clock display ticks once a second while levels are on.
@@ -89,7 +99,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 if (eligible.length > 0) setSelectedWinnerIds(new Set([eligible[0]]));
              }
         }
-        if ((modalMode === 'removePlayer' || modalMode === 'addChips' || modalMode === 'toggleBreak' || modalMode === 'streakWinnings') && players.length > 0 && !managePlayerId) {
+        if ((modalMode === 'removePlayer' || modalMode === 'addChips' || modalMode === 'toggleBreak' || modalMode === 'streakWinnings' || modalMode === 'addOn') && players.length > 0 && !managePlayerId) {
             setManagePlayerId(String(players[0].id));
         } else if (modalMode === 'addPlayer') {
             setManagePlayerId('');
@@ -122,16 +132,17 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     };
 
     const handleShowOwings = () => {
-        const { people, transactions, offBy } = pokerSettlement(gameState);
+        const { people, transactions, offBy, notice, tournament: prizes } = pokerSettlement(gameState);
         setTransactions(transactions);
-        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'poker', false, offBy));
+        setOwingsNotice(notice);
+        setSummary(notice ? [] : summaryLines(gameState.stats ?? emptyStats(), people, 'poker', false, offBy, prizes));
         setModalMode('owings');
     };
 
     const handleManagePlayers = () => {
         switch (modalMode) {
             case 'addPlayer': {
-                if (!addPlayerName.trim() || !addPlayerStack) return alert("Please enter name and stack.");
+                if (!addPlayerName.trim() || (!tournament && !addPlayerStack)) return alert("Please enter name and stack.");
                 if (!/^\d{10}$/.test(addPlayerPhone.trim())) {
                     return alert('Please enter a valid 10-digit phone number.');
                 }
@@ -158,6 +169,19 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 if (!streakAmount || parseInt(streakAmount, 10) <= 0) return alert("Please enter a valid amount.");
                 actions.applyStreakWinnings(parseInt(managePlayerId, 10), parseInt(streakAmount, 10));
                 break;
+            case 'addOn':
+                if (!managePlayerId) return alert("Please select a player.");
+                actions.takeAddOn(parseInt(managePlayerId, 10));
+                break;
+            case 'settings': {
+                const settings = parsePoker(settingsForm);
+                if (typeof settings === 'string') return alert(settings);
+                actions.applySettings(settings);
+                break;
+            }
+            case 'chop':
+                actions.chop();
+                break;
         }
         closeModal();
     };
@@ -180,6 +204,17 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         </div>
     );
 
+    const renderBustPrompt = () => {
+        const id = gameState.bust?.awaiting[0];
+        const player = players.find(p => p.id === id);
+        if (isReadOnly || gameStage !== 'pre-deal' || !player || modalMode !== 'none') return null;
+        const footer = <>
+            <button className="btn-modal btn-modal-secondary" onClick={() => actions.bustChoice(player.id, false)}>OUT</button>
+            <button className="btn-modal btn-modal-primary theme-default" onClick={() => actions.bustChoice(player.id, true)}>REBUY (₹{formatAmount(gameState.buyIn ?? 0)})</button>
+        </>;
+        return <InteractionModal isOpen={true} onClose={() => {}} title={`${toTitleCase(player.name)} is out of chips.`} theme="danger" footerContent={footer}>{null}</InteractionModal>;
+    };
+
     const renderModal = () => {
         if (modalMode === 'none') return null;
 
@@ -189,7 +224,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         }
 
         if (modalMode === 'owings') {
-            return <OwingsModal isOpen={true} onClose={closeModal} transactions={transactions} summary={summary} />;
+            return <OwingsModal isOpen={true} onClose={closeModal} transactions={transactions} summary={summary} notice={owingsNotice} />;
         }
 
         if (modalMode !== 'showdown') {
@@ -203,7 +238,9 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                     title = "Add New Player";
                     body = <>
                         <div className="form-group"><label>Player Name</label><input type="text" value={addPlayerName} onChange={e => setAddPlayerName(e.target.value)} /></div>
-                        <div className="form-group"><label>Starting Stack</label><input type="number" value={addPlayerStack} onChange={e => setAddPlayerStack(e.target.value)} /></div>
+                        {tournament
+                            ? <p>Buy-in ₹{formatAmount(gameState.buyIn ?? 0)} for {formatAmount(gameState.startingChips ?? 0)} chips.</p>
+                            : <div className="form-group"><label>Starting Stack</label><input type="number" value={addPlayerStack} onChange={e => setAddPlayerStack(e.target.value)} /></div>}
                         <div className="form-group"><label>Phone Number</label><input type="tel" value={addPlayerPhone} onChange={e => setAddPlayerPhone(e.target.value)} placeholder="10 digits" /></div>
                     </>;
                     break;
@@ -230,6 +267,22 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         <div className="form-group"><label>Amount (from each other player)</label><input type="number" value={streakAmount} onChange={e => setStreakAmount(e.target.value)} /></div>
                         <p className="text-muted" style={{ fontSize: '0.9em', marginTop: '10px' }}>This will deduct ₹{streakAmount} from everyone else and add the total to the selected player.</p>
                     </>;
+                    break;
+                case 'addOn':
+                    title = "Add-on";
+                    body = <>
+                        <div className="form-group"><label>Select Player</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{players.filter(p => !isOut(p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                        <p>{tournament ? `₹${formatAmount(gameState.addOnPrice ?? 0)} for ${formatAmount(gameState.addOnChips ?? 0)} chips.` : `₹${formatAmount(gameState.addOnAmount ?? 0)}.`}</p>
+                    </>;
+                    break;
+                case 'settings':
+                    title = "Settings";
+                    body = <SettingsFields fields={pokerFields(tournament)} form={settingsForm} onChange={setSettingsForm} />;
+                    break;
+                case 'chop':
+                    title = "CHOP";
+                    theme = 'danger';
+                    body = <p>Chop now? Players still in split the rest of the pool by chips.</p>;
                     break;
             }
 
@@ -306,7 +359,15 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         <button className="btn-primary" onClick={actions.startNewHand} disabled={isReadOnly || gameStage !== 'pre-deal'}>
                             Start Next Hand
                         </button>
-                        <button className="btn-secondary" onClick={() => setModalMode('addChips')} disabled={isReadOnly || gameStage !== 'pre-deal'}>Manage Rebuys</button>
+                        {!tournament && <button className="btn-secondary" onClick={() => setModalMode('addChips')} disabled={isReadOnly || gameStage !== 'pre-deal'}>Manage Rebuys</button>}
+                        {hasAddOn && <button className="btn-secondary" onClick={() => setModalMode('addOn')} disabled={isReadOnly || gameState.tournamentOver}>Add-on</button>}
+                        {gameState.bombAmount !== undefined && (
+                            <button className="btn-secondary" onClick={actions.toggleBombNext} disabled={isReadOnly}>
+                                Bomb pot next hand: {gameState.bombNext ? 'On' : 'Off'}
+                            </button>
+                        )}
+                        <button className="btn-secondary" onClick={() => { setSettingsForm(toForm(pokerSettingsOf(gameState))); setModalMode('settings'); }} disabled={isReadOnly}>Settings</button>
+                        {tournament && <button className="btn-danger" onClick={() => setModalMode('chop')} disabled={isReadOnly || gameState.tournamentOver}>CHOP</button>}
                         <button className="btn-secondary" onClick={() => setModalMode('addPlayer')} disabled={isReadOnly || gameStage !== 'pre-deal'}>Add Player</button>
                         <button className="btn-danger" onClick={() => setModalMode('removePlayer')} disabled={isReadOnly || gameStage !== 'pre-deal' || players.length < 1}>Remove Player</button>
                         <button className="btn-secondary" onClick={() => setModalMode('toggleBreak')} disabled={isReadOnly || gameStage !== 'pre-deal'}>
@@ -315,9 +376,11 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         <button className="btn-success" onClick={handleShowOwings} disabled={isReadOnly || gameStage !== 'pre-deal'}>
                             Final Owings
                         </button>
-                        <button className="btn-primary" style={{ backgroundColor: '#ff9800' }} onClick={() => setModalMode('streakWinnings')} disabled={isReadOnly}>
-                            Streak Winnings
-                        </button>
+                        {!tournament && (
+                            <button className="btn-primary" style={{ backgroundColor: '#ff9800' }} onClick={() => setModalMode('streakWinnings')} disabled={isReadOnly}>
+                                Streak Winnings
+                            </button>
+                        )}
                     </div>)}
 
                     {gameStage === 'pre-deal' && (
@@ -342,6 +405,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 </div>
             </div>
             {renderModal()}
+            {renderBustPrompt()}
         </>
     );
 };

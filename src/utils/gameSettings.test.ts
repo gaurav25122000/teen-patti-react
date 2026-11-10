@@ -29,6 +29,25 @@ test('poker settings: blinds, buy-in limits, bomb pot and counts', () => {
     assert.equal(parsePoker({ ...ok, ante: 'x' }), 'Amounts must be positive numbers.');
 });
 
+test('tournament settings: buy-in and chips required, add-on in pairs, payouts sum to 100', () => {
+    const t = { smallBlindAmount: '10', bigBlindAmount: '20', tournament: 'on', buyIn: '500', startingChips: '1000', minBuyIn: '50', addOnAmount: '99' };
+    const parsed = parsePoker({ ...t, payouts: '50, 30.5, 19.5', addOnPrice: '200', addOnChips: '1500' });
+    assert.ok(typeof parsed === 'object');
+    assert.deepEqual([parsed.tournament, parsed.buyIn, parsed.startingChips, parsed.addOnPrice, parsed.addOnChips, parsed.payouts], [true, 500, 1000, 200, 1500, [50, 30.5, 19.5]]);
+    assert.deepEqual([parsed.minBuyIn, parsed.addOnAmount], [undefined, undefined]); // cash-only fields are ignored
+    assert.equal((parsePoker(t) as { payouts?: number[] }).payouts, undefined);
+    assert.equal(parsePoker({ ...t, buyIn: '' }), 'Amounts must be positive numbers.');
+    assert.equal(parsePoker({ ...t, startingChips: '0' }), 'Amounts must be positive numbers.');
+    assert.equal(parsePoker({ ...t, addOnPrice: '200' }), 'Add-on needs both the price and the chips.');
+    for (const payouts of ['50, 30', '60, 50, -10', '100, 0', '50, x, 50', '50,,50']) {
+        assert.equal(parsePoker({ ...t, payouts }), 'Payouts must add up to 100%.', payouts);
+    }
+    const poker = { smallBlindAmount: 10, bigBlindAmount: 20, tournament: true, buyIn: 500, startingChips: 1000 };
+    assert.equal(pokerChange(poker, { ...poker, buyIn: 600, addOnPrice: 200, addOnChips: 1500, payouts: [60, 40] }), 'Settings: buy-in ₹600, add-on ₹200 for 1500 chips, payouts 60/40%');
+    assert.equal(pokerChange({ ...poker, payouts: [60, 40] }, { ...poker, payouts: [60, 40] }), null);
+    assert.equal(pokerChange({ ...poker, payouts: [60, 40] }, poker), 'Settings: payouts off');
+});
+
 test('blackjack settings', () => {
     assert.deepEqual(parseBlackjack({ blackjackPayout: '6to5', allowSurrender: 'on', minBet: '10', maxBet: '500', insurance: '', defaultHands: '2', bankerEvery: '', sideBets: 'on' }),
         { blackjackPayout: '6to5', allowSurrender: true, minBet: 10, maxBet: 500, insurance: false, defaultHands: 2, bankerEvery: undefined, sideBets: true });
