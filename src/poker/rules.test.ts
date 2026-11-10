@@ -263,3 +263,13 @@ test('tournament setup logs the buy-in and its settings; End game with a bust pr
     const ended = runStep(h, E.endTournament).state;
     assert.deepEqual(ended.messages.slice(-2), ['Raj is out in 3rd place.', 'Chop: Asha ₹1005, Dev ₹495']);
 });
+
+test('tournament: a player with no chips can\'t take the add-on, whether the bust prompt is open or they are placed', () => {
+    let s = tournament({ addOnPrice: 200, addOnChips: 1500 });
+    s = act(act(act(deal(s), 'all-in'), 'call'), 'fold');
+    while (s.gameStage === 'showdown') s = go(s, (x, io) => E.awardPot(x, 0, [1], io));
+    assert.deepEqual(s.bust?.awaiting, [2]);
+    assert.deepEqual(newLines(s, go(s, (x, io) => E.takeAddOn(x, 2, io))), ['Raj is out of chips.']);
+    const placed = go(s, (x, io) => E.bustChoice(x, 2, false, io));
+    assert.deepEqual(newLines(placed, go(placed, (x, io) => E.takeAddOn(x, 2, io))), ['Raj is out of chips.']);
+});

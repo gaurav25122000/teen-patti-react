@@ -155,7 +155,7 @@ export const newBlackjackGame = (players: { name: string; stack: number; phoneNu
             isTakingBreak: false,
             lastBets: Array(p.numHands).fill(initial.minBet),
         })),
-        messages: [`Game setup with ${players.length} players. Bets are locked to ₹${initial.minBet}. Click 'Deal Cards' to play or 'Change Bets' to unlock.`]
+        messages: [`Game setup with ${players.length} players. Bets are locked to ₹${initial.minBet}. Click DEAL to play or CHANGE BETS to unlock.`]
     };
     return game.bankerEvery ? withBanker(game, nextBanker(game.players)) : game;
 };
@@ -446,7 +446,7 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
             const currentHandIndex = player.hands.findIndex(h => h.id === prev.currentHandId);
             if (currentHandIndex === -1) return prev;
             io.log(`${label} splits.`);
-            const newHand: PlayerHand = { id: `${player.id}-hand-split-${io.now()}`, cards: [], bet: hand.bet, wager: hand.bet, status: 'playing', hasHit: false };
+            const newHand: PlayerHand = { id: `${player.id}-split-${player.hands.length}`, cards: [], bet: hand.bet, wager: hand.bet, status: 'playing', hasHit: false };
             newPlayers = newPlayers.map(p => {
                 if (p.id !== player.id) return p;
                 const hands = [...p.hands];

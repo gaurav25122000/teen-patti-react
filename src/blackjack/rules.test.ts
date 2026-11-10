@@ -113,3 +113,12 @@ test('a locked repeat bet is brought within the current table limits', () => {
     const big = { ...tighter, players: tighter.players.map(p => ({ ...p, lastBets: [500] })) };
     assert.deepEqual(deal(big).players.map(p => [p.hands[0].bet, p.stack]), [[100, 900], [100, 900]]);
 });
+
+test('two splits in the same moment get distinct hands, and the round still reaches the dealer', () => {
+    let s = deal(table(['Asha']));
+    s = act(act(s, 'split'), 'split'); // the clock never moves in runStep
+    const ids = s.players[0].hands.map(h => h.id);
+    assert.equal(new Set(ids).size, 3);
+    s = act(act(act(s, 'stand'), 'stand'), 'stand');
+    assert.equal(s.gameStage, 'dealer-turn');
+});

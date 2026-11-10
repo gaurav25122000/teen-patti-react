@@ -73,8 +73,10 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
 
     const currentPlayer = activePlayerIndex > -1 ? players[activePlayerIndex] : null;
     const betting = !!currentPlayer && gameStage !== 'pre-deal' && gameStage !== 'showdown';
+    const nextHand = (gameState.handNumber ?? 0) + 1;
+    const nextIsBomb = gameState.bombAmount !== undefined && (!!gameState.bombNext || (!!gameState.bombEvery && nextHand % gameState.bombEvery === 0));
     const timerLeft = useTurnTimer(isReadOnly ? undefined : gameState.turnTimer,
-        betting ? `${gameState.handNumber ?? 0}:${currentPlayer!.id}` : null, toTitleCase(currentPlayer?.name ?? ''));
+        betting ? `${gameState.handNumber ?? 0}:${gameStage}:${currentPlayer!.id}` : null, toTitleCase(currentPlayer?.name ?? ''));
 
     useEffect(() => {
         if (gameStage === 'showdown' && pot.length > 0) {
@@ -112,7 +114,11 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 if (eligible.length > 0) setSelectedWinnerIds(new Set([eligible[0]]));
              }
         }
-        if ((modalMode === 'removePlayer' || modalMode === 'addChips' || modalMode === 'toggleBreak' || modalMode === 'streakWinnings' || modalMode === 'addOn') && players.length > 0 && !managePlayerId) {
+        if (modalMode === 'addOn') {
+            // Only players still in are listed, so the default must be one of them.
+            const listed = players.filter(p => gameState.entrants?.find(e => e.id === p.id)?.place === undefined);
+            if (!listed.some(p => String(p.id) === managePlayerId)) setManagePlayerId(listed[0] ? String(listed[0].id) : '');
+        } else if ((modalMode === 'removePlayer' || modalMode === 'addChips' || modalMode === 'toggleBreak' || modalMode === 'streakWinnings') && players.length > 0 && !managePlayerId) {
             setManagePlayerId(String(players[0].id));
         } else if (modalMode === 'addPlayer') {
             setManagePlayerId('');
@@ -120,7 +126,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             setAddPlayerStack('1000');
             setAddPlayerPhone('');
         }
-    }, [modalMode, onInteractionChange, pot, players, managePlayerId]);
+    }, [modalMode, onInteractionChange, pot, players, managePlayerId, gameState.entrants]);
 
     const closeModal = () => {
         setModalMode('none');
@@ -384,13 +390,13 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                     timer={timerLeft === null ? null : clockText(timerLeft)}
                     onAction={actions.handlePlayerAction}
                 />
-            ) : gameStage === 'pre-deal' && (
+            ) : gameStage === 'pre-deal' && !gameState.bust?.awaiting.length && (
                 <ActionPanel
                     info={<>Between hands · Blinds ₹{gameState.smallBlindAmount}/₹{gameState.bigBlindAmount}{gameState.bombNext ? ' · Next hand is a bomb pot' : ''}</>}
                     buttons={[
                         { label: 'ADD PLAYER', onClick: () => setModalMode('addPlayer') },
                         { label: '☰ TABLE', onClick: () => setShowTable(true) },
-                        { label: 'DEAL', onClick: actions.startNewHand, kind: 'primary' },
+                        { label: nextIsBomb ? 'DEAL BOMB POT' : 'DEAL', onClick: actions.startNewHand, kind: 'primary' },
                     ]}
                 />
             ))}

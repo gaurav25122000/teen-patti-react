@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { cue } from '../utils/feedback';
 import { formatAmount } from '../utils/formatters';
 
@@ -18,8 +18,10 @@ interface ActionPanelProps {
 
 // The docked panel at the foot of a game screen; every button press taps before its action.
 const ActionPanel: React.FC<ActionPanelProps> = ({ info, stepper, error, buttons }) => {
+    const [typed, setTyped] = useState<string | null>(null); // the field's text while typing; a step or chip clears it
     const press = (fn: () => void) => () => {
         cue('tap');
+        setTyped(null);
         fn();
     };
     return (
@@ -28,8 +30,8 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ info, stepper, error, buttons
             {stepper && (
                 <div className="panel-stepper">
                     <button className="panel-step" onClick={press(stepper.onMinus)} aria-label="Less">−</button>
-                    <input type="text" inputMode="decimal" aria-label="Amount" value={formatAmount(stepper.amount)}
-                        onChange={e => { const n = Number(e.target.value); if (Number.isFinite(n)) stepper.onAmount(n); }} />
+                    <input type="text" inputMode="decimal" aria-label="Amount" value={typed ?? formatAmount(stepper.amount)}
+                        onChange={e => { setTyped(e.target.value); const n = Number(e.target.value); if (e.target.value.trim() && Number.isFinite(n)) stepper.onAmount(n); }} />
                     <button className="panel-step" onClick={press(stepper.onPlus)} aria-label="More">+</button>
                     {stepper.chips.map(c => (
                         <button key={c.label} className="panel-chip" onClick={press(() => stepper.onAmount(c.amount))}>{c.label}</button>

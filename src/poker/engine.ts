@@ -78,7 +78,7 @@ export const newPokerGame = (players: { name: string; stack: number; phoneNumber
         entrants: settings.tournament ? seated.map(p => entrant(p, settings.buyIn!)) : undefined,
         dealerButtonIndex: -1,
         messages: [
-            `Game setup with ${players.length} players. Blinds are ${settings.smallBlindAmount}/${settings.bigBlindAmount}. Click 'Start Next Hand' to begin.`,
+            `Game setup with ${players.length} players. Blinds are ${settings.smallBlindAmount}/${settings.bigBlindAmount}. Click DEAL to begin.`,
             ...(settings.tournament ? tournamentSetupLines(settings) : []),
         ],
     };
@@ -670,8 +670,10 @@ export const takeAddOn = (prev: PokerGameState, playerId: number, io: Io): Poker
     const player = prev.players.find(p => p.id === playerId);
     const price = prev.entrants ? prev.addOnPrice : prev.addOnAmount;
     const chips = prev.entrants ? prev.addOnChips : prev.addOnAmount;
-    if (!player || !price || !chips || prev.entrants?.find(e => e.id === playerId)?.place !== undefined) return prev;
-    const refused = prev.tournamentOver ? TOURNAMENT_OVER : prev.gameStage !== 'pre-deal' ? "Can only add chips between hands." : addOnRefusal(prev, player);
+    if (!player || !price || !chips) return prev;
+    // A tournament player with no chips between hands has busted (prompt open or already placed).
+    const refused = prev.tournamentOver ? TOURNAMENT_OVER : prev.gameStage !== 'pre-deal' ? "Can only add chips between hands."
+        : prev.entrants && player.stack < 0.005 ? outOfChips(player.name) : addOnRefusal(prev, player);
     if (refused) {
         io.log(refused);
         return prev;

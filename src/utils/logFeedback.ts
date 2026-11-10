@@ -11,17 +11,17 @@ export const addedLines = (prev: string[], next: string[]): string[] => {
     return prev.length === 0 ? next : next.slice(-1);
 };
 
-const TURN_LINE = '--- Turn is now on';
+const TURN_LINES = ['--- Turn is now on', 'Action is on ', 'Action starts with ', 'Turn is now on ', 'Player turn: '];
 
 // The newest line that isn't a turn change (else the last line), without a leading "ERROR: ".
 export const toastLine = (added: string[]): string | null => {
     if (added.length === 0) return null;
-    const line = [...added].reverse().find(l => !l.startsWith(TURN_LINE)) ?? added[added.length - 1];
+    const line = [...added].reverse().find(l => !TURN_LINES.some(t => l.startsWith(t))) ?? added[added.length - 1];
     return line.replace(/^ERROR: /, '');
 };
 
 const PRIORITY: [Sound, RegExp][] = [
-    ['error', /^ERROR: |^Can only|must see|^Max (chaal|blind bet)|^Boot is above|already playing|^Keep at least|needs more chips|^(Minimum|Maximum) bet|^Settings can only|has used all|^Rebuys closed|already took the add-on|^Add-ons are open|^Buy-in must|^Players leave a tournament|^No valid bets|^Not enough|off in tournaments/],
+    ['error', /^ERROR: |^Can only|must see|^Max (chaal|blind bet)|^Boot is above|already playing|^Keep at least|needs more chips|^(Minimum|Maximum) bet|^Settings can only|has used all|^Rebuys closed|already took the add-on|^Add-ons are open|^Buy-in must|^Players leave a tournament|^No valid bets|^Not enough|off in tournaments|is the banker this round|^Late entry is closed|^The tournament is over|^Side bets can be at most|^Place the hand's bet first|^Insurance is off|does not have enough chips|^Cannot |^Raise must be|^Bet must be|^Bets are locked|is out of chips\.$|^Please place|^Surrender is off|^Insurance is offered once|^No other active players/],
     ['win', /won the pot|wins? the pot|win\(s\) the pot|has BLACKJACK!|\) wins ₹|Streak Winnings!/],
     ['alarm', /^Pot limit/],
     ['level_up', /^Blinds up/],

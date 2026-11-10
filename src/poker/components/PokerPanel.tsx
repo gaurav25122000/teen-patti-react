@@ -25,10 +25,12 @@ const PokerPanel: React.FC<PokerPanelProps> = ({ gameState, currentPlayer, timer
     const minTotal = currentBet > 0 ? currentBet + (lastRaiseAmount || bigBlindAmount) : bigBlindAmount;
     const maxTotal = p.roundBet + p.stack;
     const canRaise = !p.canOnlyCall && p.stack > callAmount && !facingAllInCall;
-    const [amount, setAmount] = useState(Math.min(minTotal, maxTotal));
+    const floor = Math.min(minTotal, maxTotal); // a short stack can only go all-in
+    const [amount, setAmount] = useState(floor);
     const [error, setError] = useState<string | null>(null);
 
     const raise = () => {
+        if (amount >= maxTotal) return onAction('all-in'); // the whole stack, even short of a full raise
         if (currentBet > 0 && !(amount >= minTotal)) return setError(`Raise must be at least to ${minTotal}.`);
         if (currentBet === 0 && !(amount >= bigBlindAmount)) return setError(`Bet must be at least the big blind (${bigBlindAmount}).`);
         if (amount - p.roundBet > p.stack) return setError("You cannot raise more than your stack.");
@@ -45,7 +47,7 @@ const PokerPanel: React.FC<PokerPanelProps> = ({ gameState, currentPlayer, timer
     const buttons: PanelButton[] = [
         { label: 'FOLD', onClick: fold, kind: 'fold' },
         ...(canRaise ? [call] : []),
-        ...(facingAllInCall ? [] : [{ label: `ALL-IN ₹${p.stack}`, onClick: () => onAction('all-in') }]),
+        ...(facingAllInCall || p.canOnlyCall ? [] : [{ label: `ALL-IN ₹${p.stack}`, onClick: () => onAction('all-in') }]),
         canRaise ? { label: `${currentBet > 0 ? 'RAISE' : 'BET'} ₹${amount}`, onClick: raise, kind: 'primary' } : { ...call, kind: 'primary' },
     ];
 
@@ -55,8 +57,8 @@ const PokerPanel: React.FC<PokerPanelProps> = ({ gameState, currentPlayer, timer
             stepper={canRaise ? {
                 amount,
                 onAmount: setAmount,
-                onMinus: () => setAmount(a => stepDown(a, bigBlindAmount, minTotal)),
-                onPlus: () => setAmount(a => Math.min(maxTotal, stepUp(a, bigBlindAmount, minTotal))),
+                onMinus: () => setAmount(a => stepDown(a, bigBlindAmount, floor)),
+                onPlus: () => setAmount(a => Math.min(maxTotal, stepUp(a, bigBlindAmount, floor))),
                 chips: pokerChips({ pot, currentBet, bigBlind: bigBlindAmount, minTotal, maxTotal }),
             } : undefined}
             error={error}

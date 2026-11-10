@@ -202,7 +202,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                             ...(isBettingLocked ? [{ label: 'CHANGE BETS', onClick: actions.unlockAllBets }] : []),
                             { label: 'ADD PLAYER', onClick: () => handleShowModal('addPlayer') },
                             { label: '☰ TABLE', onClick: () => setShowTable(true) },
-                            { label: 'DEAL', onClick: actions.startRound, kind: 'primary' as const, disabled: !isBettingLocked && isDealDisabled },
+                            { label: isBettingLocked ? 'DEAL (SAME BETS)' : 'DEAL', onClick: actions.startRound, kind: 'primary' as const, disabled: !isBettingLocked && isDealDisabled },
                         ]}
                     />;
                 }

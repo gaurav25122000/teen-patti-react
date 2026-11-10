@@ -33,3 +33,14 @@ test('one sound per batch, by priority', () => {
     assert.equal(soundFor(["Time's up, Raj."]), null);
     assert.equal(soundFor([]), null);
 });
+
+test('turn lines of every game are skipped, and this round\'s refusals sound as errors', () => {
+    assert.equal(toastLine(['Asha calls ₹20.', 'Action is on Raj.']), 'Asha calls ₹20.');
+    assert.equal(toastLine(['Asha (Hand 1) stands.', 'Turn is now on Raj, Hand #1']), 'Asha (Hand 1) stands.');
+    assert.equal(toastLine(['--- Dealing the Flop ---', 'Action starts with Raj.']), '--- Dealing the Flop ---');
+    for (const line of ['Asha is the banker this round.', 'Late entry is closed: a player is already out.', 'The tournament is over.',
+        'Side bets can be at most ₹1000.', "Place the hand's bet first.", 'Insurance is off at this table.', 'Asha does not have enough chips.',
+        'Cannot bet more than your stack.', 'Raj is out of chips.']) {
+        assert.equal(soundFor([line]), 'error', line);
+    }
+});
