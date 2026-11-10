@@ -14,6 +14,7 @@ interface BlackjackGameSetupProps {
 
 const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) => {
     const [players, setPlayers] = useState([{ name: '', stack: '1000', phoneNumber: '', numHands: '1' }]);
+    const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState(() => toForm(blackjackSettingsOf(createInitialBlackjackState())));
     const emptyRow = () => ({ name: '', stack: '1000', phoneNumber: '', numHands: form.defaultHands || '1' });
 
@@ -39,23 +40,21 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
             }));
 
         if (finalPlayers.length < 1) {
-            alert("Please add at least 1 player.");
-            return;
+            return setError("Please add at least 1 player.");
         }
 
         for (const player of finalPlayers) {
             if (!/^\d{10}$/.test(player.phoneNumber)) {
-                return alert(`Invalid phone number for Player ${player.name}. Must be 10 digits.`);
+                return setError(`Invalid phone number for Player ${player.name}. Must be 10 digits.`);
             }
             if (player.numHands < 1) {
-                 alert(`Player ${player.name} must play at least 1 hand.`);
-                 return;
+                 return setError(`Player ${player.name} must play at least 1 hand.`);
             }
         }
         const dup = duplicatePhone(finalPlayers.map(p => p.phoneNumber));
-        if (dup) return alert(`Two players have the phone ${dup}.`);
+        if (dup) return setError(`Two players have the phone ${dup}.`);
         const settings = parseBlackjack(form);
-        if (typeof settings === 'string') return alert(settings);
+        if (typeof settings === 'string') return setError(settings);
 
         onStartGame(finalPlayers, settings);
     };
@@ -110,6 +109,7 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
             <div className="setup-actions">
                 <button className="btn-secondary" onClick={addPlayerField}>Add seat</button>
                 <button className="btn btn-start rainbow-outline" onClick={handleStart}>Start Blackjack Game</button>
+                {error && <p className="form-error">{error}</p>}
             </div>
         </div>
     );

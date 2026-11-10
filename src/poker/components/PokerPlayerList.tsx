@@ -63,7 +63,7 @@ const PokerPlayerList: React.FC<PokerPlayerListProps> = ({ players, gameState })
                             <tr key={p.id} className={className} data-player-id={p.id}>
                                 <td data-label="Name">
                                     <Avatar name={p.name} phone={p.phoneNumber} saved={saved} /> {toTitleCase(p.name)} {status}
-                                    <span style={{ marginLeft: '8px', opacity: p.winningStreak > 0 ? 1 : 0.3 }} title="Winning Streak">🔥 {p.winningStreak}</span>
+                                    <span style={{ marginLeft: '8px', opacity: p.winningStreak > 0 ? 1 : 0.7 }} title="Winning Streak">🔥 {p.winningStreak}</span>
                                 </td>
                                 <td data-label="Stack / Buy-In">₹ {p.stack} / ₹ {p.totalBuyIn}</td>
                                 <td data-label="Round Bet">₹ {p.roundBet}</td>

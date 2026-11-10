@@ -17,6 +17,7 @@ const SHOWN = ['smallBlindAmount', 'bigBlindAmount', 'buyIn', 'startingChips'];
 
 const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
     const [players, setPlayers] = useState([{ name: '', stack: '1000', phoneNumber: '' }]);
+    const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<Record<string, string>>({ smallBlindAmount: '10', bigBlindAmount: '20', buyIn: '500', startingChips: '1000' });
     const tournament = form.tournament === 'on';
     const fields = pokerFields(tournament);
@@ -37,22 +38,21 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
             .map(p => ({ name: toTitleCase(p.name), stack: Number(p.stack) || 0, phoneNumber: p.phoneNumber.trim() }));
 
         if (finalPlayers.length < 2) {
-            alert("Please add at least 2 players.");
-            return;
+            return setError("Please add at least 2 players.");
         }
 
         for (const player of finalPlayers) {
             if (!/^\d{10}$/.test(player.phoneNumber)) {
-                return alert(`Invalid phone number for Player ${player.name}. Must be 10 digits.`);
+                return setError(`Invalid phone number for Player ${player.name}. Must be 10 digits.`);
             }
         }
         const dup = duplicatePhone(finalPlayers.map(p => p.phoneNumber));
-        if (dup) return alert(`Two players have the phone ${dup}.`);
+        if (dup) return setError(`Two players have the phone ${dup}.`);
 
         const settings = parsePoker(form);
-        if (typeof settings === 'string') return alert(settings);
+        if (typeof settings === 'string') return setError(settings);
         const limit = tournament ? null : finalPlayers.map(p => buyInRefusal(settings, p.stack)).find(Boolean);
-        if (limit) return alert(limit);
+        if (limit) return setError(limit);
 
         onStartGame(finalPlayers, settings);
     };
@@ -100,6 +100,7 @@ const PokerGameSetup: React.FC<PokerGameSetupProps> = ({ onStartGame }) => {
             <div className="setup-actions">
                 <button className="btn-secondary" onClick={addPlayerField}>Add seat</button>
                 <button className="btn btn-start rainbow-outline" onClick={handleStart}>Start Poker Game</button>
+                {error && <p className="form-error">{error}</p>}
             </div>
         </div>
     );

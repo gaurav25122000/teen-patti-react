@@ -35,8 +35,8 @@
   background: rgba(13, 13, 26, 0.9);
   border: 1px solid rgba(0, 255, 255, 0.5);
   text-align: center;
-  font-size: 0.72rem;
-  line-height: 1.3;
+  font-size: 0.75rem;
+  line-height: 1.1;
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 
@@ -61,11 +61,11 @@
 }
 
 .table-seat.folded {
-  opacity: 0.45;
+  filter: grayscale(1); /* not opacity: seat text stays at least white70 */
 }
 
 .table-seat.on-break {
-  opacity: 0.35;
+  filter: grayscale(1);
   border-style: dashed;
 }
 
@@ -89,6 +89,5 @@
 @media (max-width: 480px) {
   .table-seat {
     width: 74px;
-    font-size: 0.62rem;
   }
 }

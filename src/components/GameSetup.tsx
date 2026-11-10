@@ -18,6 +18,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
     const emptySeat = { name: '', balance: '0', phoneNumber: '' };
     const [playerInputs, setPlayerInputs] = useState<{ name: string; balance: string; phoneNumber: string; }[]>([emptySeat, emptySeat]);
     const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
+    const [error, setError] = useState<string | null>(null);
 
     const handlePlayerInputChange = (index: number, field: 'name' | 'balance' | 'phoneNumber', value: string) => {
         setPlayerInputs(prev => {
@@ -32,19 +33,19 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
         for (const [index, input] of playerInputs.entries()) {
             const balance = Number(input.balance);
             if (!input.name.trim() || isNaN(balance)) {
-                return alert(`Invalid name or balance for Player ${index + 1}.`);
+                return setError(`Invalid name or balance for Player ${index + 1}.`);
             }
             const phoneNumber = input.phoneNumber.trim();
             if (!/^\d{10}$/.test(phoneNumber)) {
-                return alert(`Invalid phone number for Player ${index + 1}. Must be 10 digits.`);
+                return setError(`Invalid phone number for Player ${index + 1}. Must be 10 digits.`);
             }
             newPlayers.push({ id: index + 1, name: toTitleCase(input.name), balance, phoneNumber, isTakingBreak: false });
         }
-        if (newPlayers.length < 2) return alert("Need at least 2 players.");
+        if (newPlayers.length < 2) return setError("Need at least 2 players.");
         const dup = duplicatePhone(newPlayers.map(p => p.phoneNumber ?? ''));
-        if (dup) return alert(`Two players have the phone ${dup}.`);
+        if (dup) return setError(`Two players have the phone ${dup}.`);
         const settings = parseTeenPatti(settingsForm);
-        if (typeof settings === 'string') return alert(settings);
+        if (typeof settings === 'string') return setError(settings);
         onStartNewGame(newPlayers, settings);
     };
 
@@ -92,6 +93,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
                         <SettingsFields fields={TEEN_PATTI_FIELDS} form={settingsForm} onChange={setSettingsForm} />
                     </details>
                     <button className="btn btn-start rainbow-outline" onClick={handleStartGame} style={{ marginTop: '1rem' }}>Start Game</button>
+                    {error && <p className="form-error">{error}</p>}
             </div>
         </div>
     );

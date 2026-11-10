@@ -43,11 +43,13 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     const [parties, setParties] = useState<Party[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
     const [settingsForm, setSettingsForm] = useState<Record<string, string> | null>(null);
+    const [settingsError, setSettingsError] = useState<string | null>(null);
     const banker = players.find(p => p.id === gameState.bankerId);
 
     const openSettings = () => {
         if (isReadOnly) return;
         setSettingsForm(toForm(blackjackSettingsOf(gameState)));
+        setSettingsError(null);
         onInteractionChange(true);
     };
     const closeSettings = () => {
@@ -56,7 +58,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     };
     const saveSettings = () => {
         const settings = parseBlackjack(settingsForm ?? {});
-        if (typeof settings === 'string') return alert(settings);
+        if (typeof settings === 'string') return setSettingsError(settings);
         actions.applySettings(settings);
         closeSettings();
     };
@@ -239,7 +241,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
 
             {settingsForm && (
                 <InteractionModal isOpen={true} onClose={closeSettings} title="Settings" theme="default"
-                    footerContent={<><button className="btn-modal btn-modal-secondary" onClick={closeSettings}>Cancel</button><button className="btn-modal btn-modal-primary theme-default" onClick={saveSettings}>Confirm</button></>}>
+                    footerContent={<><button className="btn-modal btn-modal-secondary" onClick={closeSettings}>Cancel</button><button className="btn-modal btn-modal-primary theme-default" onClick={saveSettings}>Confirm</button></>} error={settingsError}>
                     <SettingsFields fields={BLACKJACK_FIELDS} form={settingsForm} onChange={setSettingsForm} />
                 </InteractionModal>
             )}

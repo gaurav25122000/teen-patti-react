@@ -298,7 +298,6 @@ h1 {
 
 .player-list .folded {
   filter: grayscale(80%);
-  opacity: 0.5;
 }
 
 .player-list .folded td {

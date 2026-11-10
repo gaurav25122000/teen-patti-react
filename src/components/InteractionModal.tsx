@@ -10,6 +10,7 @@ interface InteractionModalProps {
     icon?: React.ReactNode;
     children: React.ReactNode; // For the main body content
     footerContent: React.ReactNode; // For the buttons in the footer
+    error?: string | null; // shown in red under the form
 
     // --- Control functions ---
     onClose: () => void;
@@ -23,7 +24,8 @@ const InteractionModal: React.FC<InteractionModalProps> = ({
     theme = 'default',
     icon,
     children,
-    footerContent
+    footerContent,
+    error
 }) => {
     // If the modal isn't open, render nothing
     if (!isOpen) {
@@ -46,6 +48,7 @@ const InteractionModal: React.FC<InteractionModalProps> = ({
             {/* Main body where the form/message goes */}
             <div className="modal-body">
                 {children}
+                {error && <p className="form-error">{error}</p>}
             </div>
 
             {/* Footer where the action buttons go */}

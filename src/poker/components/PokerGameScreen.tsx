@@ -9,6 +9,7 @@ import { clockText, useTurnTimer } from '../../hooks/useTurnTimer';
 import { END_GAME_CONFIRM } from '../../utils/archive';
 import ActionLog from '../../components/ActionLog';
 import InteractionModal from '../../components/InteractionModal';
+import { useFormError } from '../../hooks/useFormError';
 import OwingsModal from '../../components/OwingsModal';
 import type { Party } from '../../utils/owingsLogic';
 import { toTitleCase } from '../../utils/formatters';
@@ -41,6 +42,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const { players, activePlayerIndex, messages, gameStage, pot } = gameState;
 
     const [modalMode, setModalMode] = useState<ModalMode>('none');
+    const [formError, setFormError] = useFormError(modalMode);
     useWakeLock(readAppSettings().keepAwake);
     const [showTable, setShowTable] = useState(false);
 
@@ -135,7 +137,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         if (selectedWinnerIds.size > 0) {
             actions.awardPot(0, Array.from(selectedWinnerIds));
         } else {
-            alert("Please select at least one winner.");
+            setFormError("Please select at least one winner.");
         }
     };
 
@@ -160,40 +162,40 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const handleManagePlayers = () => {
         switch (modalMode) {
             case 'addPlayer': {
-                if (!addPlayerName.trim() || (!tournament && !addPlayerStack)) return alert("Please enter name and stack.");
+                if (!addPlayerName.trim() || (!tournament && !addPlayerStack)) return setFormError("Please enter name and stack.");
                 if (!/^\d{10}$/.test(addPlayerPhone.trim())) {
-                    return alert('Please enter a valid 10-digit phone number.');
+                    return setFormError('Please enter a valid 10-digit phone number.');
                 }
                 const taken = phoneInUse(players, addPlayerPhone);
-                if (taken) return alert(taken);
+                if (taken) return setFormError(taken);
                 actions.addPlayer(addPlayerName, Number(addPlayerStack), addPlayerPhone.trim());
                 break;
             }
             case 'removePlayer':
-                if (!managePlayerId) return alert("Please select a player to remove.");
+                if (!managePlayerId) return setFormError("Please select a player to remove.");
                 actions.removePlayer(parseInt(managePlayerId, 10));
                 setManagePlayerId('');
                 break;
             case 'addChips':
-                if (!managePlayerId) return alert("Please select a player.");
+                if (!managePlayerId) return setFormError("Please select a player.");
                 actions.addChipsToPlayer(parseInt(managePlayerId, 10), Number(addChipsAmount));
                 break;
             case 'toggleBreak':
-                if (!managePlayerId) return alert("Please select a player.");
+                if (!managePlayerId) return setFormError("Please select a player.");
                 actions.togglePlayerBreak(parseInt(managePlayerId, 10));
                 break;
             case 'streakWinnings':
-                if (!managePlayerId) return alert("Please select a player.");
-                if (!streakAmount || Number(streakAmount) <= 0) return alert("Please enter a valid amount.");
+                if (!managePlayerId) return setFormError("Please select a player.");
+                if (!streakAmount || Number(streakAmount) <= 0) return setFormError("Please enter a valid amount.");
                 actions.applyStreakWinnings(parseInt(managePlayerId, 10), Number(streakAmount));
                 break;
             case 'addOn':
-                if (!managePlayerId) return alert("Please select a player.");
+                if (!managePlayerId) return setFormError("Please select a player.");
                 actions.takeAddOn(parseInt(managePlayerId, 10));
                 break;
             case 'settings': {
                 const settings = parsePoker(settingsForm);
-                if (typeof settings === 'string') return alert(settings);
+                if (typeof settings === 'string') return setFormError(settings);
                 actions.applySettings(settings);
                 break;
             }
@@ -307,7 +309,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
 
             footer = <><button className="btn-modal btn-modal-secondary" onClick={closeModal}>Cancel</button><button className={`btn-modal btn-modal-primary theme-${theme}`} onClick={handleManagePlayers}>Confirm</button></>;
 
-            return <InteractionModal isOpen={true} onClose={closeModal} title={title} theme={theme} footerContent={footer}>{body}</InteractionModal>;
+            return <InteractionModal isOpen={true} onClose={closeModal} title={title} theme={theme} footerContent={footer} error={formError}>{body}</InteractionModal>;
         }
 
         const currentPot = pot[0];
@@ -360,7 +362,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         </div>;
         const footer = <button className="btn-modal btn-modal-primary theme-success" onClick={handleAwardPot}>Award Pot to Winner</button>;
 
-        return <InteractionModal isOpen={true} onClose={closeModal} title={title} theme={theme} footerContent={footer}>{body}</InteractionModal>;
+        return <InteractionModal isOpen={true} onClose={closeModal} title={title} theme={theme} footerContent={footer} error={formError}>{body}</InteractionModal>;
     }
 
     return (

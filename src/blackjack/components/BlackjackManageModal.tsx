@@ -4,6 +4,7 @@ import type { BlackjackPlayer } from '../types/blackjackGameTypes';
 import InteractionModal from '../../components/InteractionModal';
 import { toTitleCase } from '../../utils/formatters';
 import { phoneInUse } from '../../utils/savedPlayers';
+import { useFormError } from '../../hooks/useFormError';
 
 export type ModalMode = 'none' | 'addPlayer' | 'removePlayer' | 'addChips' | 'toggleBreak' | 'updateHands';
 
@@ -25,6 +26,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
     onAddPlayer, onRemovePlayer, onAddChips, onToggleBreak, onUpdateHands, defaultHands
 }) => {
     const [managePlayerId, setManagePlayerId] = useState<string>('');
+    const [formError, setFormError] = useFormError(mode);
     const [addPlayerName, setAddPlayerName] = useState('');
     const [addPlayerStack, setAddPlayerStack] = useState('1000');
     const [addPlayerPhone, setAddPlayerPhone] = useState('');
@@ -74,12 +76,12 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
                 <div className="form-group"><label>Number of Hands</label><input type="number" min="1" value={addPlayerNumHands} onChange={e => setAddPlayerNumHands(e.target.value)} /></div>
             </>;
             confirmAction = () => {
-                 if (!addPlayerName.trim() || !addPlayerStack) return alert("Please enter name and stack.");
+                 if (!addPlayerName.trim() || !addPlayerStack) return setFormError("Please enter name and stack.");
                 if (!/^\d{10}$/.test(addPlayerPhone.trim())) {
-                    return alert('Please enter a valid 10-digit phone number.');
+                    return setFormError('Please enter a valid 10-digit phone number.');
                 }
                 const taken = phoneInUse(players, addPlayerPhone);
-                if (taken) return alert(taken);
+                if (taken) return setFormError(taken);
                 onAddPlayer(addPlayerName, Number(addPlayerStack), addPlayerPhone.trim(), parseInt(addPlayerNumHands, 10));
                 onClose();
             };
@@ -89,7 +91,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
             theme = 'danger';
             body = <div className="form-group"><label>Select Player to Remove</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{playerOptions}</select></div>;
             confirmAction = () => {
-                if (!managePlayerId) return alert("Please select a player.");
+                if (!managePlayerId) return setFormError("Please select a player.");
                 onRemovePlayer(parseInt(managePlayerId, 10));
                 setManagePlayerId('');
                 onClose();
@@ -102,7 +104,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
                 <div className="form-group"><label>Amount to Add</label><input type="number" inputMode="decimal" value={addChipsAmount} onChange={e => setAddChipsAmount(e.target.value)} /></div>
             </>;
             confirmAction = () => {
-                if (!managePlayerId) return alert("Please select a player.");
+                if (!managePlayerId) return setFormError("Please select a player.");
                 onAddChips(parseInt(managePlayerId, 10), Number(addChipsAmount));
                 onClose();
             };
@@ -111,7 +113,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
             title = "Break";
             body = <div className="form-group"><label>Select Player</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{playerBreakOptions}</select></div>;
             confirmAction = () => {
-                 if (!managePlayerId) return alert("Please select a player.");
+                 if (!managePlayerId) return setFormError("Please select a player.");
                 onToggleBreak(parseInt(managePlayerId, 10));
                 onClose();
             };
@@ -123,7 +125,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
                 <div className="form-group"><label>New Number of Hands</label><input type="number" min="1" value={updateNumHands} onChange={e => setUpdateNumHands(e.target.value)} /></div>
             </>;
             confirmAction = () => {
-                 if (!managePlayerId) return alert("Please select a player.");
+                 if (!managePlayerId) return setFormError("Please select a player.");
                  onUpdateHands(parseInt(managePlayerId, 10), parseInt(updateNumHands, 10));
                  onClose();
             };
@@ -132,7 +134,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
 
     footer = <><button className="btn-modal btn-modal-secondary" onClick={onClose}>Cancel</button><button className={`btn-modal btn-modal-primary theme-${theme}`} onClick={confirmAction}>Confirm</button></>;
 
-    return <InteractionModal isOpen={true} onClose={onClose} title={title} theme={theme} footerContent={footer}>{body}</InteractionModal>;
+    return <InteractionModal isOpen={true} onClose={onClose} title={title} theme={theme} footerContent={footer} error={formError}>{body}</InteractionModal>;
 };
 
 export default BlackjackManageModal;

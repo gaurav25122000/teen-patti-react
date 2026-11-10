@@ -29,6 +29,7 @@ import { useWakeLock } from '../hooks/useWakeLock';
 import { readAppSettings } from '../utils/appSettings';
 import { clockText, useTurnTimer } from '../hooks/useTurnTimer';
 import { END_GAME_CONFIRM } from '../utils/archive';
+import { useFormError } from '../hooks/useFormError';
 
 // --- SVG Icons ---
 const IconTrophy = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9a9 9 0 119 0zM16.5 18.75a9 9 0 00-9 0m9 0a9 9 0 01-9 0m9 0v-4.5A3.375 3.375 0 0012 10.5h-1.5a3.375 3.375 0 00-3.375 3.375v4.5m5.906-9.043c.124.083.242.172.355.267.112.096.22.2.322.308.1.107.196.22.286.338a3.743 3.743 0 01.286.338c.107.112.208.228.308.347.1.118.19.242.27.375M8.094 9.457c.124-.083.242-.172.355-.267.112-.096.22-.2.322-.308.1-.107.196-.22.286-.338a3.743 3.743 0 00.286-.338c.107-.112.208-.228.308-.347.1-.118.19-.242.27-.375" /></svg>;
@@ -49,6 +50,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     const { gameState, activePlayers, currentPlayer, precedingPlayer, addMessage, actions, undo, canUndo } = gameHook;
 
     const [interaction, setInteraction] = useState<InteractionType>('idle');
+    const [formError, setFormError] = useFormError(interaction);
     const [showTable, setShowTable] = useState(false);
     useWakeLock(readAppSettings().keepAwake);
     const timerLeft = useTurnTimer(isReadOnly ? undefined : gameState.turnTimer,
@@ -151,12 +153,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
             while (players[nextPlayerIndex].isTakingBreak) {
                 nextPlayerIndex = (nextPlayerIndex + 1) % players.length;
             }
-            const refusal = actions.startRound(nextPlayerIndex, roundInitialBootAmount);
-            if (refusal) alert(refusal);
+            setFormError(actions.startRound(nextPlayerIndex, roundInitialBootAmount));
         } else {
             setInteraction('gettingBoot');
         }
-    }, [gameState, actions, addMessage]);
+    }, [gameState, actions, addMessage, setFormError]);
 
     const handleShowClick = () => {
         const requester = currentPlayer;
@@ -193,11 +194,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 confirmText = "Set & Continue";
                 primaryAction = () => {
                     const refusal = bootRefusal(gameState, nextBoot(gameState, Number(bootAmount)));
-                    if (refusal) return alert(refusal);
+                    if (refusal) return setFormError(refusal);
                     if (Number(bootAmount) > 0) {
                         setInteraction('gettingStartPlayer');
                     } else {
-                        alert('Invalid boot amount.');
+                        setFormError('Invalid boot amount.');
                     }
                 };
                 break;
@@ -247,10 +248,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     primaryAction = () => {
                         const cost = gameState.blindPlayerIds.has(requester!.id) ? gameState.currentStake : gameState.currentStake * 2;
                         const refusal = actions.requestShow(cost);
-                        if (refusal) {
-                            alert(refusal);
-                            return closeModal();
-                        }
+                        if (refusal) return setFormError(refusal);
                         actions.resolveShow(parseInt(selectedPlayerId, 10));
                         addMessage(`${toTitleCase(requester!.name)} pays ₹ ${cost} for Show with ${toTitleCase(target!.name)}.`);
                         closeModal();
@@ -268,12 +266,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     </>
                 );
                 primaryAction = () => {
-                    if (!addPlayerName.trim()) return alert('Player name cannot be empty.');
+                    if (!addPlayerName.trim()) return setFormError('Player name cannot be empty.');
                     if (!/^\d{10}$/.test(addPlayerPhone.trim())) {
-                        return alert('Please enter a valid 10-digit phone number.');
+                        return setFormError('Please enter a valid 10-digit phone number.');
                     }
                     const taken = phoneInUse(gameState.players, addPlayerPhone);
-                    if (taken) return alert(taken);
+                    if (taken) return setFormError(taken);
                     actions.addPlayer(addPlayerName, Number(addPlayerBalance) || 0, addPlayerPhone.trim());
                     closeModal();
                 };
@@ -325,7 +323,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 confirmText = "Save";
                 primaryAction = () => {
                     const settings = parseTeenPatti(settingsForm);
-                    if (typeof settings === 'string') return alert(settings);
+                    if (typeof settings === 'string') return setFormError(settings);
                     actions.applySettings(settings);
                     closeModal();
                 };
@@ -335,7 +333,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 title = "Deduct & Distribute"; theme = 'danger'; icon = <IconCash />;
                 body = <><div className="form-group"><label>Deduct from</label><select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>)}</select></div><div className="form-group"><label>Amount</label><input type="number" inputMode="decimal" value={deductAmount} onChange={e => setDeductAmount(Number(e.target.value))} /></div></>;
                 primaryAction = () => {
-                    if (deductAmount > 0) actions.deductAndDistribute(parseInt(selectedPlayerId, 10), deductAmount);
+                    if (!(deductAmount > 0)) return setFormError('Please enter a valid amount.');
+                    actions.deductAndDistribute(parseInt(selectedPlayerId, 10), deductAmount);
                     closeModal();
                 };
                 break;
@@ -343,7 +342,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
         footer = <><button className="btn-modal btn-modal-secondary" onClick={closeModal}>Cancel</button><button className={`btn-modal btn-modal-primary theme-${theme}`} onClick={primaryAction}>{confirmText}</button></>;
 
-        return <InteractionModal isOpen={true} onClose={closeModal} title={title} theme={theme} icon={icon} footerContent={footer}>{body}</InteractionModal>;
+        return <InteractionModal isOpen={true} onClose={closeModal} title={title} theme={theme} icon={icon} footerContent={footer} error={formError}>{body}</InteractionModal>;
     }
 
 
@@ -381,6 +380,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 />
             ) : !roundActive && (
                 <ActionPanel
+                    error={interaction === 'idle' ? formError : null}
                     info={<>Between rounds{gameState.roundInitialBootAmount ? ` · Boot ₹${gameState.roundInitialBootAmount}` : ''}</>}
                     buttons={[
                         { label: 'ADD PLAYER', onClick: () => setInteraction('addingPlayer') },
