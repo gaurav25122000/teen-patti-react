@@ -24,6 +24,7 @@ const LifetimeWinnings = lazy(() => import('./components/LifetimeWinnings'));
 const SavedPlayersScreen = lazy(() => import('./components/SavedPlayersScreen'));
 const HistoryScreen = lazy(() => import('./components/HistoryScreen'));
 const PlayerStatsScreen = lazy(() => import('./components/PlayerStatsScreen'));
+const AppSettingsScreen = lazy(() => import('./components/AppSettingsScreen'));
 const SyncScreen = lazy(() => import('./components/SyncScreen'));
 const SpectatorWrapper = lazy(() => import('./components/SpectatorWrapper'));
 
@@ -75,6 +76,7 @@ function App() {
         <Route path="/saved-players" element={<SavedPlayersScreen />} />
         <Route path="/history" element={<HistoryScreen />} />
         <Route path="/stats" element={<PlayerStatsScreen />} />
+        <Route path="/settings" element={<AppSettingsScreen />} />
         <Route path="/sync" element={<SyncScreen />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

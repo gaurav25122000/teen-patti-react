@@ -1,5 +1,6 @@
 // src/components/OwingsModal.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { cue } from '../utils/feedback';
 import { throughTransfers, type Party, type Transaction } from '../utils/owingsLogic';
 import InteractionModal from './InteractionModal';
 import ShareButtons from './ShareButtons';
@@ -25,6 +26,7 @@ const OwingsContent: React.FC<Omit<OwingsModalProps, 'isOpen'>> = ({ onClose, tr
     const [{ list: saved, failed: savedFailed }] = useState(() => loadSavedPlayers());
     const [payNote, setPayNote] = useState<string | null>(null);
     const [hub, setHub] = useState(-1); // -1: fewest transfers
+    useEffect(() => cue('settle'), []);
     const transactions = hub < 0 ? fewest : throughTransfers(parties, hub);
 
     return (

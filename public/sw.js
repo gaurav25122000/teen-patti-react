@@ -1,6 +1,7 @@
 // Offline cache so local game management works without a network. Streaming and Lifetime Winnings still need one.
 const CACHE = 'bets-manager-v1';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
+const SOUNDS = ['alarm', 'card', 'chip', 'deal', 'error', 'fold', 'level_up', 'new_round', 'raise', 'see', 'settle', 'share', 'show', 'tap', 'tick', 'undo', 'win'].map(name => `/sounds/${name}.wav`);
+const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', ...SOUNDS];
 
 const isHtml = response => (response.headers.get('content-type') || '').includes('text/html');
 

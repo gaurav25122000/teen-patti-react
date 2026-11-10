@@ -37,21 +37,26 @@ const drawCard = (lines: string[]): Promise<Blob> => {
     return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('No image'))), 'image/png'));
 };
 
-// Resolves false when nothing could be shared or saved; a cancelled share sheet counts as done.
-export const shareCard = async (lines: string[]): Promise<boolean> => {
+// 'cancelled' when the share sheet was dismissed; 'failed' when nothing could be shared or saved.
+export const shareCard = async (lines: string[]): Promise<'shared' | 'cancelled' | 'failed'> => {
     try {
         const file = new File([await drawCard(lines)], 'settlement.png', { type: 'image/png' });
         if (navigator.canShare?.({ files: [file] })) {
-            await navigator.share({ files: [file] }).catch(err => { if (err?.name !== 'AbortError') throw err; });
-            return true;
+            try {
+                await navigator.share({ files: [file] });
+            } catch (err) {
+                if ((err as Error)?.name === 'AbortError') return 'cancelled';
+                throw err;
+            }
+            return 'shared';
         }
         const url = URL.createObjectURL(file);
         const a = Object.assign(document.createElement('a'), { href: url, download: 'settlement.png' });
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        return true;
+        return 'shared';
     } catch (err) {
         console.error('Could not share the settlement image:', err);
-        return false;
+        return 'failed';
     }
 };

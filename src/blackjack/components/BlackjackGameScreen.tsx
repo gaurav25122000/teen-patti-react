@@ -14,6 +14,9 @@ import { blackjackSettlement } from '../../utils/gameSettlement';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
 import Celebration from '../../components/Celebration';
+import LogFeedback from '../../components/LogFeedback';
+import { useWakeLock } from '../../hooks/useWakeLock';
+import { readAppSettings } from '../../utils/appSettings';
 import InteractionModal from '../../components/InteractionModal';
 import SettingsFields from '../../components/SettingsFields';
 import { parseBlackjack } from '../../utils/gameSettings';
@@ -32,6 +35,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     const { players, messages, gameStage, currentPlayerId, currentHandId, dealerNet, isBettingLocked } = gameState; // ADDED isBettingLocked
 
     const [modalMode, setModalMode] = useState<ModalMode>('none');
+    useWakeLock(readAppSettings().keepAwake);
     const [showOwings, setShowOwings] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [parties, setParties] = useState<Party[]>([]);
@@ -109,7 +113,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
 
     return (
         <>
-            {isReadOnly && <ActionToast messages={messages} />}
+            {isReadOnly ? <ActionToast messages={messages} /> : <LogFeedback messages={messages} />}
             <Celebration messages={messages} />
             <div className="blackjack-game-screen">
                 <div className="player-list-container">

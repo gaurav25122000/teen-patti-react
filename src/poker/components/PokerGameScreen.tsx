@@ -15,6 +15,9 @@ import { phoneInUse } from '../../utils/savedPlayers';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
 import Celebration from '../../components/Celebration';
+import LogFeedback from '../../components/LogFeedback';
+import { useWakeLock } from '../../hooks/useWakeLock';
+import { readAppSettings } from '../../utils/appSettings';
 import SettingsFields from '../../components/SettingsFields';
 import { parsePoker } from '../../utils/gameSettings';
 import { pokerFields, toForm } from '../../utils/settingsFields';
@@ -34,6 +37,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const { players, activePlayerIndex, messages, gameStage, pot } = gameState;
 
     const [modalMode, setModalMode] = useState<ModalMode>('none');
+    useWakeLock(readAppSettings().keepAwake);
 
     const [selectedWinnerIds, setSelectedWinnerIds] = useState<Set<number>>(new Set());
 
@@ -348,7 +352,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
 
     return (
         <>
-            {isReadOnly && <ActionToast messages={messages} />}
+            {isReadOnly ? <ActionToast messages={messages} /> : <LogFeedback messages={messages} />}
             <Celebration messages={messages} />
             <div className="game-screen">
                 <div className="player-list-container">

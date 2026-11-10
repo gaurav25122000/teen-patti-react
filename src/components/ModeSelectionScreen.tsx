@@ -30,6 +30,9 @@ const ModeSelectionScreen: React.FC = () => {
         <Link to="/sync" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
           Sync
         </Link>
+        <Link to="/settings" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
+          Settings
+        </Link>
       </div>
     </div>
   );

@@ -1199,6 +1199,22 @@ h1 {
   color: #fff;
   z-index: 10000;
 }
+.action-toast {
+  position: fixed;
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  max-width: 90vw;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(20, 20, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 14px;
+  text-align: center;
+  pointer-events: none;
+  z-index: 9999;
+}
 .toast-copy {
   width: 100%;
   min-height: 6rem;

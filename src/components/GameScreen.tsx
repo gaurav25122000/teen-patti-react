@@ -23,6 +23,9 @@ import { phoneInUse } from '../utils/savedPlayers';
 import StreamControls from './StreamControls';
 import ActionToast from './ActionToast';
 import Celebration from './Celebration';
+import LogFeedback from './LogFeedback';
+import { useWakeLock } from '../hooks/useWakeLock';
+import { readAppSettings } from '../utils/appSettings';
 
 // --- SVG Icons ---
 const IconTrophy = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9a9 9 0 119 0zM16.5 18.75a9 9 0 00-9 0m9 0a9 9 0 01-9 0m9 0v-4.5A3.375 3.375 0 0012 10.5h-1.5a3.375 3.375 0 00-3.375 3.375v4.5m5.906-9.043c.124.083.242.172.355.267.112.096.22.2.322.308.1.107.196.22.286.338a3.743 3.743 0 01.286.338c.107.112.208.228.308.347.1.118.19.242.27.375M8.094 9.457c.124-.083.242-.172.355-.267.112-.096.22-.2.322-.308.1-.107.196-.22.286-.338a3.743 3.743 0 00.286-.338c.107-.112.208-.228.308-.347.1-.118.19-.242.27-.375" /></svg>;
@@ -43,6 +46,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     const { gameState, activePlayers, currentPlayer, precedingPlayer, addMessage, actions, undo, canUndo } = gameHook;
 
     const [interaction, setInteraction] = useState<InteractionType>('idle');
+    useWakeLock(readAppSettings().keepAwake);
     const [showOwings, setShowOwings] = useState(false);
     const [showEntityManager, setShowEntityManager] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -335,7 +339,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
     return (
         <>
-            {isReadOnly && <ActionToast messages={gameState.messages} />}
+            {isReadOnly ? <ActionToast messages={gameState.messages} /> : <LogFeedback messages={gameState.messages} />}
             <Celebration messages={gameState.messages} />
             <div className="game-screen">
                 <div className="player-list-container">
