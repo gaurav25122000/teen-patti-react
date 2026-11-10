@@ -1,6 +1,6 @@
 // src/types/gameTypes.ts
 import type { NightStats } from '../utils/nightStats';
-import type { TableRules } from '../utils/teenPattiRules';
+import type { TeenPattiSettings } from '../utils/gameSettings';
 import type { Departure } from '../utils/departures';
 
 export interface Player {
@@ -17,7 +17,7 @@ export interface Entity {
     name:string;
 }
 
-export interface GameState extends TableRules {
+export interface GameState extends TeenPattiSettings {
   players: Player[];
   entities: Entity[];
   lastWinnerId: number | null;
@@ -34,6 +34,8 @@ export interface GameState extends TableRules {
   stats?: NightStats; // absent in saves from before the night summary
   carriedIn?: boolean; // a player started or joined with a non-zero balance; absent in older saves (unknown)
   departed?: Departure[]; // removed players, still settled
+  dealerId?: number; // set when a round starts: the player before the starter
+  roundsStarted?: number; // since setup, for the boot rise
   messages: string[];
 }
 
@@ -48,4 +50,4 @@ export type InteractionType =
   | 'reorderingPlayers'
   | 'deductAndDistribute'
   | 'toggleBreak' // ADDED
-  | 'tableRules';
+  | 'settings';

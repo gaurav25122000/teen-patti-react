@@ -10,7 +10,8 @@ import { useEngineIo } from './useEngineIo';
 import { teenPattiSettlement } from '../utils/gameSettlement';
 import { archiveOrWarn } from '../utils/archive';
 import { rememberPlayers } from '../utils/savedPlayers';
-import { betRefusal, bootRefusal, type TableRules } from '../utils/teenPattiRules';
+import { betRefusal, bootRefusal, nextBoot } from '../utils/teenPattiRules';
+import type { TeenPattiSettings } from '../utils/gameSettings';
 import * as engine from './teenPattiEngine';
 import type { Io } from '../utils/engine';
 
@@ -43,10 +44,10 @@ export const useTeenPattiGame = () => {
 
   const endRound = (winner: Player | null) => step((s, io) => engine.endRound(s, winner?.id ?? null, io));
 
-  const startNewGame = (newPlayers: Player[], rules: TableRules = {}) => {
+  const startNewGame = (newPlayers: Player[], settings: TeenPattiSettings = {}) => {
     setGameState(prev => {
       afterCommit(() => archiveOrWarn('teen-patti', prev.stats, teenPattiSettlement(prev)));
-      return engine.newGame(newPlayers, rules);
+      return engine.newGame(newPlayers, settings);
     });
     const full = rememberPlayers(newPlayers.map(p => ({ name: p.name, phone: p.phoneNumber })));
     if (full) addMessage(full);
@@ -55,7 +56,7 @@ export const useTeenPattiGame = () => {
   // Empties the game without saving it to history (used after handing the game to another phone).
   const clearGame = () => setGameState(engine.createInitialGameState());
 
-  const updateTableRules = (rules: TableRules) => step(s => engine.updateTableRules(s, rules));
+  const applySettings = (settings: TeenPattiSettings) => step((s, io) => engine.applySettings(s, settings, io));
 
   const loadGame = () => {
     const loadedState = loadStateFromLocalStorage();
@@ -71,7 +72,7 @@ export const useTeenPattiGame = () => {
   };
 
   const startRound = (startingPlayerIndex: number, bootAmount: number): string | null => {
-    const bootRefused = bootRefusal(gameState, bootAmount);
+    const bootRefused = bootRefusal(gameState, nextBoot(gameState, bootAmount));
     if (bootRefused) {
       addMessage(bootRefused, true);
       return bootRefused;
@@ -158,7 +159,7 @@ export const useTeenPattiGame = () => {
       updatePlayers,
       togglePlayerBreak,
       clearGame,
-      updateTableRules,
+      applySettings,
     })
   };
 };

@@ -5,6 +5,7 @@ import type { Player, GameState } from '../types/gameTypes';
 import { toTitleCase } from '../utils/formatters';
 import TableView, { ViewToggle } from './TableView';
 import { useStoredState } from '../hooks/useStoredState';
+import { dealerOf } from '../utils/teenPattiRules';
 
 interface PlayerListProps {
     players: Player[];
@@ -16,6 +17,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
     // Players who left still count, so the net shows whether the table balances.
     const netBalance = players.reduce((acc, player) => acc + player.balance, 0) + (gameState.departed ?? []).reduce((acc, d) => acc + d.net, 0);
     const [view, setView] = useStoredState('seatView', 'list');
+    const dealerId = dealerOf(gameState);
 
     const rows = players.map(p => {
         const isFolded = gameState.foldedPlayerIds.has(p.id);
@@ -45,7 +47,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
             <h3>Players ({players.length}) <ViewToggle view={view} onChange={setView} /></h3>
             {view === 'table' ? (
                 <TableView
-                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), amount: `₹ ${p.balance}`, status, className }))}
+                    seats={rows.map(({ p, status, className }) => ({ id: p.id, name: toTitleCase(p.name), amount: `₹ ${p.balance}`, status, className, dealer: p.id === dealerId }))}
                     center={<>Pot ₹{gameState.potAmount}<br />Stake ₹{gameState.currentStake}</>}
                 />
             ) : (
@@ -64,7 +66,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, gameState, currentPlay
                         return (
                             <tr key={p.id} className={className} data-player-id={p.id}>
                                 <td data-label="ID">{p.id}</td>
-                                <td data-label="Name">{toTitleCase(p.name)}</td>
+                                <td data-label="Name">{toTitleCase(p.name)}{p.id === dealerId && <span className="dealer-badge">D</span>}</td>
                                 <td data-label="Balance">₹ {p.balance}</td>
                                 <td data-label="Contribution">₹ {contribution}</td>
                                 <td data-label="Status">{status}</td>

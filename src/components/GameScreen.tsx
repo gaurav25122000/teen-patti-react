@@ -14,8 +14,11 @@ import type { Transaction } from '../utils/owingsLogic';
 import { toTitleCase } from '../utils/formatters';
 import { emptyStats, summaryLines } from '../utils/nightStats';
 import { teenPattiSettlement } from '../utils/gameSettlement';
-import { bootRefusal, parseTableRules, potLimitReached } from '../utils/teenPattiRules';
-import TableRulesFields from './TableRulesFields';
+import { bootRefusal, nextBoot, potLimitReached } from '../utils/teenPattiRules';
+import { parseTeenPatti } from '../utils/gameSettings';
+import { TEEN_PATTI_FIELDS, toForm } from '../utils/settingsFields';
+import { settingsOf } from '../hooks/teenPattiEngine';
+import SettingsFields from './SettingsFields';
 import { phoneInUse } from '../utils/savedPlayers';
 import StreamControls from './StreamControls';
 import ActionToast from './ActionToast';
@@ -44,7 +47,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     const [showEntityManager, setShowEntityManager] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
-    const [rulesInput, setRulesInput] = useState({ potLimit: '', maxBlindTurns: '', maxChaal: '' });
+    const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
 
     const [bootAmount, setBootAmount] = useState('10');
     const [startPlayerId, setStartPlayerId] = useState('');
@@ -62,7 +65,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
         switch (interaction) {
             case 'gettingBoot':
-                setBootAmount(String(gameState.roundInitialBootAmount || 10));
+                setBootAmount(String(gameState.roundInitialBootAmount || gameState.defaultBoot || 10));
                 break;
             case 'addingPlayer':
                 setAddPlayerName('');
@@ -88,15 +91,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
             case 'reorderingPlayers':
                 setReorderablePlayers([...gameState.players]);
                 break;
-            case 'tableRules':
-                setRulesInput({
-                    potLimit: String(gameState.potLimit ?? ''),
-                    maxBlindTurns: String(gameState.maxBlindTurns ?? ''),
-                    maxChaal: String(gameState.maxChaal ?? ''),
-                });
+            case 'settings':
+                setSettingsForm(toForm(settingsOf(gameState)));
                 break;
         }
-    }, [interaction, gameState.players, gameState.roundInitialBootAmount, gameState.potLimit, gameState.maxBlindTurns, gameState.maxChaal, activePlayers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the form is filled once, when it opens
+    }, [interaction, gameState.players, gameState.roundInitialBootAmount, activePlayers]);
 
     // A bet that takes the pot to the limit ends the betting: pick the winner.
     const limitReached = potLimitReached(gameState);
@@ -176,7 +176,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 body = <div className="form-group"><label htmlFor="boot-amount">Enter amount</label><input id="boot-amount" type="number" value={bootAmount} onChange={e => setBootAmount(e.target.value)} min="1" autoFocus /></div>;
                 confirmText = "Set & Continue";
                 primaryAction = () => {
-                    const refusal = bootRefusal(gameState, parseInt(bootAmount, 10));
+                    const refusal = bootRefusal(gameState, nextBoot(gameState, parseInt(bootAmount, 10)));
                     if (refusal) return alert(refusal);
                     if (parseInt(bootAmount, 10) > 0) {
                         setInteraction('gettingStartPlayer');
@@ -303,14 +303,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     break;
                 }
 
-            case 'tableRules':
-                title = "Table Rules"; theme = 'default'; icon = <IconList />;
-                body = <TableRulesFields value={rulesInput} onChange={setRulesInput} />;
+            case 'settings':
+                title = "Settings"; theme = 'default'; icon = <IconList />;
+                body = <SettingsFields fields={TEEN_PATTI_FIELDS} form={settingsForm} onChange={setSettingsForm} />;
                 confirmText = "Save";
                 primaryAction = () => {
-                    const rules = parseTableRules(rulesInput);
-                    if (typeof rules === 'string') return alert(rules);
-                    actions.updateTableRules(rules);
+                    const settings = parseTeenPatti(settingsForm);
+                    if (typeof settings === 'string') return alert(settings);
+                    actions.applySettings(settings);
                     closeModal();
                 };
                 break;
@@ -359,7 +359,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                             onShowSetup={onShowSetup}
                             onManageEntities={() => setShowEntityManager(true)}
                             onTogglePlayerBreak={() => setInteraction('toggleBreak')}
-                            onTableRules={() => setInteraction('tableRules')}
+                            onSettings={() => setInteraction('settings')}
                         />
                     </div>
                     {gameState.roundActive && currentPlayer && (

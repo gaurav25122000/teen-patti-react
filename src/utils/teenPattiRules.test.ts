@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { betRefusal, blindTurnsRefusal, bootRefusal, parseTableRules, potLimitLines, potLimitReached, roundCarryOver, tableRulesLine } from './teenPattiRules.ts';
+import { betRefusal, blindTurnsRefusal, bootRefusal, dealerOf, nextBoot, potLimitLines, potLimitReached, roundCarryOver } from './teenPattiRules.ts';
 
 const round = (over = {}) => ({ potAmount: 100, roundActive: true, ...over });
 
@@ -40,12 +40,25 @@ test('a blind player past the blind-turn limit cannot show; a seen player can', 
     assert.equal(betRefusal(s, 'show', 20, 'Raj', 3, false), null);
 });
 
-test('a round reset keeps entities, table rules and the carried-in flag', () => {
+test('a round reset keeps groups, departures, every setting and the round count', () => {
     const entities = [{ id: 1, name: 'Team A' }];
-    assert.deepEqual(
-        roundCarryOver({ entities, potLimit: 500, maxBlindTurns: 3, maxChaal: 100, carriedIn: true }),
-        { entities, departed: undefined, carriedIn: true, potLimit: 500, maxBlindTurns: 3, maxChaal: 100 }
-    );
+    const departed = [{ name: 'Dev', net: -5 }];
+    const kept = { entities, departed, carriedIn: true, potLimit: 500, maxBlindTurns: 3, maxChaal: 100, defaultBoot: 20, turnTimer: 30, bootRiseEvery: 5, bootRiseStep: 10, roundsStarted: 7 };
+    assert.deepEqual(roundCarryOver({ ...kept, players: [], potAmount: 99 } as never), kept);
+});
+
+test('boot rise: every N rounds since setup, at round N+1, 2N+1', () => {
+    const rise = { bootRiseEvery: 3, bootRiseStep: 10 };
+    assert.deepEqual([0, 1, 2, 3, 4, 5, 6].map(roundsStarted => nextBoot({ ...rise, roundsStarted }, 50)), [50, 50, 50, 60, 50, 50, 60]);
+    assert.equal(nextBoot({ roundsStarted: 3 }, 50), 50);
+});
+
+test('the D badge: this round\'s dealer, else the last winner, else the first player', () => {
+    const players = [{ id: 1 }, { id: 2 }, { id: 3 }] as never;
+    assert.equal(dealerOf({ roundActive: true, dealerId: 3, lastWinnerId: 2, players }), 3);
+    assert.equal(dealerOf({ roundActive: false, dealerId: 3, lastWinnerId: 2, players }), 2);
+    assert.equal(dealerOf({ roundActive: false, lastWinnerId: null, players }), 1);
+    assert.equal(dealerOf({ roundActive: false, lastWinnerId: 9, players }), 1);
 });
 
 test('max chaal: chaal above it, blind above half of it, boot above half of it', () => {
@@ -66,16 +79,3 @@ test('no rules, nothing refused', () => {
     assert.equal(betRefusal(round(), 'show', 1000, 'Raj', 50, true), null);
 });
 
-test('rules log line names each rule or says it is off', () => {
-    assert.equal(tableRulesLine({ potLimit: 5000, maxBlindTurns: 4, maxChaal: 200 }), 'Table rules: pot limit ₹5000, max 4 blind turns, max chaal ₹200');
-    assert.equal(tableRulesLine({}), 'Table rules: no pot limit, no blind limit, no max chaal');
-});
-
-test('rule fields: empty is off, values must be positive, blind turns 1 to 20', () => {
-    assert.deepEqual(parseTableRules({ potLimit: '', maxBlindTurns: ' ', maxChaal: '' }), {});
-    assert.deepEqual(parseTableRules({ potLimit: '5000', maxBlindTurns: '20', maxChaal: '200' }), { potLimit: 5000, maxBlindTurns: 20, maxChaal: 200 });
-    assert.equal(parseTableRules({ potLimit: '0', maxBlindTurns: '', maxChaal: '' }), 'Table rules must be positive numbers.');
-    assert.equal(parseTableRules({ potLimit: '', maxBlindTurns: '', maxChaal: 'abc' }), 'Table rules must be positive numbers.');
-    assert.equal(parseTableRules({ potLimit: '', maxBlindTurns: '21', maxChaal: '' }), 'Max blind turns must be 1 to 20.');
-    assert.equal(parseTableRules({ potLimit: '', maxBlindTurns: '2.5', maxChaal: '' }), 'Max blind turns must be 1 to 20.');
-});

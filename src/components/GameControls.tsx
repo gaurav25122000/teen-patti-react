@@ -14,7 +14,7 @@ interface GameControlsProps {
     onShowSetup: () => void;
     onManageEntities: () => void;
     onTogglePlayerBreak: () => void; // ADDED
-    onTableRules: () => void;
+    onSettings: () => void;
 }
 
 const GameControls: React.FC<GameControlsProps> = (props) => {
@@ -23,7 +23,7 @@ const GameControls: React.FC<GameControlsProps> = (props) => {
         onRemovePlayer, onReorderPlayers, onDeductAndDistribute, 
         onShowOwings, onShowSetup, onManageEntities, 
         onTogglePlayerBreak, // ADDED
-        onTableRules
+        onSettings
     } = props;
     const { roundActive, players, roundInitialBootAmount: lastBootAmount, lastWinnerId } = gameState;
 
@@ -74,8 +74,8 @@ const GameControls: React.FC<GameControlsProps> = (props) => {
                 </button>
             )}
             {!roundActive && (
-                <button className="btn-secondary" onClick={onTableRules}>
-                    TABLE RULES
+                <button className="btn-secondary" onClick={onSettings}>
+                    Settings
                 </button>
             )}
             {!roundActive && (

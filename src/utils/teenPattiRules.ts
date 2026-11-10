@@ -34,40 +34,35 @@ export const betRefusal = (s: RoundState, kind: 'blind' | 'chaal' | 'show', amou
     return null;
 };
 
-// Entities, departures, table rules and the carried-in flag survive a round reset; endRound sets the rest.
-export const roundCarryOver = (prev: Pick<GameState, 'entities' | 'departed' | 'potLimit' | 'maxBlindTurns' | 'maxChaal' | 'carriedIn'>) => ({
+// What survives a round reset besides what endRound sets itself: groups, departures, settings, counters.
+export const roundCarryOver = (prev: GameState) => ({
     entities: prev.entities,
     departed: prev.departed,
     carriedIn: prev.carriedIn,
     potLimit: prev.potLimit,
     maxBlindTurns: prev.maxBlindTurns,
     maxChaal: prev.maxChaal,
+    defaultBoot: prev.defaultBoot,
+    turnTimer: prev.turnTimer,
+    bootRiseEvery: prev.bootRiseEvery,
+    bootRiseStep: prev.bootRiseStep,
+    roundsStarted: prev.roundsStarted,
 });
+
+// The boot for the next round: every N rounds since setup it rises by the step (at round N+1, 2N+1, …).
+export const nextBoot = (s: Pick<GameState, 'bootRiseEvery' | 'bootRiseStep' | 'roundsStarted'>, boot: number) => {
+    const played = s.roundsStarted ?? 0;
+    return s.bootRiseEvery && s.bootRiseStep && played > 0 && played % s.bootRiseEvery === 0 ? boot + s.bootRiseStep : boot;
+};
+
+// Who the D badge sits on: this round's dealer, or between rounds the next one (the last winner, else the first player).
+export const dealerOf = (s: Pick<GameState, 'roundActive' | 'dealerId' | 'lastWinnerId' | 'players'>) =>
+    s.roundActive ? s.dealerId : (s.players.some(p => p.id === s.lastWinnerId) ? s.lastWinnerId ?? undefined : s.players[0]?.id);
 
 export const bootRefusal = (rules: TableRules, boot: number) =>
     rules.maxChaal !== undefined && boot > rules.maxChaal / 2
         ? `Boot is above the max blind bet (₹${formatAmount(rules.maxChaal / 2)}).`
         : null;
-
-export const tableRulesLine = (rules: TableRules) => `Table rules: ${[
-    rules.potLimit !== undefined ? `pot limit ₹${formatAmount(rules.potLimit)}` : 'no pot limit',
-    rules.maxBlindTurns !== undefined ? `max ${rules.maxBlindTurns} blind turns` : 'no blind limit',
-    rules.maxChaal !== undefined ? `max chaal ₹${formatAmount(rules.maxChaal)}` : 'no max chaal',
-].join(', ')}`;
-
-// Form text to rules: empty is off; returns an error message for a bad value.
-export const parseTableRules = (input: { potLimit: string; maxBlindTurns: string; maxChaal: string }): TableRules | string => {
-    const rules: TableRules = {};
-    for (const key of ['potLimit', 'maxBlindTurns', 'maxChaal'] as const) {
-        const text = input[key].trim();
-        if (!text) continue;
-        const value = Number(text);
-        if (!Number.isFinite(value) || value <= 0) return 'Table rules must be positive numbers.';
-        if (key === 'maxBlindTurns' && (!Number.isInteger(value) || value > 20)) return 'Max blind turns must be 1 to 20.';
-        rules[key] = value;
-    }
-    return rules;
-};
 
 // Log line for a bet that takes the pot to the limit; the bet itself is accepted in full.
 export const potLimitLines = (potLimit: number | undefined, pot: number) =>

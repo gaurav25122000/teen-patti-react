@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as E from './teenPattiEngine.ts';
 import { runStep, type Io } from '../utils/engine.ts';
 import type { GameState, Player } from '../types/gameTypes.ts';
-import { betRefusal, bootRefusal } from '../utils/teenPattiRules.ts';
+import { betRefusal, bootRefusal, nextBoot } from '../utils/teenPattiRules.ts';
 import { teenPattiSettlement } from '../utils/gameSettlement.ts';
 import { settlementProblem } from '../utils/settlementCheck.ts';
 import { toTitleCase } from '../utils/formatters.ts';
@@ -29,7 +29,7 @@ const randomAction = (s: GameState, r: () => number): { next: GameState; added: 
         const choice = r();
         if (choice < 0.55) {
             const boot = amount(40);
-            if (bootRefusal(s, boot)) return { next: s, added: 0 };
+            if (bootRefusal(s, nextBoot(s, boot))) return { next: s, added: 0 };
             return { next: go(s, (x, io) => E.startRound(x, Math.floor(r() * x.players.length), boot, io)), added: 0 };
         }
         if (choice < 0.65) {
@@ -42,8 +42,12 @@ const randomAction = (s: GameState, r: () => number): { next: GameState; added: 
         }
         if (choice < 0.8) return { next: go(s, (x, io) => E.deductAndDistribute(x, pick(s.players).id, amount(60), io)), added: 0 };
         if (choice < 0.9) return { next: go(s, (x, io) => E.togglePlayerBreak(x, pick(s.players).id, io)), added: 0 };
-        const rules = { potLimit: r() < 0.5 ? amount(400) + 50 : undefined, maxBlindTurns: r() < 0.5 ? amount(4) : undefined, maxChaal: r() < 0.5 ? amount(100) + 20 : undefined };
-        return { next: go(s, x => E.updateTableRules(x, rules)), added: 0 };
+        const settings = {
+            potLimit: r() < 0.5 ? amount(400) + 50 : undefined, maxBlindTurns: r() < 0.5 ? amount(4) : undefined, maxChaal: r() < 0.5 ? amount(100) + 20 : undefined,
+            bootRiseEvery: r() < 0.3 ? amount(3) : undefined, bootRiseStep: undefined as number | undefined,
+        };
+        settings.bootRiseStep = settings.bootRiseEvery ? amount(20) : undefined;
+        return { next: go(s, (x, io) => E.applySettings(x, settings, io)), added: 0 };
     }
     const { currentPlayer, precedingPlayer, activePlayers } = E.derivePlayers(s);
     if (!currentPlayer) return { next: s, added: 0 };
@@ -125,4 +129,28 @@ test('joining with a balance marks the game carried in; joining at zero does not
 test('deduct and distribute keeps balances in whole paise', () => {
     const s = go(E.newGame([player(1, 0), player(2, 0), player(3, 0), player(4, 0)]), (x, io) => E.deductAndDistribute(x, 1, 10.004, io));
     assert.deepEqual(s.players.map(p => p.balance), [-10, 4, 3, 3]);
+});
+
+test('settings change only between rounds, logging what changed', () => {
+    let s = E.newGame([player(1, 0), player(2, 0)]);
+    s = runStep(s, (x, io) => E.applySettings(x, { potLimit: 500, turnTimer: 30 }, io)).state;
+    assert.equal(s.messages.at(-1), 'Settings: pot limit ₹500, turn timer 30 s');
+    assert.equal(s.potLimit, 500);
+    s = go(s, (x, io) => E.startRound(x, 0, 10, io));
+    const refused = runStep(s, (x, io) => E.applySettings(x, { potLimit: 900 }, io)).state;
+    assert.equal(refused.potLimit, 500);
+    assert.equal(refused.messages.at(-1), 'ERROR: Settings can only change between rounds.');
+});
+
+test('the boot rises on schedule and is logged; the dealer sits before the starter, skipping breaks', () => {
+    let s = E.newGame([player(1, 0), player(2, 0), player(3, 0)], { bootRiseEvery: 1, bootRiseStep: 5 });
+    s = go(s, (x, io) => E.togglePlayerBreak(x, 3, io));
+    s = go(s, (x, io) => E.startRound(x, 0, 10, io));
+    assert.equal(s.potAmount, 20);
+    assert.equal(s.dealerId, 2);
+    s = go(s, (x, io) => E.endRound(x, 1, io));
+    s = go(s, (x, io) => E.startRound(x, 1, 10, io));
+    assert.equal(s.potAmount, 30);
+    assert.equal(s.messages.includes('Boot is now ₹15.'), true);
+    assert.equal(s.dealerId, 1);
 });

@@ -1,11 +1,12 @@
 // Teen Patti game steps as pure functions: the hook runs them inside setGameState, tests run them directly.
 import type { GameState, Player, Entity } from '../types/gameTypes.ts';
 import type { Io, RawRecord } from '../utils/engine.ts';
-import { toTitleCase } from '../utils/formatters.ts';
+import { formatAmount, toTitleCase } from '../utils/formatters.ts';
 import { splitEvenly, toPaise } from '../utils/money.ts';
 import { emptyStats, recordRound, statsNames } from '../utils/nightStats.ts';
 import { partyKey } from '../utils/owingsLogic.ts';
-import { potLimitLines, roundCarryOver, tableRulesLine, type TableRules } from '../utils/teenPattiRules.ts';
+import { nextBoot, potLimitLines, roundCarryOver } from '../utils/teenPattiRules.ts';
+import { MID_ROUND, teenPattiChange, type TeenPattiSettings } from '../utils/gameSettings.ts';
 import { depart, departureNote, tooFewToRemove } from '../utils/departures.ts';
 
 // A non-zero starting balance marks the game as carried in; the summary then says so.
@@ -122,24 +123,31 @@ export const endRound = (prev: GameState, winnerId: number | null, io: Io): Game
   };
 };
 
-export const newGame = (newPlayers: Player[], rules: TableRules = {}): GameState => ({
+export const newGame = (newPlayers: Player[], settings: TeenPattiSettings = {}): GameState => ({
   ...createInitialGameState(),
-  ...rules,
+  ...settings,
   carriedIn: carried(newPlayers.map(p => p.balance)),
   players: newPlayers.map(p => ({ ...p, isTakingBreak: false })),
   messages: newPlayers.length > 0 ? [`New game started with ${newPlayers.length} players. Please set the boot amount.`] : ["Returning to setup..."],
 });
 
-export const updateTableRules = (prev: GameState, rules: TableRules): GameState => prev.roundActive ? prev : {
-  ...prev,
-  potLimit: rules.potLimit,
-  maxBlindTurns: rules.maxBlindTurns,
-  maxChaal: rules.maxChaal,
-  messages: [...prev.messages, tableRulesLine(rules)],
+export const settingsOf = (s: GameState): TeenPattiSettings => ({
+  defaultBoot: s.defaultBoot, potLimit: s.potLimit, maxBlindTurns: s.maxBlindTurns, maxChaal: s.maxChaal,
+  turnTimer: s.turnTimer, bootRiseEvery: s.bootRiseEvery, bootRiseStep: s.bootRiseStep,
+});
+
+// Between rounds only; logs one line naming what changed.
+export const applySettings = (prev: GameState, settings: TeenPattiSettings, io: Io): GameState => {
+  if (prev.roundActive) {
+    io.log(`ERROR: ${MID_ROUND}`);
+    return prev;
+  }
+  const line = teenPattiChange(settingsOf(prev), settings);
+  return { ...prev, ...settings, messages: line ? [...prev.messages, line] : prev.messages };
 };
 
-// The boot refusal (table rules) is checked by the caller first.
-export const startRound = (prev: GameState, startingPlayerIndex: number, bootAmount: number, io: Io): GameState => {
+// The caller checks the boot refusal (max chaal) on nextBoot first.
+export const startRound = (prev: GameState, startingPlayerIndex: number, chosenBoot: number, io: Io): GameState => {
   const activePlayersForRound = prev.players.filter(p => !p.isTakingBreak);
   if (activePlayersForRound.length < 2) {
     io.log("ERROR: Not enough active players to start a round.");
@@ -154,6 +162,15 @@ export const startRound = (prev: GameState, startingPlayerIndex: number, bootAmo
       finalStartingPlayerIndex = (finalStartingPlayerIndex + 1) % prev.players.length;
     } while (!activePlayerIds.has(prev.players[finalStartingPlayerIndex].id));
   }
+
+  const bootAmount = nextBoot(prev, chosenBoot);
+  if (bootAmount !== chosenBoot) io.log(`Boot is now ₹${formatAmount(bootAmount)}.`);
+
+  // The dealer sits just before the starter, skipping players on a break.
+  let dealerIndex = finalStartingPlayerIndex;
+  do {
+    dealerIndex = (dealerIndex - 1 + prev.players.length) % prev.players.length;
+  } while (!activePlayerIds.has(prev.players[dealerIndex].id));
 
   let newPot = 0;
   const newContributions = new Map<number, number>();
@@ -178,6 +195,8 @@ export const startRound = (prev: GameState, startingPlayerIndex: number, bootAmo
     blindTurns: {},
     lastActorWasBlind: true,
     roundInitialBootAmount: bootAmount,
+    dealerId: prev.players[dealerIndex].id,
+    roundsStarted: (prev.roundsStarted ?? 0) + 1,
     messages: [
       ...prev.messages,
       `--- NEW ROUND STARTED ---`,

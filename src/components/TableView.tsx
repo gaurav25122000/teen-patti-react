@@ -7,6 +7,7 @@ export interface Seat {
     amount: string;
     status: string;
     className: string;
+    dealer?: boolean;
 }
 
 interface TableViewProps {
@@ -29,7 +30,7 @@ const TableView: React.FC<TableViewProps> = ({ seats, center }) => (
                     className={`table-seat ${seat.className}`}
                     style={{ left: `${50 + 44 * Math.cos(angle)}%`, top: `${50 + 42 * Math.sin(angle)}%` }}
                 >
-                    <div className="seat-name">{seat.name}</div>
+                    <div className="seat-name">{seat.name}{seat.dealer && <span className="dealer-badge">D</span>}</div>
                     <div className="seat-amount">{seat.amount}</div>
                     {seat.status && <div className="seat-status">{seat.status}</div>}
                 </div>
