@@ -3,6 +3,7 @@ import { couldNot } from './formatters.ts';
 import type { Person, Transaction } from './owingsLogic.ts';
 import { playerNets } from './gameSettlement.ts';
 import { shareText } from './settlement.ts';
+import { notifyLocalChange } from './localChange.ts';
 import type { SavedPlayer } from './savedPlayers.ts';
 
 interface SettlementParts {
@@ -70,6 +71,7 @@ export const hasUnreadableHistory = (storage: HistoryStorage = localStorage) => 
 
 export const writeHistory = (list: HistoryEntry[], storage: HistoryStorage = localStorage) => {
     storage.setItem(HISTORY_KEY, JSON.stringify(list));
+    notifyLocalChange();
 };
 
 // Newest first: the newest 50 live games, plus older ones that still have an unpaid transfer, up to 200 in all.

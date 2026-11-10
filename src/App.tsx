@@ -1,6 +1,7 @@
 // src/App.tsx
-import { useState, useCallback, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { startSync } from './sync/syncRunner';
 import './App.css';
 
 // Teen Patti Imports
@@ -22,6 +23,7 @@ import Toaster from './components/Toaster';
 const LifetimeWinnings = lazy(() => import('./components/LifetimeWinnings'));
 const SavedPlayersScreen = lazy(() => import('./components/SavedPlayersScreen'));
 const HistoryScreen = lazy(() => import('./components/HistoryScreen'));
+const SyncScreen = lazy(() => import('./components/SyncScreen'));
 const SpectatorWrapper = lazy(() => import('./components/SpectatorWrapper'));
 
 function App() {
@@ -30,6 +32,13 @@ function App() {
   const handleInteractionChange = useCallback((isOpen: boolean) => {
     setIsModalOpen(isOpen);
   }, []);
+
+  const navigate = useNavigate();
+  useEffect(() => startSync(), []);
+  // A join link opens the Sync screen with its code filled in.
+  useEffect(() => {
+    if (window.location.hash.startsWith('#join=')) navigate(`/sync${window.location.hash}`);
+  }, [navigate]);
 
   const teenPattiHook = useTeenPattiGame();
   const pokerHook = usePokerGame();
@@ -64,6 +73,7 @@ function App() {
         <Route path="/lifetime-winnings" element={<LifetimeWinnings />} />
         <Route path="/saved-players" element={<SavedPlayersScreen />} />
         <Route path="/history" element={<HistoryScreen />} />
+        <Route path="/sync" element={<SyncScreen />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
       </Suspense>

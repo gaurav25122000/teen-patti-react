@@ -1,4 +1,5 @@
 import { couldNot, toTitleCase } from './formatters.ts';
+import { notifyLocalChange } from './localChange.ts';
 
 // Players remembered on this device (and synced to a group, if any), keyed by phone.
 export interface SavedPlayer {
@@ -79,6 +80,7 @@ export const cleanPhone = (phone: unknown) => (typeof phone === 'string' && phon
 
 export const writeSavedPlayers = (list: SavedPlayer[], storage: Pick<Storage, 'setItem'> = localStorage) => {
     storage.setItem(SAVED_PLAYERS_KEY, JSON.stringify(list));
+    notifyLocalChange();
 };
 
 // Game players upserted by phone into the full list: the latest trimmed name wins, an existing UPI ID stays,

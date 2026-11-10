@@ -27,6 +27,9 @@ const ModeSelectionScreen: React.FC = () => {
         <Link to="/history" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
           History
         </Link>
+        <Link to="/sync" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
+          Sync
+        </Link>
       </div>
     </div>
   );
