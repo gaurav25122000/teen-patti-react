@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { blackjackSettlement, playerNets, pokerSettlement, teenPattiSettlement } from './gameSettlement.ts';
-import { partyKey, partyLabels, settleParties, throughTransfers } from './owingsLogic.ts';
+import { fewestTransfers, partyKey, partyLabels, settleParties, throughTransfers } from './owingsLogic.ts';
+import { everyModeProblem } from './settlementCheck.ts';
+import { paise } from './money.ts';
 
 const tpPlayer = (id: number, name: string, balance: number, phoneNumber?: string, more = {}) =>
     ({ id, name, balance, phoneNumber, isTakingBreak: false, ...more });
@@ -233,4 +235,21 @@ test('a stored "Through <party>" drives the settlement (and so History); a hub n
     assert.deepEqual(rows('Raj'), [['Dev', 'Raj', 20], ['Raj', 'Asha', 30]]);
     assert.deepEqual(rows(null), [['Raj', 'Asha', 10], ['Dev', 'Asha', 20]]);
     assert.deepEqual(rows('Mira'), rows(null));
+});
+
+const rng = (seed: number) => () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+test('any nets (sub-paisa, balanced or not): fewest and every Through settle each party to under a paisa', () => {
+    const r = rng(7);
+    for (let run = 0; run < 500; run++) {
+        const parties = Array.from({ length: 2 + Math.floor(r() * 7) }, (_, i) => ({ label: `P${i}`, phone: null, net: r() < 0.3 ? Math.round((r() - 0.5) * 6) / 100 : Math.round((r() - 0.5) * 2e5) / 1000 }));
+        if (r() < 0.5) parties[0].net -= parties.reduce((sum, p) => sum + p.net, 0);
+        const offBy = paise(parties.reduce((sum, p) => sum + p.net, 0)) / 100;
+        assert.equal(everyModeProblem({ parties, transactions: fewestTransfers(parties), offBy }), null, `run ${run}: ${JSON.stringify(parties)}`);
+    }
 });

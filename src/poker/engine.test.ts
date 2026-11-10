@@ -4,7 +4,7 @@ import * as E from './engine.ts';
 import { runStep, type Io } from '../utils/engine.ts';
 import type { PokerGameState } from './types/pokerGameTypes.ts';
 import { pokerSettlement } from '../utils/gameSettlement.ts';
-import { settlementProblem } from '../utils/settlementCheck.ts';
+import { everyModeProblem } from '../utils/settlementCheck.ts';
 import type { PokerSettings } from '../utils/gameSettings.ts';
 import { poolPaise } from './tournament.ts';
 import { paise } from '../utils/money.ts';
@@ -113,7 +113,7 @@ test('poker chips are conserved over 50 seeded random games of 200 actions, and 
             }
             assert.ok(s.players.every(p => p.totalPotContribution >= 0), `${where}: negative contribution`);
             const settled = pokerSettlement(s);
-            assert.equal(settlementProblem(settled.parties, settled.transactions, settled.offBy), null, where);
+            assert.equal(everyModeProblem(settled), null, where);
             assert.ok(Math.abs(settled.offBy) < 0.005, `${where}: off by ${settled.offBy}`);
         }
     }
@@ -162,7 +162,7 @@ test('tournament chips are conserved over 50 seeded random games, prizes sum to 
                     if (state.chopOrder) chopped++; else finished++;
                 }
                 const settled = pokerSettlement(state);
-                assert.equal(settlementProblem(settled.parties, settled.transactions, settled.offBy), null, where);
+                assert.equal(everyModeProblem(settled), null, where);
                 assert.ok(Math.abs(settled.offBy) < 0.005, `${where}: off by ${settled.offBy}`);
             }
             s = state;

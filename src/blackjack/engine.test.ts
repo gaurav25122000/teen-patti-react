@@ -5,7 +5,7 @@ import { runStep, type Io } from '../utils/engine.ts';
 import type { BlackjackGameState, BlackjackPlayer, HandStatus, SideResult } from './types/blackjackGameTypes.ts';
 import type { BlackjackSettings } from '../utils/gameSettings.ts';
 import { blackjackSettlement } from '../utils/gameSettlement.ts';
-import { settlementProblem } from '../utils/settlementCheck.ts';
+import { everyModeProblem } from '../utils/settlementCheck.ts';
 
 const rng = (seed: number) => () => {
     seed = (seed + 0x6d2b79f5) | 0;
@@ -99,7 +99,7 @@ test('blackjack chips plus the house are conserved over 50 seeded random games o
             const leftWith = sum((s.departed ?? []).map(d => d.net)); // players who left stay settled
             assert.ok(Math.abs(sum(s.players.map(chipsWithBets)) + s.dealerNet + leftWith - sum(s.players.map(p => p.totalBuyIn))) < 1e-9, `${where}: chips not conserved`);
             const settled = blackjackSettlement(s);
-            assert.equal(settlementProblem(settled.parties, settled.transactions, settled.offBy), null, where);
+            assert.equal(everyModeProblem(settled), null, where);
             assert.ok(Math.abs(settled.offBy) < 0.005, `${where}: off by ${settled.offBy}`);
         }
     }

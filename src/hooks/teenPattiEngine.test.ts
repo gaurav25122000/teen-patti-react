@@ -5,7 +5,7 @@ import { runStep, type Io } from '../utils/engine.ts';
 import type { GameState, Player } from '../types/gameTypes.ts';
 import { betRefusal, bootRefusal, nextBoot } from '../utils/teenPattiRules.ts';
 import { teenPattiSettlement } from '../utils/gameSettlement.ts';
-import { settlementProblem } from '../utils/settlementCheck.ts';
+import { everyModeProblem } from '../utils/settlementCheck.ts';
 import { toTitleCase } from '../utils/formatters.ts';
 
 // Small seeded PRNG so every failure replays.
@@ -86,7 +86,7 @@ test('teen patti money is conserved over 50 seeded random games of 200 actions, 
             assert.equal(s.potAmount, [...s.roundContributions.values()].reduce((a, b) => a + b, 0), `${where}: pot != contributions`);
             if (!s.roundActive) assert.equal(s.potAmount, 0, `${where}: pot left between rounds`);
             const settled = teenPattiSettlement(s);
-            assert.equal(settlementProblem(settled.parties, settled.transactions, settled.offBy), null, where);
+            assert.equal(everyModeProblem(settled), null, where);
         }
     }
 });
