@@ -108,7 +108,7 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
             };
             break;
         case 'toggleBreak':
-            title = "Toggle Player Break";
+            title = "Break";
             body = <div className="form-group"><label>Select Player</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{playerBreakOptions}</select></div>;
             confirmAction = () => {
                  if (!managePlayerId) return alert("Please select a player.");

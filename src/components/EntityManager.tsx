@@ -39,7 +39,7 @@ const EntityManager: React.FC<EntityManagerProps> = ({ isOpen, onClose, players,
         <InteractionModal
             isOpen={isOpen}
             onClose={onClose}
-            title="Manage Entities"
+            title="Groups"
             footerContent={null}
             theme="default"
         >

@@ -271,7 +271,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                     </>;
                     break;
                 case 'toggleBreak':
-                    title = "Toggle Player Break";
+                    title = "Break";
                     body = <div className="form-group"><label>Select Player</label><select value={managePlayerId} onChange={e => setManagePlayerId(e.target.value)}>{players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)} ({p.isTakingBreak ? "On Break" : "Active"})</option>)}</select></div>;
                     break;
                 case 'streakWinnings':

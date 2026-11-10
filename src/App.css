@@ -18,7 +18,7 @@
     --color-glow-yellow: #bfec57;
   --color-glow-gold: #ffd700;
   --color-text: #e8e8e8;
-  --color-text-muted: #8c8ca0;
+  --color-text-muted: #b3b3c4; /* at least white70 on the dark felt */
   --font-display: 'Consolas', 'Menlo', 'monospace';
   --font-body: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
 }

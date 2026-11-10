@@ -637,7 +637,7 @@ const rebuyLimit = (s: PokerGameState, player: PokerPlayer) => {
 // Why a cash rebuy is refused (limits above, then buy-in limits), or null.
 export const rebuyRefusal = (s: PokerGameState, player: PokerPlayer, amount: number) => rebuyLimit(s, player) ?? buyInRefusal(s, amount);
 
-// A rebuy (Manage Rebuys): adds chips and buy-in, and counts toward the rebuy limit.
+// A rebuy (Table → Rebuy): adds chips and buy-in, and counts toward the rebuy limit.
 export const addChipsToPlayer = (prev: PokerGameState, playerId: number, amount: number, io: Io): PokerGameState => {
     if (amount <= 0 || prev.entrants) return prev; // tournament rebuys go through the bust prompt
     if (prev.gameStage !== 'pre-deal') {

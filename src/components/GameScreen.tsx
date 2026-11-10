@@ -293,7 +293,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
             // ADDED CASE
             case 'toggleBreak':
-                title = "Toggle Player Break"; 
+                title = "Break";
                 theme = 'default'; 
                 icon = <IconUsers />; // Re-using icon
                 body = <div className="form-group"><label>Select player to toggle break status</label><select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>{gameState.players.map(p => <option key={p.id} value={p.id}>{toTitleCase(p.name)} ({p.isTakingBreak ? "On Break" : "Active"})</option>)}</select></div>;
