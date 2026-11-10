@@ -28,7 +28,9 @@ const BlackjackPlayerList: React.FC<BlackjackPlayerListProps> = ({ players, game
                         const isCurrent = p.id === currentPlayerId && gameStage === 'player-turn';
                         
                         let status = 'Waiting';
-                        if (p.isTakingBreak) {
+                        if (p.id === gameState.bankerId) {
+                            status = 'Banker';
+                        } else if (p.isTakingBreak) {
                             status = 'On Break';
                         } else if (gameStage === 'betting') {
                             status = `Playing ${p.initialHandsCount} hand(s)`;

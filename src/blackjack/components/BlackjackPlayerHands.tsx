@@ -1,8 +1,13 @@
 // teen-patti-react/src/blackjack/components/BlackjackPlayerHands.tsx
 // src/blackjack/components/BlackjackPlayerHands.tsx
 import React, { useState } from 'react';
-import type { BlackjackPlayer, HandStatus } from '../types/blackjackGameTypes';
+import type { BlackjackPlayer, HandStatus, PlayerHand, SideResult } from '../types/blackjackGameTypes';
 import { toTitleCase } from '../../utils/formatters';
+import type { SideKind } from '../engine';
+
+const CHIPS = [10, 50, 100, 500];
+const PAIR_RESULTS: [SideResult, string][] = [['lose', 'Lose'], ['mixed', 'Mixed 6:1'], ['coloured', 'Coloured 12:1'], ['perfect', 'Perfect 25:1']];
+const THREE_RESULTS: [SideResult, string][] = [['lose', 'Lose'], ['flush', 'Flush 5:1'], ['straight', 'Straight 10:1'], ['trips', 'Trips 30:1'], ['straight-flush', 'Str. flush 40:1'], ['suited-trips', 'Suited trips 100:1']];
 
 interface BlackjackPlayerHandsProps {
     player: BlackjackPlayer;
@@ -14,14 +19,20 @@ interface BlackjackPlayerHandsProps {
     onPlayerAction: (action: 'hit' | 'stand' | 'double' | 'surrender' | 'split' | 'insurance') => void;
     onSetHandStatus: (playerId: number, handId: string, status: HandStatus) => void;
     onUnlockBet: () => void; // RENAMED
+    isBanker: boolean;
+    insurance: boolean;
+    sideBets: boolean;
+    onPlaceSideBet: (playerId: number, handIndex: number, kind: SideKind, amount: number) => void;
+    onSettleSideBet: (playerId: number, handId: string, kind: SideKind, result: SideResult) => void;
 }
 
 const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({ 
     player, isCurrentPlayer, currentHandId, gameStage, isBettingLocked,
-    onPlaceBet, onPlayerAction, onSetHandStatus
+    onPlaceBet, onPlayerAction, onSetHandStatus, isBanker, insurance, sideBets, onPlaceSideBet, onSettleSideBet
 }) => {
     // This local state is only for when betting is unlocked
     const [betAmounts, setBetAmounts] = useState<Record<number, string>>({});
+    const [sideAmounts, setSideAmounts] = useState<Record<string, string>>({});
 
     const handleBetChange = (handIndex: number, amount: string) => {
         setBetAmounts(prev => ({ ...prev, [handIndex]: amount }));
@@ -49,20 +60,64 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
         // --- FIX: Get the last bet for this specific hand ---
         const lastBetForThisHand = player.lastBets[handIndex] || player.lastBets[0] || 10; // Fallback
 
-        // Betting is unlocked, show input
+        // Betting is unlocked: chips add to the field, Place Bet submits it (placeBet checks the limits).
+        const addChip = (chip: number) => handleBetChange(handIndex, String((parseInt(betAmounts[handIndex] || '0') || 0) + chip));
         return (
-            <div className="inline-input-group">
-                <input
-                    type="number"
-                    value={betAmounts[handIndex] || ''}
-                    onChange={e => handleBetChange(handIndex, e.target.value)}
-                    placeholder={`Bet (Last: ${lastBetForThisHand})`}
-                />
-                <button className="btn-success" onClick={() => handleBetSubmit(handIndex)}>Place Bet</button>
-            </div>
+            <>
+                <div className="inline-input-group">
+                    <input
+                        type="number"
+                        value={betAmounts[handIndex] || ''}
+                        onChange={e => handleBetChange(handIndex, e.target.value)}
+                        placeholder={`Bet (Last: ${lastBetForThisHand})`}
+                    />
+                    <button className="btn-success" onClick={() => handleBetSubmit(handIndex)}>Place Bet</button>
+                </div>
+                <div className="game-actions">
+                    {CHIPS.map(chip => <button key={chip} className="btn-sm btn-outline-secondary" onClick={() => addChip(chip)}>+₹{chip}</button>)}
+                    <button className="btn-sm btn-outline-secondary" onClick={() => handleBetChange(handIndex, '')}>CLEAR</button>
+                    <button className="btn-sm btn-outline-secondary" onClick={() => handleBetChange(handIndex, String(lastBetForThisHand))}>REPEAT LAST</button>
+                </div>
+                {sideBets && hand.bet > 0 && renderSideBetInputs(handIndex)}
+            </>
         );
         // --- END UPDATED LOGIC ---
     };
+
+    const renderSideBetInputs = (handIndex: number) => (
+        <div className="game-actions">
+            {(['pp', 't3'] as SideKind[]).map(kind => {
+                const key = `${handIndex}-${kind}`;
+                const placed = player.hands[handIndex]?.[kind];
+                return (
+                    <div key={kind} className="inline-input-group">
+                        <input type="number" min="0" value={sideAmounts[key] ?? ''} placeholder={`${kind === 'pp' ? 'Perfect Pairs' : '21+3'}${placed ? ` (₹${placed})` : ''}`}
+                            onChange={e => setSideAmounts(prev => ({ ...prev, [key]: e.target.value }))} />
+                        <button className="btn-secondary" onClick={() => {
+                            onPlaceSideBet(player.id, handIndex, kind, parseInt(sideAmounts[key] || '0') || 0);
+                            setSideAmounts(prev => ({ ...prev, [key]: '' }));
+                        }}>Place</button>
+                    </div>
+                );
+            })}
+        </div>
+    );
+
+    // Open side bets get a button per result; the round ends once all are marked.
+    const renderSideBetResults = (hand: PlayerHand) => (
+        <>
+            {([['pp', PAIR_RESULTS, 'Perfect Pairs'], ['t3', THREE_RESULTS, '21+3']] as [SideKind, [SideResult, string][], string][])
+                .filter(([kind]) => hand[kind] && !hand[kind === 'pp' ? 'ppResult' : 't3Result'])
+                .map(([kind, results, title]) => (
+                    <div key={kind} className="game-actions">
+                        <span>{title} ₹{hand[kind]}:</span>
+                        {results.map(([result, label]) => (
+                            <button key={result} className="btn-sm btn-outline-secondary" onClick={() => onSettleSideBet(player.id, hand.id, kind, result)}>{label}</button>
+                        ))}
+                    </div>
+                ))}
+        </>
+    );
 
     const renderPlayerTurnControls = (handId: string) => {
         const isCurrentHand = isCurrentPlayer && currentHandId === handId;
@@ -75,7 +130,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                 <button className="btn-success" onClick={() => onPlayerAction('double')}>Double</button>
                 <button className="btn-accent" onClick={() => onPlayerAction('split')}>Split</button>
                 <button className="btn-error" onClick={() => onPlayerAction('surrender')}>Surrender</button>
-                <button className="btn-secondary" onClick={() => onPlayerAction('insurance')}>Insurance</button>
+                {insurance && <button className="btn-secondary" onClick={() => onPlayerAction('insurance')}>Insurance</button>}
             </div>
         );
     };
@@ -97,7 +152,8 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
     return (
         <div className={`player-hands-container ${isCurrentPlayer ? 'current-player-hands' : ''}`}>
             <h4>{toTitleCase(player.name)}'s Hands</h4>
-            {player.hands.length === 0 && gameStage === 'betting' && (
+            {isBanker && <p style={{ textAlign: 'center' }}>{player.name} is the banker this round.</p>}
+            {!isBanker && player.hands.length === 0 && gameStage === 'betting' && (
                  <p style={{textAlign: 'center', color: 'var(--color-text-muted)'}}>
                     {isBettingLocked ? `Click 'Change Bets' to place new wagers.` : `Player will play ${player.initialHandsCount} hand(s). Place bets below.`}
                  </p>
@@ -117,6 +173,11 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                                     Bet: ₹{hand.wager} {hand.wager !== hand.bet && `(2x${hand.bet})`}
                                 </span>
                             }
+                            {(hand.pp || hand.t3) &&
+                                <span style={{color: 'var(--color-text-muted)', display: 'block', fontSize: '0.9rem'}}>
+                                    {hand.pp ? `PP ₹${hand.pp}${hand.ppResult ? ` (${hand.ppResult})` : ''} ` : ''}{hand.t3 ? `21+3 ₹${hand.t3}${hand.t3Result ? ` (${hand.t3Result})` : ''}` : ''}
+                                </span>
+                            }
                             {hand.insurance &&
                                 <span style={{color: 'var(--color-text-muted)', display: 'block', fontSize: '0.9rem'}}>
                                     Insurance: ₹{hand.insurance}{hand.insuranceResult && ` (${hand.insuranceResult})`}
@@ -128,6 +189,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                     {gameStage === 'betting' && renderBettingControls(hand, index)}
                     {gameStage === 'player-turn' && renderPlayerTurnControls(hand.id)}
                     {gameStage === 'dealer-turn' && renderSettlementControls(hand.id, hand.status)}
+                    {(gameStage === 'player-turn' || gameStage === 'dealer-turn') && renderSideBetResults(hand)}
                 </div>
             ))}
         </div>

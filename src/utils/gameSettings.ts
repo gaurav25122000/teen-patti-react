@@ -184,7 +184,7 @@ const POKER_ITEMS: Item<PokerSettings>[] = [
     opt('buyIn', 'buy-in', v => `buy-in ${money(v)}`),
     opt('startingChips', 'starting chips', v => `starting chips ${formatAmount(v)}`),
     { keys: ['addOnPrice', 'addOnChips'], off: 'add-on', text: s => (s.addOnPrice && s.addOnChips ? `add-on ${money(s.addOnPrice)} for ${formatAmount(s.addOnChips)} chips` : null) },
-    { keys: ['payouts'], off: 'payouts', text: s => (s.payouts ? `payouts ${s.payouts.join('/')}%` : null) },
+    { keys: ['payouts'], off: 'payouts', text: s => (s.payouts ? `payouts ${s.payouts.join('/')}` : null) },
 ];
 
 const BLACKJACK_ITEMS: Item<BlackjackSettings>[] = [

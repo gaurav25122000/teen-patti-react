@@ -17,11 +17,12 @@ interface BlackjackManageModalProps {
     onAddChips: (playerId: number, amount: number) => void;
     onToggleBreak: (playerId: number) => void;
     onUpdateHands: (playerId: number, numHands: number) => void;
+    defaultHands: number;
 }
 
 const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
     isOpen, mode, players, onClose,
-    onAddPlayer, onRemovePlayer, onAddChips, onToggleBreak, onUpdateHands
+    onAddPlayer, onRemovePlayer, onAddChips, onToggleBreak, onUpdateHands, defaultHands
 }) => {
     const [managePlayerId, setManagePlayerId] = useState<string>('');
     const [addPlayerName, setAddPlayerName] = useState('');
@@ -41,6 +42,10 @@ const BlackjackManageModal: React.FC<BlackjackManageModalProps> = ({
         }
     }, [isOpen, mode, players, managePlayerId]);
     
+    useEffect(() => {
+        if (isOpen && mode === 'addPlayer') setAddPlayerNumHands(String(defaultHands));
+    }, [isOpen, mode, defaultHands]);
+
     useEffect(() => {
         if (managePlayerId) {
              const player = players.find(p => p.id === Number(managePlayerId));

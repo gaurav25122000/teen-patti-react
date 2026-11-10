@@ -3,13 +3,19 @@ import React, { useState } from 'react';
 import { toTitleCase } from '../../utils/formatters';
 import { duplicatePhone, fillRow } from '../../utils/savedPlayers';
 import SavedPlayerChips from '../../components/SavedPlayerChips';
+import SettingsFields from '../../components/SettingsFields';
+import { parseBlackjack, type BlackjackSettings } from '../../utils/gameSettings';
+import { BLACKJACK_FIELDS, toForm } from '../../utils/settingsFields';
+import { blackjackSettingsOf, createInitialBlackjackState } from '../engine';
 
 interface BlackjackGameSetupProps {
-    onStartGame: (players: { name: string, stack: number, phoneNumber: string, numHands: number }[]) => void;
+    onStartGame: (players: { name: string, stack: number, phoneNumber: string, numHands: number }[], settings: BlackjackSettings) => void;
 }
 
 const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) => {
     const [players, setPlayers] = useState([{ name: '', stack: '1000', phoneNumber: '', numHands: '1' }]);
+    const [form, setForm] = useState(() => toForm(blackjackSettingsOf(createInitialBlackjackState())));
+    const emptyRow = () => ({ name: '', stack: '1000', phoneNumber: '', numHands: form.defaultHands || '1' });
 
     const handlePlayerChange = (index: number, field: 'name' | 'stack' | 'phoneNumber' | 'numHands', value: string) => {
         const newPlayers = [...players];
@@ -18,7 +24,7 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
     };
 
     const addPlayerField = () => {
-        setPlayers([...players, { name: '', stack: '1000', phoneNumber: '', numHands: '1' }]);
+        setPlayers([...players, emptyRow()]);
     };
 
     const handleStart = () => {
@@ -48,17 +54,23 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
         }
         const dup = duplicatePhone(finalPlayers.map(p => p.phoneNumber));
         if (dup) return alert(`Two players have the phone ${dup}.`);
+        const settings = parseBlackjack(form);
+        if (typeof settings === 'string') return alert(settings);
 
-        onStartGame(finalPlayers);
+        onStartGame(finalPlayers, settings);
     };
 
     return (
         <div className="setup-screen">
             <h2>Blackjack Game Setup</h2>
+            <details className="table-settings">
+                <summary>Table settings</summary>
+                <SettingsFields fields={BLACKJACK_FIELDS} form={form} onChange={setForm} />
+            </details>
             <hr />
             <SavedPlayerChips
                 formPhones={players.map(p => p.phoneNumber)}
-                onPick={picked => setPlayers(rows => fillRow(rows, picked, { name: '', stack: '1000', phoneNumber: '', numHands: '1' }))}
+                onPick={picked => setPlayers(rows => fillRow(rows, picked, emptyRow()))}
             />
             {players.map((p, index) => (
                 <div key={index} className="player-setup-row" style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0', flexWrap: 'wrap', alignItems: 'center' }}>

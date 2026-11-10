@@ -2,6 +2,7 @@
 // src/blackjack/types/blackjackGameTypes.ts
 import type { NightStats } from '../../utils/nightStats';
 import type { Departure } from '../../utils/departures';
+import type { BlackjackSettings } from '../../utils/gameSettings';
 
 export type Card = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 export type HandStatus = 'playing' | 'stand' | 'busted' | 'blackjack' | 'push' | 'win' | 'lose' | 'surrendered';
@@ -15,7 +16,13 @@ export interface PlayerHand {
     hasHit: boolean; // To prevent doubling after hitting
     insurance?: number; // side bet, half the original bet
     insuranceResult?: 'won' | 'lost';
+    pp?: number; // Perfect Pairs side bet
+    ppResult?: SideResult;
+    t3?: number; // 21+3 side bet
+    t3Result?: SideResult;
 }
+
+export type SideResult = 'lose' | 'mixed' | 'coloured' | 'perfect' | 'flush' | 'straight' | 'trips' | 'straight-flush' | 'suited-trips';
 
 export interface BlackjackPlayer {
     id: number;
@@ -37,19 +44,17 @@ export interface DealerHand {
 
 export type GameStage = 'betting' | 'dealing' | 'player-turn' | 'dealer-turn' | 'round-over';
 
-export interface BlackjackGameState {
+export interface BlackjackGameState extends BlackjackSettings {
     players: BlackjackPlayer[];
     dealerHand: DealerHand;
     gameStage: GameStage;
     messages: string[];
     currentPlayerId: number | null; // Player whose turn it is
     currentHandId: string | null; // Hand whose turn it is
-    minBet: number;
-    maxBet: number;
-    allowSurrender: boolean;
-    blackjackPayout: '3to2' | '6to5';
     dealerNet: number;
     isBettingLocked: boolean; // ADDED
     stats?: NightStats; // absent in saves from before the night summary
     departed?: Departure[]; // removed players, still settled
+    bankerId?: number; // a player banking instead of the house
+    bankerRounds?: number; // rounds banked so far this turn
 }

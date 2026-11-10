@@ -14,6 +14,11 @@ import { blackjackSettlement } from '../../utils/gameSettlement';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
 import Celebration from '../../components/Celebration';
+import InteractionModal from '../../components/InteractionModal';
+import SettingsFields from '../../components/SettingsFields';
+import { parseBlackjack } from '../../utils/gameSettings';
+import { BLACKJACK_FIELDS, toForm } from '../../utils/settingsFields';
+import { blackjackSettingsOf } from '../engine';
 
 interface BlackjackGameScreenProps {
     blackjackHook: ReturnType<typeof useBlackjackGame>;
@@ -30,6 +35,24 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     const [showOwings, setShowOwings] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
+    const [settingsForm, setSettingsForm] = useState<Record<string, string> | null>(null);
+    const banker = players.find(p => p.id === gameState.bankerId);
+
+    const openSettings = () => {
+        if (isReadOnly) return;
+        setSettingsForm(toForm(blackjackSettingsOf(gameState)));
+        onInteractionChange(true);
+    };
+    const closeSettings = () => {
+        setSettingsForm(null);
+        onInteractionChange(false);
+    };
+    const saveSettings = () => {
+        const settings = parseBlackjack(settingsForm ?? {});
+        if (typeof settings === 'string') return alert(settings);
+        actions.applySettings(settings);
+        closeSettings();
+    };
 
     const handleShowModal = (mode: ModalMode) => {
         if (isReadOnly) return;
@@ -67,7 +90,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     const isDealDisabled = useMemo(() => {
         if (isBettingLocked) return true; // Disabled if bets are locked
 
-        const activePlayers = players.filter(p => !p.isTakingBreak && p.initialHandsCount > 0);
+        const activePlayers = players.filter(p => !p.isTakingBreak && p.initialHandsCount > 0 && p.id !== gameState.bankerId);
         if (activePlayers.length === 0) return true; // No one to deal to
 
         // Check if all hands have bets
@@ -79,7 +102,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
         }
         
         return false; // All hands have bets
-    }, [players, isBettingLocked]);
+    }, [players, isBettingLocked, gameState.bankerId]);
     // --- END UPDATED LOGIC ---
 
     return (
@@ -101,6 +124,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                     </div>
 
                     <BlackjackDealerDisplay dealerNet={dealerNet} />
+                    {banker && <p style={{ textAlign: 'center' }}>Banker: <strong>{banker.name}</strong> ({(gameState.bankerRounds ?? 0) + 1} of {gameState.bankerEvery} rounds)</p>}
 
                     {gameStage === 'betting' && (
                         <div style={isReadOnly ? { pointerEvents: 'none', opacity: 0.7 } : {}}>
@@ -113,6 +137,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                                 isDealDisabled={isDealDisabled}
                                 onShowSetup={handleShowSetup}
                             />
+                            <button className="btn-secondary" onClick={openSettings}>Settings</button>
                         </div>
                     )}
                     
@@ -144,6 +169,11 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                                     gameStage={gameStage}
                                     isBettingLocked={isBettingLocked} 
                                     onPlaceBet={actions.placeBet}
+                                    isBanker={player.id === gameState.bankerId}
+                                    insurance={gameState.insurance}
+                                    sideBets={gameState.sideBets}
+                                    onPlaceSideBet={actions.placeSideBet}
+                                    onSettleSideBet={actions.settleSideBet}
                                     onPlayerAction={actions.handlePlayerAction}
                                     onSetHandStatus={actions.setHandStatus}
                                     onUnlockBet={actions.unlockAllBets} 
@@ -164,7 +194,15 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                 onAddChips={actions.addChipsToPlayer}
                 onToggleBreak={actions.togglePlayerBreak}
                 onUpdateHands={actions.updatePlayerHandCount}
+                defaultHands={gameState.defaultHands}
             />
+
+            {settingsForm && (
+                <InteractionModal isOpen={true} onClose={closeSettings} title="Settings" theme="default"
+                    footerContent={<><button className="btn-modal btn-modal-secondary" onClick={closeSettings}>Cancel</button><button className="btn-modal btn-modal-primary theme-default" onClick={saveSettings}>Confirm</button></>}>
+                    <SettingsFields fields={BLACKJACK_FIELDS} form={settingsForm} onChange={setSettingsForm} />
+                </InteractionModal>
+            )}
 
             <OwingsModal
                 isOpen={showOwings}

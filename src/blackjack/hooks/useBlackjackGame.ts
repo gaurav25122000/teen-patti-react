@@ -10,6 +10,8 @@ import { archiveOrWarn } from '../../utils/archive';
 import { rememberPlayers } from '../../utils/savedPlayers';
 import * as engine from '../engine';
 import type { Io } from '../../utils/engine';
+import type { BlackjackSettings } from '../../utils/gameSettings';
+import type { SideResult } from '../types/blackjackGameTypes';
 
 export const BLACKJACK_STORAGE_KEY = 'blackjackGameState';
 
@@ -65,8 +67,8 @@ export const useBlackjackGame = () => {
         setGameState(engine.createInitialBlackjackState());
     }, [setGameState]);
 
-    const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string, numHands: number }[]) => {
-        const next = engine.newBlackjackGame(players);
+    const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string, numHands: number }[], settings: BlackjackSettings) => {
+        const next = engine.newBlackjackGame(players, settings);
         setGameState(prev => {
             afterCommit(() => archiveBlackjack(prev));
             return next;
@@ -100,6 +102,11 @@ export const useBlackjackGame = () => {
     const togglePlayerBreak = useCallback((playerId: number) => step((s, io) => engine.togglePlayerBreak(s, playerId, io)), [step]);
     const updatePlayerHandCount = useCallback((playerId: number, numHands: number) => step((s, io) => engine.updatePlayerHandCount(s, playerId, numHands, io)), [step]);
     const unlockAllBets = useCallback(() => step((s, io) => engine.unlockAllBets(s, io)), [step]);
+    const applySettings = useCallback((settings: BlackjackSettings) => step((s, io) => engine.applySettings(s, settings, io)), [step]);
+    const placeSideBet = useCallback((playerId: number, handIndex: number, kind: engine.SideKind, amount: number) =>
+        step((s, io) => engine.placeSideBet(s, playerId, handIndex, kind, amount, io)), [step]);
+    const settleSideBet = useCallback((playerId: number, handId: string, kind: engine.SideKind, result: SideResult) =>
+        step((s, io) => engine.settleSideBet(s, playerId, handId, kind, result, io)), [step]);
 
     const actions = useMemo(() => ({
         setupNewGame,
@@ -117,8 +124,12 @@ export const useBlackjackGame = () => {
         updatePlayerHandCount,
         unlockAllBets,
         settleInsurance,
+        applySettings,
+        placeSideBet,
+        settleSideBet,
     }), [setupNewGame, clearGame, setupGame, loadGame, placeBet, startRound, handlePlayerAction, setHandStatus,
-        addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, updatePlayerHandCount, unlockAllBets, settleInsurance]);
+        addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, updatePlayerHandCount, unlockAllBets, settleInsurance,
+        applySettings, placeSideBet, settleSideBet]);
 
     const recordedActions = useMemo(() => record(actions), [record, actions]);
 

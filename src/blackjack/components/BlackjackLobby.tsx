@@ -37,8 +37,8 @@ const BlackjackLobby: React.FC<BlackjackLobbyProps> = ({ blackjackHook, onIntera
         case 'intro':
             return <BlackjackIntroScreen onStartNew={() => setStep('setup')} onLoadGame={handleLoadGame} />;
         case 'setup':
-            return <BlackjackGameSetup onStartGame={(players) => {
-                actions.setupGame(players);
+            return <BlackjackGameSetup onStartGame={(players, settings) => {
+                actions.setupGame(players, settings);
                 setStep('game');
             }} />;
         case 'game':

@@ -43,7 +43,7 @@ test('tournament settings: buy-in and chips required, add-on in pairs, payouts s
         assert.equal(parsePoker({ ...t, payouts }), 'Payouts must add up to 100%.', payouts);
     }
     const poker = { smallBlindAmount: 10, bigBlindAmount: 20, tournament: true, buyIn: 500, startingChips: 1000 };
-    assert.equal(pokerChange(poker, { ...poker, buyIn: 600, addOnPrice: 200, addOnChips: 1500, payouts: [60, 40] }), 'Settings: buy-in ₹600, add-on ₹200 for 1500 chips, payouts 60/40%');
+    assert.equal(pokerChange(poker, { ...poker, buyIn: 600, addOnPrice: 200, addOnChips: 1500, payouts: [60, 40] }), 'Settings: buy-in ₹600, add-on ₹200 for 1500 chips, payouts 60/40');
     assert.equal(pokerChange({ ...poker, payouts: [60, 40] }, { ...poker, payouts: [60, 40] }), null);
     assert.equal(pokerChange({ ...poker, payouts: [60, 40] }, poker), 'Settings: payouts off');
 });

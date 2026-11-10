@@ -1,15 +1,62 @@
 // Blackjack game steps as pure functions: the hook runs them inside setGameState, tests run them directly.
-import type { BlackjackGameState, BlackjackPlayer, PlayerHand, HandStatus, GameStage } from './types/blackjackGameTypes.ts';
+import type { BlackjackGameState, BlackjackPlayer, PlayerHand, HandStatus, GameStage, SideResult } from './types/blackjackGameTypes.ts';
 import type { Io, RawRecord } from '../utils/engine.ts';
-import { toTitleCase } from '../utils/formatters.ts';
+import { formatAmount, toTitleCase } from '../utils/formatters.ts';
+import { blackjackChange, MID_ROUND, type BlackjackSettings } from '../utils/gameSettings.ts';
 import { biggestWin, emptyStats, partialStats, recordRound, statsNames } from '../utils/nightStats.ts';
 import { partyKey } from '../utils/owingsLogic.ts';
 import { cleanPhone } from '../utils/savedPlayers.ts';
 import { depart, departureNote, tooFewToRemove } from '../utils/departures.ts';
 
-// A player's chips counting bets still on the table (open wagers and unresolved insurance).
+// Side bet payouts (x:1) by result.
+export const PAIR_PAYS: Partial<Record<SideResult, number>> = { mixed: 6, coloured: 12, perfect: 25 };
+export const THREE_PAYS: Partial<Record<SideResult, number>> = { flush: 5, straight: 10, trips: 30, 'straight-flush': 40, 'suited-trips': 100 };
+const SIDE_LABELS: Record<SideResult, string> = {
+    lose: 'lose', mixed: 'mixed pair', coloured: 'coloured pair', perfect: 'perfect pair',
+    flush: 'flush', straight: 'straight', trips: 'three of a kind', 'straight-flush': 'straight flush', 'suited-trips': 'suited trips',
+};
+export type SideKind = 'pp' | 't3';
+const RESULT_KEY = { pp: 'ppResult', t3: 't3Result' } as const;
+const sideOpen = (h: PlayerHand, kind: SideKind) => (h[kind] && !h[RESULT_KEY[kind]] ? h[kind]! : 0);
+// A settled side bet's net for the player: bet × ratio won, or the bet lost.
+const sideNet = (h: PlayerHand, kind: SideKind) => {
+    const result = h[RESULT_KEY[kind]];
+    if (!h[kind] || !result) return 0;
+    return result === 'lose' ? -h[kind]! : h[kind]! * ((kind === 'pp' ? PAIR_PAYS : THREE_PAYS)[result] ?? 0);
+};
+// Money a hand has on the table before the deal: its bet and side bets.
+const placedOn = (h: PlayerHand) => h.bet + (h.pp ?? 0) + (h.t3 ?? 0);
+
+// A player's chips counting bets still on the table (open wagers, unresolved insurance and side bets).
 export const chipsWithBets = (p: BlackjackPlayer) => p.stack + p.hands.reduce((sum, h) =>
-    sum + (h.status === 'playing' || h.status === 'stand' ? h.wager : 0) + (h.insurance && !h.insuranceResult ? h.insurance : 0), 0);
+    sum + (h.status === 'playing' || h.status === 'stand' ? h.wager : 0) + (h.insurance && !h.insuranceResult ? h.insurance : 0) + sideOpen(h, 'pp') + sideOpen(h, 't3'), 0);
+
+// The house side of a result: the banker's stack when a player banks, else dealerNet.
+const toHouse = (s: BlackjackGameState, players: BlackjackPlayer[], amount: number) =>
+    s.bankerId === undefined
+        ? { players, dealerNet: s.dealerNet + amount }
+        : { players: players.map(p => (p.id === s.bankerId ? { ...p, stack: p.stack + amount } : p)), dealerNet: s.dealerNet };
+
+const bankerRefusal = (name: string) => `${name} is the banker this round.`;
+
+// The next player by seat after afterId (from the first seat when absent) who isn't on a break.
+const nextBanker = (players: BlackjackPlayer[], afterId?: number) => {
+    const start = afterId === undefined ? -1 : players.findIndex(p => p.id === afterId);
+    for (let i = 1; i <= players.length; i++) {
+        const p = players[(start + i) % players.length];
+        if (!p.isTakingBreak) return p;
+    }
+    return undefined;
+};
+
+// Between rounds: the banker's placed bets go back and their turn starts at 0 rounds.
+const withBanker = (s: BlackjackGameState, banker: BlackjackPlayer | undefined): BlackjackGameState => banker ? {
+    ...s,
+    bankerId: banker.id,
+    bankerRounds: 0,
+    players: s.players.map(p => (p.id === banker.id ? { ...p, stack: p.stack + p.hands.reduce((sum, h) => sum + placedOn(h), 0), hands: [] } : p)),
+    messages: [...s.messages, `${banker.name} is now the banker for ${s.bankerEvery} rounds.`],
+} : { ...s, bankerId: undefined, bankerRounds: 0 };
 
 export type HandAction = 'hit' | 'stand' | 'double' | 'split' | 'surrender' | 'insurance';
 
@@ -26,6 +73,9 @@ export const createInitialBlackjackState = (): BlackjackGameState => ({
     blackjackPayout: '3to2',
     dealerNet: 0,
     isBettingLocked: true,
+    insurance: true,
+    defaultHands: 1,
+    sideBets: false,
     stats: emptyStats(),
 });
 
@@ -56,11 +106,42 @@ const emptyHand = (playerId: number, index: number): PlayerHand =>
     ({ id: `${playerId}-hand-${index}`, cards: [], bet: 0, wager: 0, status: 'playing', hasHit: false });
 
 const areAllHandsSettled = (players: BlackjackPlayer[]): boolean =>
-    players.every(p => p.isTakingBreak || p.hands.every(h => !(h.status === 'playing' || h.status === 'stand' || (h.insurance && !h.insuranceResult))));
+    players.every(p => p.isTakingBreak || p.hands.every(h => !(h.status === 'playing' || h.status === 'stand' || (h.insurance && !h.insuranceResult) || sideOpen(h, 'pp') || sideOpen(h, 't3'))));
 
-export const newBlackjackGame = (players: { name: string; stack: number; phoneNumber: string; numHands: number }[]): BlackjackGameState => {
-    const initial = createInitialBlackjackState();
-    return {
+const finishIfSettled = (next: BlackjackGameState, io: Io): BlackjackGameState => {
+    if (!areAllHandsSettled(next.players)) return next;
+    io.log("All hands settled.");
+    return endRoundAndPay(next, io);
+};
+
+export const blackjackSettingsOf = (s: BlackjackGameState): BlackjackSettings => ({
+    blackjackPayout: s.blackjackPayout, allowSurrender: s.allowSurrender, minBet: s.minBet, maxBet: s.maxBet,
+    insurance: s.insurance, defaultHands: s.defaultHands, bankerEvery: s.bankerEvery, sideBets: s.sideBets,
+});
+
+// Between rounds only. Side bets turned off go back; a banker starts (or restarts) when "banker every" changes.
+export const applySettings = (prev: BlackjackGameState, settings: BlackjackSettings, io: Io): BlackjackGameState => {
+    if (prev.gameStage !== 'betting') {
+        io.log(MID_ROUND);
+        return prev;
+    }
+    const line = blackjackChange(blackjackSettingsOf(prev), settings);
+    let next: BlackjackGameState = { ...prev, ...settings, messages: line ? [...prev.messages, line] : prev.messages };
+    if (!settings.sideBets) {
+        next = { ...next, players: next.players.map(p => ({
+            ...p,
+            stack: p.stack + p.hands.reduce((sum, h) => sum + (h.pp ?? 0) + (h.t3 ?? 0), 0),
+            hands: p.hands.map(h => ({ ...h, pp: undefined, t3: undefined })),
+        })) };
+    }
+    if (settings.bankerEvery === prev.bankerEvery) return next;
+    if (!settings.bankerEvery) return { ...next, bankerId: undefined, bankerRounds: 0 };
+    return withBanker(next, next.players.find(p => p.id === prev.bankerId) ?? nextBanker(next.players));
+};
+
+export const newBlackjackGame = (players: { name: string; stack: number; phoneNumber: string; numHands: number }[], settings?: BlackjackSettings): BlackjackGameState => {
+    const initial = { ...createInitialBlackjackState(), ...settings };
+    const game: BlackjackGameState = {
         ...initial,
         players: players.map((p, i) => ({
             id: i + 1,
@@ -75,6 +156,7 @@ export const newBlackjackGame = (players: { name: string; stack: number; phoneNu
         })),
         messages: [`Game setup with ${players.length} players. Bets are locked to ₹${initial.minBet}. Click 'Deal Cards' to play or 'Change Bets' to unlock.`]
     };
+    return game.bankerEvery ? withBanker(game, nextBanker(game.players)) : game;
 };
 
 export const placeBet = (prev: BlackjackGameState, playerId: number, handIndex: number, amount: number, io: Io): BlackjackGameState => {
@@ -88,6 +170,11 @@ export const placeBet = (prev: BlackjackGameState, playerId: number, handIndex: 
     }
     if (amount < prev.minBet || amount > prev.maxBet) {
         io.log(`Bet must be between ${prev.minBet} and ${prev.maxBet}.`);
+        return prev;
+    }
+    const bettor = prev.players.find(p => p.id === playerId);
+    if (bettor && bettor.id === prev.bankerId) {
+        io.log(bankerRefusal(bettor.name));
         return prev;
     }
     return {
@@ -108,19 +195,63 @@ export const placeBet = (prev: BlackjackGameState, playerId: number, handIndex: 
     };
 };
 
+// Perfect Pairs or 21+3 on a hand that has its bet; 0 clears it, a new amount replaces the old.
+export const placeSideBet = (prev: BlackjackGameState, playerId: number, handIndex: number, kind: SideKind, amount: number, io: Io): BlackjackGameState => {
+    const player = prev.players.find(p => p.id === playerId);
+    if (!prev.sideBets || !player || amount < 0) return prev;
+    const hand = player.hands[handIndex];
+    const refusal = prev.gameStage !== 'betting' ? "Can only place bets before the deal."
+        : prev.isBettingLocked ? "Bets are locked. Click 'Change Bets' to unlock."
+        : player.id === prev.bankerId ? bankerRefusal(player.name)
+        : !hand || hand.bet <= 0 ? "Place the hand's bet first."
+        : amount > prev.maxBet ? `Side bets can be at most ₹${formatAmount(prev.maxBet)}.`
+        : player.stack + (hand[kind] ?? 0) < amount ? `${player.name} does not have enough chips.` : null;
+    if (refusal) {
+        io.log(refusal);
+        return prev;
+    }
+    return {
+        ...prev,
+        players: prev.players.map(p => (p.id !== playerId ? p : {
+            ...p,
+            stack: p.stack + (hand[kind] ?? 0) - amount,
+            hands: p.hands.map((h, i) => (i === handIndex ? { ...h, [kind]: amount || undefined } : h)),
+        })),
+    };
+};
+
+// The host marks a side bet: a win pays bet × ratio from the house (or banker), a loss goes to them.
+export const settleSideBet = (prev: BlackjackGameState, playerId: number, handId: string, kind: SideKind, result: SideResult, io: Io): BlackjackGameState => {
+    if (prev.gameStage !== 'player-turn' && prev.gameStage !== 'dealer-turn') return prev;
+    const player = prev.players.find(p => p.id === playerId);
+    const hand = player?.hands.find(h => h.id === handId);
+    const ratio = result === 'lose' ? 0 : (kind === 'pp' ? PAIR_PAYS : THREE_PAYS)[result];
+    if (!player || !hand || !sideOpen(hand, kind) || ratio === undefined) return prev;
+    const bet = hand[kind]!;
+    const label = `${player.name} (Hand ${handNumber(handId)}) ${kind === 'pp' ? 'Perfect Pairs' : '21+3'}`;
+    io.log(ratio ? `${label}: ${SIDE_LABELS[result]}, wins ₹${formatAmount(bet * ratio)}.` : `${label} loses ₹${formatAmount(bet)}.`);
+    const players = prev.players.map(p => (p.id !== playerId ? p : {
+        ...p,
+        stack: p.stack + (ratio ? bet * (1 + ratio) : 0),
+        hands: p.hands.map(h => (h.id === handId ? { ...h, [RESULT_KEY[kind]]: result } : h)),
+    }));
+    return finishIfSettled({ ...prev, ...toHouse(prev, players, ratio ? -bet * ratio : bet) }, io);
+};
+
 export const startRound = (prev: BlackjackGameState, io: Io): BlackjackGameState => {
     let activePlayerFound = false;
     let totalHands = 0;
     let handsWithBets = 0;
 
     const newPlayers = prev.players.map(p => {
+        if (p.id === prev.bankerId) return { ...p, stack: p.stack + p.hands.reduce((sum, h) => sum + placedOn(h), 0), hands: [] };
         const totalLastBet = p.lastBets.slice(0, p.initialHandsCount).reduce((a, b) => a + b, 0);
         const placed = p.hands.some(h => h.bet > 0); // unlocked bets already came out of the stack
         if (p.isTakingBreak || (prev.isBettingLocked ? p.stack < totalLastBet : !placed && p.stack < prev.minBet)) {
             if (p.isTakingBreak) io.log(`${p.name} is on break.`);
             else io.log(`${p.name} has insufficient chips to play.`);
             // Bets already placed on a skipped player's hands go back to them.
-            return { ...p, stack: p.stack + p.hands.reduce((sum, h) => sum + h.bet, 0), hands: [] };
+            return { ...p, stack: p.stack + p.hands.reduce((sum, h) => sum + placedOn(h), 0), hands: [] };
         }
 
         let currentHands = p.hands.length === 0 ? Array.from({ length: p.initialHandsCount }, (_, i) => emptyHand(p.id, i)) : p.hands;
@@ -211,6 +342,7 @@ const findNextHand = (players: BlackjackPlayer[], currentPlayerId: number, curre
 const endRoundAndPay = (endState: BlackjackGameState, io: Io): BlackjackGameState => {
     const rows: RawRecord[] = [];
     const nets: Record<string, number> = {}; // players who bet this round
+    let tableNet = 0; // the players' total, which the banker takes the other side of
 
     const finalPlayers = endState.players.map(p => {
         let roundNet = 0;
@@ -224,14 +356,21 @@ const endRoundAndPay = (endState: BlackjackGameState, io: Io): BlackjackGameStat
             // Insurance pays 2:1, settled separately from the hand
             if (h.insuranceResult === 'won') roundNet += h.insurance! * 2;
             else if (h.insuranceResult === 'lost') roundNet -= h.insurance!;
+            roundNet += sideNet(h, 'pp') + sideNet(h, 't3');
         });
+        tableNet += roundNet;
         if (p.hands.some(h => h.bet > 0)) nets[partyKey(p.name, p.phoneNumber)] = roundNet;
         if (p.phoneNumber && roundNet !== 0) rows.push({ phone: p.phoneNumber, name: p.name, winnings: roundNet });
         return { ...p, hands: [], lastBets: p.lastBets.map((oldBet, i) => newLastBets.get(i) || oldBet) };
     });
+    const banker = endState.players.find(p => p.id === endState.bankerId);
+    if (banker) {
+        nets[partyKey(banker.name, banker.phoneNumber)] = -tableNet;
+        if (banker.phoneNumber && tableNet !== 0) rows.push({ phone: banker.phoneNumber, name: banker.name, winnings: -tableNet });
+    }
     io.records(rows);
 
-    return {
+    const next: BlackjackGameState = {
         ...endState,
         players: finalPlayers,
         gameStage: 'betting',
@@ -242,6 +381,9 @@ const endRoundAndPay = (endState: BlackjackGameState, io: Io): BlackjackGameStat
         stats: recordRound(endState.stats ?? emptyStats(), nets, biggestWin(nets), statsNames(endState.players)),
         messages: [...endState.messages, "--- ROUND OVER ---", `Bets locked to last amount. Click 'Change Bets' to unlock.`]
     };
+    if (!next.bankerEvery) return next;
+    const rounds = (endState.bankerRounds ?? 0) + 1;
+    return banker && rounds < next.bankerEvery ? { ...next, bankerRounds: rounds } : withBanker(next, nextBanker(next.players, banker?.id));
 };
 
 export const playerAction = (prev: BlackjackGameState, action: HandAction, io: Io): BlackjackGameState => {
@@ -255,7 +397,7 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
     let nextPlayerId: number | null = prev.currentPlayerId;
     let nextHandId: string | null = prev.currentHandId;
     let nextStage: GameStage = 'player-turn';
-    let newDealerNet = prev.dealerNet;
+    let houseGain = 0;
     const label = `${player.name} (Hand ${handNumber(hand.id)})`;
 
     const updateHand = (updates: Partial<PlayerHand>) => {
@@ -320,9 +462,13 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
             io.log(`${label} surrenders.`);
             updateStack(player.stack + hand.bet / 2); // half the original bet back
             updateHand({ status: 'surrendered' });
-            newDealerNet += hand.bet / 2;
+            houseGain += hand.bet / 2;
             break;
         case 'insurance': {
+            if (!prev.insurance) {
+                io.log("Insurance is off at this table.");
+                return prev;
+            }
             if (hand.hasHit || hand.insurance) {
                 io.log("Insurance is offered once per hand, before hitting.");
                 return prev;
@@ -354,11 +500,11 @@ export const playerAction = (prev: BlackjackGameState, action: HandAction, io: I
             io.log("All players have acted. Dealer's turn. Settle all hands.");
             if (areAllHandsSettled(newPlayers)) {
                 io.log("All hands settled.");
-                return endRoundAndPay({ ...prev, players: newPlayers, dealerNet: newDealerNet, gameStage: 'dealer-turn' }, io);
+                return endRoundAndPay({ ...prev, ...toHouse(prev, newPlayers, houseGain), gameStage: 'dealer-turn' }, io);
             }
         }
     }
-    return { ...prev, players: newPlayers, gameStage: nextStage, currentPlayerId: nextPlayerId, currentHandId: nextHandId, dealerNet: newDealerNet };
+    return { ...prev, ...toHouse(prev, newPlayers, houseGain), gameStage: nextStage, currentPlayerId: nextPlayerId, currentHandId: nextHandId };
 };
 
 export const setHandStatus = (prev: BlackjackGameState, playerId: number, handId: string, status: HandStatus, io: Io): BlackjackGameState => {
@@ -409,12 +555,7 @@ export const setHandStatus = (prev: BlackjackGameState, playerId: number, handId
         else if (finalStatus === 'surrendered') io.log(`${label} surrendered and loses ₹${handBet / 2}`);
     }
 
-    const next = { ...prev, players: newPlayers, dealerNet: prev.dealerNet + dealerNetChange };
-    if (areAllHandsSettled(newPlayers)) {
-        io.log("All hands settled.");
-        return endRoundAndPay(next, io);
-    }
-    return next;
+    return finishIfSettled({ ...prev, ...toHouse(prev, newPlayers, dealerNetChange) }, io);
 };
 
 // Host answers whether the dealer had blackjack: insured hands get the side bet back plus 2:1, or lose it.
@@ -437,12 +578,7 @@ export const settleInsurance = (prev: BlackjackGameState, dealerHasBlackjack: bo
         });
         return { ...p, stack, hands };
     });
-    const next = { ...prev, players: newPlayers, dealerNet: prev.dealerNet + dealerNetChange };
-    if (areAllHandsSettled(newPlayers)) {
-        io.log("All hands settled.");
-        return endRoundAndPay(next, io);
-    }
-    return next;
+    return finishIfSettled({ ...prev, ...toHouse(prev, newPlayers, dealerNetChange) }, io);
 };
 
 export const addPlayer = (prev: BlackjackGameState, name: string, stack: number, phoneNumber: string, numHands: number, io: Io): BlackjackGameState => {
@@ -474,11 +610,11 @@ export const removePlayer = (prev: BlackjackGameState, playerId: number, io: Io)
     }
     const net = chipsWithBets(leaver) - leaver.totalBuyIn;
     io.log(`Player ${toTitleCase(leaver.name)} has been removed.${departureNote(net)}`);
-    return {
-        ...prev,
-        players: prev.players.filter(p => p.id !== playerId),
-        departed: depart(prev.departed, { name: leaver.name, phone: leaver.phoneNumber, net }),
-    };
+    const players = prev.players.filter(p => p.id !== playerId);
+    const next = { ...prev, players, departed: depart(prev.departed, { name: leaver.name, phone: leaver.phoneNumber, net }) };
+    if (leaver.id !== prev.bankerId) return next;
+    const seat = prev.players.indexOf(leaver); // the banker role moves to the next seat at once
+    return withBanker(next, nextBanker(players, players[seat - 1]?.id));
 };
 
 export const addChipsToPlayer = (prev: BlackjackGameState, playerId: number, amount: number, io: Io): BlackjackGameState => {
@@ -536,8 +672,8 @@ export const unlockAllBets = (prev: BlackjackGameState, io: Io): BlackjackGameSt
         ...prev,
         players: prev.players.map(p => ({
             ...p,
-            stack: p.stack + p.hands.reduce((sum, h) => sum + h.bet, 0),
-            hands: Array.from({ length: p.initialHandsCount }, (_, i) => emptyHand(p.id, i)),
+            stack: p.stack + p.hands.reduce((sum, h) => sum + placedOn(h), 0),
+            hands: p.id === prev.bankerId ? [] : Array.from({ length: p.initialHandsCount }, (_, i) => emptyHand(p.id, i)),
         })),
         isBettingLocked: false,
     };
