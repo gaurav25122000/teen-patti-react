@@ -8,6 +8,7 @@ import type { SideKind } from '../engine';
 const CHIPS = [10, 50, 100, 500];
 const PAIR_RESULTS: [SideResult, string][] = [['lose', 'Lose'], ['mixed', 'Mixed 6:1'], ['coloured', 'Coloured 12:1'], ['perfect', 'Perfect 25:1']];
 const THREE_RESULTS: [SideResult, string][] = [['lose', 'Lose'], ['flush', 'Flush 5:1'], ['straight', 'Straight 10:1'], ['trips', 'Trips 30:1'], ['straight-flush', 'Str. flush 40:1'], ['suited-trips', 'Suited trips 100:1']];
+const RESULT_THEMES = ['btn-error', 'btn-sky', 'btn-violet', 'btn-pink', 'btn-orange', 'btn-accent']; // by position: Lose, then each payout
 
 interface BlackjackPlayerHandsProps {
     player: BlackjackPlayer;
@@ -71,10 +72,10 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                     />
                     <button className="btn-success" onClick={() => handleBetSubmit(handIndex)}>Place Bet</button>
                 </div>
-                <div className="game-actions">
-                    {CHIPS.map(chip => <button key={chip} className="btn-sm btn-outline-secondary" onClick={() => addChip(chip)}>+₹{chip}</button>)}
-                    <button className="btn-sm btn-outline-secondary" onClick={() => handleBetChange(handIndex, '')}>CLEAR</button>
-                    <button className="btn-sm btn-outline-secondary" onClick={() => handleBetChange(handIndex, String(lastBetForThisHand))}>REPEAT LAST</button>
+                <div className="chip-row">
+                    {CHIPS.map(chip => <button key={chip} className="btn btn-chip" onClick={() => addChip(chip)}>+₹{chip}</button>)}
+                    <button className="btn btn-error btn-compact" onClick={() => handleBetChange(handIndex, '')}>CLEAR</button>
+                    <button className="btn btn-sky btn-compact" onClick={() => handleBetChange(handIndex, String(lastBetForThisHand))}>REPEAT LAST</button>
                 </div>
                 {sideBets && hand.bet > 0 && renderSideBetInputs(handIndex)}
             </>
@@ -91,7 +92,7 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                     <div key={kind} className="inline-input-group">
                         <input type="number" inputMode="decimal" min="0" value={sideAmounts[key] ?? ''} placeholder={`${kind === 'pp' ? 'Perfect Pairs' : '21+3'}${placed ? ` (₹${placed})` : ''}`}
                             onChange={e => setSideAmounts(prev => ({ ...prev, [key]: e.target.value }))} />
-                        <button className="btn-secondary" onClick={() => {
+                        <button className="btn-orange" onClick={() => {
                             onPlaceSideBet(player.id, handIndex, kind, Number(sideAmounts[key] || '0') || 0);
                             setSideAmounts(prev => ({ ...prev, [key]: '' }));
                         }}>Place</button>
@@ -109,8 +110,8 @@ const BlackjackPlayerHands: React.FC<BlackjackPlayerHandsProps> = ({
                 .map(([kind, results, title]) => (
                     <div key={kind} className="game-actions">
                         <span>{title} ₹{hand[kind]}:</span>
-                        {results.map(([result, label]) => (
-                            <button key={result} className="btn-sm btn-outline-secondary" onClick={() => onSettleSideBet(player.id, hand.id, kind, result)}>{label}</button>
+                        {results.map(([result, label], i) => (
+                            <button key={result} className={`btn ${RESULT_THEMES[i]} btn-compact`} onClick={() => onSettleSideBet(player.id, hand.id, kind, result)}>{label}</button>
                         ))}
                     </div>
                 ))}

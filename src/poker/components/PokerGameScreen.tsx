@@ -217,8 +217,8 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 <div className="blind-clock">
                     <span>{levelText}</span>
                     {!isReadOnly && (gameState.pausedRemainingMs !== undefined
-                        ? <button className="btn-sm btn-outline-secondary" onClick={actions.resumeBlindClock}>RESUME</button>
-                        : <button className="btn-sm btn-outline-secondary" onClick={actions.pauseBlindClock}>PAUSE</button>)}
+                        ? <button className="btn btn-success btn-compact" onClick={actions.resumeBlindClock}>RESUME</button>
+                        : <button className="btn btn-orange btn-compact" onClick={actions.pauseBlindClock}>PAUSE</button>)}
                 </div>
             )}
         </div>
@@ -372,15 +372,15 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
             <div className="game-screen">
                 <div className="player-list-container">
                     <PokerPlayerList players={players} gameState={gameState} />
-                    <ActionLog messages={messages} />
-                </div>
-                <div className="main-content-container">
                     {renderStageDisplay()}
                     {gameStage !== 'pre-deal' && (
-                        <div className="pot-display" style={{ marginTop: 'auto', paddingTop: '2rem' }}>
+                        <div className="pot-display">
                             <h2>Total Pot: ₹ {players.reduce((sum, p) => sum + p.totalPotContribution, 0)}</h2>
                         </div>
                     )}
+                </div>
+                <div className="main-content-container">
+                    <ActionLog messages={messages} />
                 </div>
             </div>
             {!isReadOnly && (betting ? (
@@ -395,9 +395,9 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                 <ActionPanel
                     info={<>Between hands · Blinds ₹{gameState.smallBlindAmount}/₹{gameState.bigBlindAmount}{gameState.bombNext ? ' · Next hand is a bomb pot' : ''}</>}
                     buttons={[
-                        { label: 'ADD PLAYER', onClick: () => setModalMode('addPlayer') },
-                        { label: '☰ TABLE', onClick: () => setShowTable(true) },
-                        { label: nextIsBomb ? 'DEAL BOMB POT' : 'DEAL', onClick: actions.startNewHand, kind: 'primary' },
+                        { label: 'ADD PLAYER', onClick: () => setModalMode('addPlayer'), theme: 'btn-violet' },
+                        { label: '☰ TABLE', onClick: () => setShowTable(true), theme: 'btn-sky' },
+                        { label: nextIsBomb ? 'DEAL BOMB POT' : 'DEAL', onClick: actions.startNewHand, theme: 'btn-start rainbow-outline', kind: 'primary' },
                     ]}
                 />
             ))}
@@ -419,7 +419,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
                         { icon: '⚙', label: 'Settings', onClick: () => { setSettingsForm(toForm(pokerSettingsOf(gameState))); setModalMode('settings'); } },
                         ...(gameState.bombAmount !== undefined ? [{ icon: '💣', label: `Bomb pot next hand: ${gameState.bombNext ? 'On' : 'Off'}`, onClick: actions.toggleBombNext }] : []),
                         ...(tournament && !gameState.tournamentOver ? [{ icon: '✂', label: 'Chop', onClick: () => setModalMode('chop') }] : []),
-                        { icon: '⏹', label: 'End game', onClick: () => { if (window.confirm(END_GAME_CONFIRM)) actions.endGame(); } },
+                        { icon: '⏹', label: 'End game', danger: true, onClick: () => { if (window.confirm(END_GAME_CONFIRM)) actions.endGame(); } },
                     ]],
                 ]} />
             )}

@@ -50,7 +50,7 @@ const HistoryScreen: React.FC = () => {
         };
         return (
             <div className="setup-screen">
-                <button className="btn-secondary" onClick={() => { setOpenId(null); setPayNote(null); }}>← History</button>
+                <button className="btn-orange" onClick={() => { setOpenId(null); setPayNote(null); }}>← History</button>
                 <h2>{GAME_LABELS[open.game]}</h2>
                 <p>{when(open.endedAt)}</p>
                 <ul className="owings-list">
@@ -92,7 +92,7 @@ const HistoryScreen: React.FC = () => {
     return (
         <div className="setup-screen">
             <h2>History</h2>
-            <Link to="/stats" className="btn-secondary">Player stats</Link>
+            <Link to="/stats" className="btn-sky">Player stats</Link>
             {notice && <p className="form-error">{notice}</p>}
             {liveHistory(entries).length === 0 ? <p>No finished games yet. A game is kept here when you end it.</p> : (
                 <ul className="history-list">

@@ -42,18 +42,19 @@ const TeenPattiPanel: React.FC<TeenPattiPanelProps> = ({ gameState, currentPlaye
     };
 
     const buttons: PanelButton[] = limitReached
-        ? [{ label: 'PICK WINNER', onClick: actions.onEndBettingClick, kind: 'primary' }]
+        ? [{ label: 'PICK WINNER', onClick: actions.onEndBettingClick, theme: 'btn-secondary', kind: 'primary' }]
         : [
-            { label: 'FOLD', onClick: fold, kind: 'fold' },
-            ...(blind ? [{ label: 'SEE', onClick: actions.seeCards }] : []),
-            ...(mustSee ? [] : [{ label: `SHOW ₹${minBet}`, onClick: actions.onShowClick, disabled: showDisabled }]),
-            { label: 'END BETTING', onClick: actions.onEndBettingClick },
-            { label: blind ? (amount > currentStake ? `RAISE ₹${amount}` : `PLAY ₹${amount}`) : `CHAAL ₹${amount}`, onClick: bet, kind: 'primary', disabled: !!mustSee },
+            { label: 'FOLD', onClick: fold, theme: 'btn-error', kind: 'fold' },
+            ...(blind ? [{ label: 'SEE', onClick: actions.seeCards, theme: 'btn-orange' }] : []),
+            ...(mustSee ? [] : [{ label: `SHOW ₹${minBet}`, onClick: actions.onShowClick, theme: 'btn-pink', disabled: showDisabled }]),
+            { label: 'END BETTING', onClick: actions.onEndBettingClick, theme: 'btn-secondary' },
+            { label: blind ? (amount > currentStake ? `RAISE ₹${amount}` : `PLAY ₹${amount}`) : `CHAAL ₹${amount}`, onClick: bet, theme: 'btn-success', kind: 'primary', disabled: !!mustSee },
         ];
 
     return (
         <ActionPanel
-            info={<><strong>{name}</strong> · {blind ? 'BLIND' : 'SEEN'} · Stake ₹{minBet} · Pot ₹{potAmount}{timer && <> · ⏱ {timer}</>}</>}
+            info={<><strong>{name}</strong> · {blind ? 'BLIND' : 'SEEN'} · <span className="panel-stake">Stake ₹{minBet}</span>{timer && <> · ⏱ {timer}</>}</>}
+            pot={potAmount}
             stepper={limitReached || mustSee ? undefined : {
                 amount,
                 onAmount: setAmount,

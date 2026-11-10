@@ -27,8 +27,8 @@ const Toaster: React.FC = () => {
     return (
         <div className="app-toast" role="status">
             <span>{copy === 'done' ? 'Settlement copied' : copy === 'failed' ? "Couldn't copy. Select the text and copy it." : toast.text}</span>
-            {toast.copyText && copy === 'idle' && <button className="btn-sm" onClick={copyText}>COPY</button>}
-            {toast.copyText && <button className="btn-sm" onClick={dismiss} aria-label="Dismiss">✕</button>}
+            {toast.copyText && copy === 'idle' && <button className="btn btn-primary btn-compact" onClick={copyText}>COPY</button>}
+            {toast.copyText && <button className="btn btn-secondary btn-compact" onClick={dismiss} aria-label="Dismiss">✕</button>}
             {copy === 'failed' && <textarea className="toast-copy" readOnly value={toast.copyText} onFocus={e => e.target.select()} />}
         </div>
     );

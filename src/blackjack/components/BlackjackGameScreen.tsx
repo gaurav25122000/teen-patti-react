@@ -121,7 +121,26 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
             <div className="blackjack-game-screen">
                 <div className="player-list-container">
                     <BlackjackPlayerList players={players} gameState={gameState} />
-                    <ActionLog messages={messages} />
+                    <div className="blackjack-hands-area" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem' }}>
+                        {players.filter(p => !p.isTakingBreak).map(player => (
+                            <div key={player.id} data-player-id={player.id} style={isReadOnly ? { pointerEvents: 'none' } : {}}>
+                                <BlackjackPlayerHands
+                                    player={player}
+                                    isCurrentPlayer={player.id === currentPlayerId}
+                                    currentHandId={currentHandId}
+                                    gameStage={gameStage}
+                                    isBettingLocked={isBettingLocked} 
+                                    onPlaceBet={actions.placeBet}
+                                    isBanker={player.id === gameState.bankerId}
+                                    sideBets={gameState.sideBets}
+                                    onPlaceSideBet={actions.placeSideBet}
+                                    onSettleSideBet={actions.settleSideBet}
+                                    onSetHandStatus={actions.setHandStatus}
+                                    onUnlockBet={actions.unlockAllBets} 
+                                />
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 <div className="main-content-container">
                     <div className="stage-display" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -154,26 +173,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                         </div>
                     )}
 
-                    <div className="blackjack-hands-area" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem' }}>
-                        {players.filter(p => !p.isTakingBreak).map(player => (
-                            <div key={player.id} data-player-id={player.id} style={isReadOnly ? { pointerEvents: 'none' } : {}}>
-                                <BlackjackPlayerHands
-                                    player={player}
-                                    isCurrentPlayer={player.id === currentPlayerId}
-                                    currentHandId={currentHandId}
-                                    gameStage={gameStage}
-                                    isBettingLocked={isBettingLocked} 
-                                    onPlaceBet={actions.placeBet}
-                                    isBanker={player.id === gameState.bankerId}
-                                    sideBets={gameState.sideBets}
-                                    onPlaceSideBet={actions.placeSideBet}
-                                    onSettleSideBet={actions.settleSideBet}
-                                    onSetHandStatus={actions.setHandStatus}
-                                    onUnlockBet={actions.unlockAllBets} 
-                                />
-                            </div>
-                        ))}
-                    </div>
+                    <ActionLog messages={messages} />
                 </div>
             </div>
             
@@ -186,12 +186,12 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                     return <ActionPanel
                         info={<><strong>{player.name}</strong> · Hand {handIndex + 1} · Bet ₹{hand.wager}</>}
                         buttons={[
-                            ...(gameState.allowSurrender ? [{ label: 'SURRENDER', onClick: act('surrender'), kind: 'fold' as const }] : []),
-                            { label: 'DOUBLE', onClick: act('double') },
-                            { label: 'SPLIT', onClick: act('split') },
-                            ...(gameState.insurance ? [{ label: 'INSURANCE', onClick: act('insurance') }] : []),
-                            { label: 'STAND', onClick: act('stand') },
-                            { label: 'HIT', onClick: act('hit'), kind: 'primary' as const },
+                            ...(gameState.allowSurrender ? [{ label: 'SURRENDER', onClick: act('surrender'), theme: 'btn-error', kind: 'fold' as const }] : []),
+                            { label: 'DOUBLE', onClick: act('double'), theme: 'btn-accent' },
+                            { label: 'SPLIT', onClick: act('split'), theme: 'btn-violet' },
+                            ...(gameState.insurance ? [{ label: 'INSURANCE', onClick: act('insurance'), theme: 'btn-sky' }] : []),
+                            { label: 'STAND', onClick: act('stand'), theme: 'btn-primary' },
+                            { label: 'HIT', onClick: act('hit'), theme: 'btn-success', kind: 'primary' as const },
                         ]}
                     />;
                 }
@@ -199,10 +199,10 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                     return <ActionPanel
                         info={<>Between rounds · {isBettingLocked ? 'Bets locked to the last amounts' : 'Place a bet on every hand'}</>}
                         buttons={[
-                            ...(isBettingLocked ? [{ label: 'CHANGE BETS', onClick: actions.unlockAllBets }] : []),
-                            { label: 'ADD PLAYER', onClick: () => handleShowModal('addPlayer') },
-                            { label: '☰ TABLE', onClick: () => setShowTable(true) },
-                            { label: isBettingLocked ? 'DEAL (SAME BETS)' : 'DEAL', onClick: actions.startRound, kind: 'primary' as const, disabled: !isBettingLocked && isDealDisabled },
+                            ...(isBettingLocked ? [{ label: 'CHANGE BETS', onClick: actions.unlockAllBets, theme: 'btn-orange' }] : []),
+                            { label: 'ADD PLAYER', onClick: () => handleShowModal('addPlayer'), theme: 'btn-violet' },
+                            { label: '☰ TABLE', onClick: () => setShowTable(true), theme: 'btn-sky' },
+                            { label: isBettingLocked ? 'DEAL (SAME BETS)' : 'DEAL', onClick: actions.startRound, theme: 'btn-start rainbow-outline', kind: 'primary' as const, disabled: !isBettingLocked && isDealDisabled },
                         ]}
                     />;
                 }
@@ -221,7 +221,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                     ['Money', [{ icon: '💰', label: 'Settlement', onClick: handleShowOwings }]],
                     ['Game', [
                         { icon: '⚙', label: 'Settings', onClick: openSettings },
-                        { icon: '⏹', label: 'End game', onClick: handleShowSetup },
+                        { icon: '⏹', label: 'End game', danger: true, onClick: handleShowSetup },
                     ]],
                 ]} />
             )}

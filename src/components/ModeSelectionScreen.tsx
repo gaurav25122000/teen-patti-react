@@ -21,16 +21,16 @@ const ModeSelectionScreen: React.FC = () => {
         <Link to="/lifetime-winnings" className="btn btn-accent" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none', width: '100%', marginTop: '1rem', textAlign: 'center' }}>
           Lifetime Winnings
         </Link>
-        <Link to="/saved-players" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
+        <Link to="/saved-players" className="btn btn-violet" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
           Saved Players
         </Link>
-        <Link to="/history" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
+        <Link to="/history" className="btn btn-orange" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
           History
         </Link>
-        <Link to="/sync" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
+        <Link to="/sync" className="btn btn-sky" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
           Sync
         </Link>
-        <Link to="/settings" className="btn btn-secondary" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
+        <Link to="/settings" className="btn btn-pink" style={{ padding: '20px 40px', fontSize: '1.5rem', textDecoration: 'none' }}>
           Settings
         </Link>
       </div>

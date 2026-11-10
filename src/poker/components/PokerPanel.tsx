@@ -41,19 +41,20 @@ const PokerPanel: React.FC<PokerPanelProps> = ({ gameState, currentPlayer, timer
         onAction('fold');
     };
     const call: PanelButton = facingAllInCall
-        ? { label: `ALL-IN ₹${callAmount}`, onClick: () => onAction('call') }
-        : canCheck ? { label: 'CHECK', onClick: () => onAction('check') } : { label: `CALL ₹${callAmount}`, onClick: () => onAction('call') };
+        ? { label: `ALL-IN ₹${callAmount}`, onClick: () => onAction('call'), theme: 'btn-accent rainbow-outline' }
+        : canCheck ? { label: 'CHECK', onClick: () => onAction('check'), theme: 'btn-primary' } : { label: `CALL ₹${callAmount}`, onClick: () => onAction('call'), theme: 'btn-primary' };
 
     const buttons: PanelButton[] = [
-        { label: 'FOLD', onClick: fold, kind: 'fold' },
+        { label: 'FOLD', onClick: fold, theme: 'btn-error', kind: 'fold' },
         ...(canRaise ? [call] : []),
-        ...(facingAllInCall || p.canOnlyCall ? [] : [{ label: `ALL-IN ₹${p.stack}`, onClick: () => onAction('all-in') }]),
-        canRaise ? { label: `${currentBet > 0 ? 'RAISE' : 'BET'} ₹${amount}`, onClick: raise, kind: 'primary' } : { ...call, kind: 'primary' },
+        ...(facingAllInCall || p.canOnlyCall ? [] : [{ label: `ALL-IN ₹${p.stack}`, onClick: () => onAction('all-in'), theme: 'btn-accent rainbow-outline' }]),
+        canRaise ? { label: `${currentBet > 0 ? 'RAISE' : 'BET'} ₹${amount}`, onClick: raise, theme: 'btn-success', kind: 'primary' } : { ...call, kind: 'primary' },
     ];
 
     return (
         <ActionPanel
-            info={<><strong>{name}</strong> · {gameState.gameStage.toUpperCase()} · To call ₹{canCheck ? 0 : callAmount} · Pot ₹{pot} · Stack ₹{p.stack}{timer && <> · ⏱ {timer}</>}</>}
+            info={<><strong>{name}</strong> · {gameState.gameStage.toUpperCase()} · <span className="panel-stake">To call ₹{canCheck ? 0 : callAmount}</span> · Stack ₹{p.stack}{timer && <> · ⏱ {timer}</>}</>}
+            pot={pot}
             stepper={canRaise ? {
                 amount,
                 onAmount: setAmount,

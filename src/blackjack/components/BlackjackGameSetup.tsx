@@ -103,11 +103,11 @@ const BlackjackGameSetup: React.FC<BlackjackGameSetupProps> = ({ onStartGame }) 
                         onChange={(e) => handlePlayerChange(index, 'numHands', e.target.value)}
                         style={{ flexBasis: '80px' }}
                     />
-                    {players.length > 1 && <button className="btn-sm" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayers(rows => rows.filter((_, i) => i !== index))}>✕</button>}
+                    {players.length > 1 && <button className="btn btn-error btn-compact" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayers(rows => rows.filter((_, i) => i !== index))}>✕</button>}
                 </div>
             ))}
             <div className="setup-actions">
-                <button className="btn-secondary" onClick={addPlayerField}>Add seat</button>
+                <button className="btn-violet" onClick={addPlayerField}>Add seat</button>
                 <button className="btn btn-start rainbow-outline" onClick={handleStart}>Start Blackjack Game</button>
                 {error && <p className="form-error">{error}</p>}
             </div>

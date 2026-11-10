@@ -127,7 +127,7 @@ const LifetimeWinnings: React.FC = () => {
                 <button className="btn btn-primary" onClick={() => handleFetchWinnings(phoneNumbers)} disabled={loading}>
                     {loading ? 'Loading...' : 'Get Winnings'}
                 </button>
-                <button className="btn btn-secondary" onClick={checkSavedPlayers} disabled={loading}>
+                <button className="btn btn-violet" onClick={checkSavedPlayers} disabled={loading}>
                     Check saved players
                 </button>
             </div>
@@ -136,7 +136,7 @@ const LifetimeWinnings: React.FC = () => {
             {winningsData && (
                 <div className="game-actions" style={{ justifyContent: 'center' }}>
                     {RANGES.map(([kind, label]) => (
-                        <button key={kind} className={range === kind ? 'btn-primary' : 'btn-secondary'} onClick={() => setRange(kind)}>{label}</button>
+                        <button key={kind} className={range === kind ? 'btn-accent' : 'btn-secondary'} onClick={() => setRange(kind)}>{label}</button>
                     ))}
                     {range === 'custom' && (
                         <>

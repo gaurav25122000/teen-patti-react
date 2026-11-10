@@ -82,7 +82,7 @@ const SavedPlayersScreen: React.FC = () => {
                             <span className="saved-name">{p.name}</span>
                             <span>{p.phone}</span>
                             <span>{p.upi ?? ''}</span>
-                            <button className="btn-secondary" onClick={() => startEdit(p)}>Edit</button>
+                            <button className="btn-sky" onClick={() => startEdit(p)}>Edit</button>
                             <button className="btn-danger" onClick={() => remove(p)}>Delete</button>
                         </li>
                     ))}

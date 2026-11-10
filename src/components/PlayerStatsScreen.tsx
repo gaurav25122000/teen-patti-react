@@ -25,7 +25,7 @@ const PlayerStatsScreen: React.FC = () => {
     return (
         <div className="setup-screen">
             <h2>Player stats</h2>
-            <Link to="/history" className="btn-secondary">History</Link>
+            <Link to="/history" className="btn-orange">History</Link>
             {stats.length === 0 ? <p>No finished games yet.</p> : (
                 <ul className="history-list">
                     {stats.map(s => (

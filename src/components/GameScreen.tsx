@@ -353,6 +353,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
             <div className="game-screen">
                 <div className="player-list-container">
                     <PlayerList players={gameState.players} gameState={gameState} currentPlayer={currentPlayer} />
+                    <Notes roundActive={gameState.roundActive} />
                 </div>
                 <div className="main-content-container">
                     <div className="game-controls-container">
@@ -363,7 +364,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
                     </div>
                     <div className="side-panel-container">
-                        <Notes roundActive={gameState.roundActive} />
                         <ActionLog messages={gameState.messages} />
                     </div>
                 </div>
@@ -383,9 +383,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                     error={interaction === 'idle' ? formError : null}
                     info={<>Between rounds{gameState.roundInitialBootAmount ? ` · Boot ₹${gameState.roundInitialBootAmount}` : ''}</>}
                     buttons={[
-                        { label: 'ADD PLAYER', onClick: () => setInteraction('addingPlayer') },
-                        { label: '☰ TABLE', onClick: () => setShowTable(true) },
-                        { label: 'START', onClick: handleStartRound, kind: 'primary', disabled: !canStartRound },
+                        { label: 'ADD PLAYER', onClick: () => setInteraction('addingPlayer'), theme: 'btn-violet' },
+                        { label: '☰ TABLE', onClick: () => setShowTable(true), theme: 'btn-sky' },
+                        { label: 'START', onClick: handleStartRound, theme: 'btn-start rainbow-outline', kind: 'primary', disabled: !canStartRound },
                     ]}
                 />
             ))}
@@ -406,7 +406,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                         { icon: '⚙', label: 'Settings', onClick: () => setInteraction('settings') },
                         ...(players.length >= 2 ? [{ icon: '₹', label: 'Change boot', onClick: () => setInteraction('gettingBoot') }] : []),
                         { icon: '👥', label: 'Groups', onClick: () => setShowEntityManager(true) },
-                        { icon: '⏹', label: 'End game', onClick: endGame },
+                        { icon: '⏹', label: 'End game', danger: true, onClick: endGame },
                     ]],
                 ]} />
             )}

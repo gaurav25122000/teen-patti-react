@@ -84,10 +84,10 @@ const GameSetup: React.FC<GameSetupProps> = ({ onStartNewGame, onLoadGame }) => 
                                 value={input.phoneNumber}
                                 onChange={(e) => handlePlayerInputChange(index, 'phoneNumber', e.target.value)}
                             />
-                            {playerInputs.length > 2 && <button className="btn-sm" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayerInputs(rows => rows.filter((_, i) => i !== index))}>✕</button>}
+                            {playerInputs.length > 2 && <button className="btn btn-error btn-compact" aria-label={`Remove seat ${index + 1}`} onClick={() => setPlayerInputs(rows => rows.filter((_, i) => i !== index))}>✕</button>}
                         </div>
                     ))}
-                    <button className="btn-secondary" onClick={() => setPlayerInputs(rows => [...rows, emptySeat])}>Add seat</button>
+                    <button className="btn-violet" onClick={() => setPlayerInputs(rows => [...rows, emptySeat])}>Add seat</button>
                     <details className="table-settings">
                         <summary>Table settings</summary>
                         <SettingsFields fields={TEEN_PATTI_FIELDS} form={settingsForm} onChange={setSettingsForm} />

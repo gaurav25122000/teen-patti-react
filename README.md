@@ -34,7 +34,7 @@ The application leverages local storage to save game state, allowing you to clos
   * **Settle through one person:** Final Owings can route every payment through one player instead of the fewest transfers.
   * **Session length:** summaries end with the session's length and the biggest winner's rate per hour.
   * **Lifetime Winnings ranges:** All time, This month, Last 30 days, This year or a custom range.
-  * **Docked action panel:** turn, stake and timer, a stepper with quick chips, and large buttons; one ☰ TABLE sheet holds the rest. Sounds, haptics, keep-awake and Confirm before fold are app settings (home → Settings).
+  * **Docked action panel:** turn, stake, timer and pot, a stepper with quick chips, and large neon buttons, one colour per purpose; one ☰ TABLE sheet holds the rest. From 700 px wide, game screens use two columns with the log on the right. Sounds, haptics, keep-awake and Confirm before fold are app settings (home → Settings).
   * **Avatars:** each saved player gets a colour and an optional emoji, shown beside their name.
   * **Sync:** a group key, shared by code or QR, syncs saved players and history between phones, end-to-end encrypted.
 
