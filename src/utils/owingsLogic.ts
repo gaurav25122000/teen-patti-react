@@ -39,14 +39,37 @@ export const partyKey = (name: string, phone?: string | null) =>
 // The phone in a party key, or null for a name key, a group or the house.
 export const phoneOfKey = (key: string) => (key.includes('|') ? key.split('|')[0] : null);
 
-// A label still shared after the other rules gets " (2)", " (3)", … in first-seen order.
+// A label still shared after the other rules gets " (2)", " (3)", … in first-seen order, skipping labels in use.
 const numberRepeats = (labels: string[]) => {
-    const seen = new Map<string, number>();
+    const used = new Set(labels);
+    const last = new Map<string, number>();
     return labels.map(label => {
-        const n = (seen.get(label) ?? 0) + 1;
-        seen.set(label, n);
-        return n === 1 ? label : `${label} (${n})`;
+        if (!last.has(label)) {
+            last.set(label, 1);
+            return label;
+        }
+        let n = last.get(label)!;
+        let candidate: string;
+        do candidate = `${label} (${++n})`; while (used.has(candidate));
+        last.set(label, n);
+        used.add(candidate);
+        return candidate;
     });
+};
+
+// Whole paise per party by largest remainder (floors, then the leftover paise to the largest fractions,
+// first-seen on a tie), so nets that balance stay balanced however the floats fell.
+const toCents = (nets: number[]) => {
+    const scaled = nets.map(n => n * 100);
+    const cents = scaled.map(Math.floor);
+    let leftover = paise(nets.reduce((a, b) => a + b, 0)) - cents.reduce((a, b) => a + b, 0);
+    const byFraction = scaled.map((_, i) => i).sort((a, b) => (scaled[b] - cents[b]) - (scaled[a] - cents[a]) || a - b);
+    for (const i of byFraction) {
+        if (leftover <= 0) break;
+        cents[i]++;
+        leftover--;
+    }
+    return cents;
 };
 
 // Each key's first-listed name. When names collide, people with a phone get " (…<last 4 digits>)",
@@ -96,8 +119,9 @@ export const settleParties = (players: OwingsPlayer[], entities: Entity[] = []) 
     const byAmount = (a: { cents: number; order: number }, b: { cents: number; order: number }) => a.cents - b.cents || a.order - b.order;
     const list = [...parties.values()];
     numberRepeats(list.map(p => p.label)).forEach((label, i) => { list[i].label = label; });
-    const debtors = list.map(p => ({ ...p, cents: -paise(p.net) })).filter(p => p.cents > 0).sort(byAmount);
-    const creditors = list.map(p => ({ ...p, cents: paise(p.net) })).filter(p => p.cents > 0).sort(byAmount);
+    const cents = toCents(list.map(p => p.net));
+    const debtors = list.map((p, i) => ({ ...p, cents: -cents[i] })).filter(p => p.cents > 0).sort(byAmount);
+    const creditors = list.map((p, i) => ({ ...p, cents: cents[i] })).filter(p => p.cents > 0).sort(byAmount);
     const transactions: Transaction[] = [];
     let d = 0;
     let c = 0;
@@ -110,6 +134,6 @@ export const settleParties = (players: OwingsPlayer[], entities: Entity[] = []) 
         if (creditors[c].cents === 0) c++;
     }
     // offBy: what no transfer can cover when the nets don't sum to zero (carried-in balances).
-    const offBy = list.reduce((sum, p) => sum + paise(p.net), 0) / 100;
+    const offBy = paise(list.reduce((sum, p) => sum + p.net, 0)) / 100;
     return { transactions, people: [...people.values()], parties: list.map(({ label, phone, net }) => ({ label, phone, net })), offBy };
 };

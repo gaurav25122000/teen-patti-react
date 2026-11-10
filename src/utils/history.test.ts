@@ -186,3 +186,10 @@ test('a paid tick stamps the entry for sync', () => {
     const a = { ...entry('a'), transactions: [{ from: 'R', to: 'A', amount: 1, toPhone: null, paid: false }] };
     assert.equal(setPaid([a], 'a', 0, true, 77)[0].updatedAt, 77);
 });
+
+test('an unbalanced game is kept past the newest 50 like an unpaid one', () => {
+    const off = { ...entry('off'), summary: ['Balances are off by +₹5: settle the difference by hand.'] };
+    let list: HistoryEntry[] = [off];
+    for (let i = 1; i <= 50; i++) list = addEntry(list, entry(`g${i}`));
+    assert.equal(list.some(e => e.id === 'off'), true);
+});

@@ -12,7 +12,7 @@ export const splitEvenly = (amount: number, count: number): number[] => {
 };
 
 // Whole paise, halves away from zero (as Dart's round), so +x and -x always round alike.
-export const paise = (amount: number) => Math.sign(amount) * Math.round(Math.abs(amount) * 100);
+export const paise = (amount: number) => Math.sign(amount) * Math.round(Math.abs(amount) * 100) || 0; // never -0
 
 // Money is kept in whole paise so every settlement can be paid exactly.
 export const toPaise = (amount: number) => paise(amount) / 100;

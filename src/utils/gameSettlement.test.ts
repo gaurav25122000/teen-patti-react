@@ -196,3 +196,19 @@ test('halves of a paisa round away from zero on both sides, so they never make a
     assert.deepEqual(s.transactions, [{ from: 'B', to: 'A', amount: 0.13, toPhone: '1' }]);
     assert.equal(s.offBy, 0);
 });
+
+test('largest-remainder paise: a ₹10.01 bet paid 3:2 balances exactly, never "off by ₹0.01"', () => {
+    const s = blackjackSettlement({ players: [{ name: 'Asha', stack: 1000 + 10.01 * 1.5, totalBuyIn: 1000, phoneNumber: '9000000001', hands: [] }] as never, dealerNet: -10.01 * 1.5 });
+    assert.equal(s.offBy, 0);
+    // 15.015 is stored as 15.01499… for Asha and -15.015 for the house; the leftover paisa goes to the larger fraction.
+    assert.deepEqual(s.transactions, [{ from: 'Dealer (house)', to: 'Asha', amount: 15.01, toPhone: '9000000001' }]);
+});
+
+test('numbering skips a label already in use', () => {
+    const { transactions } = settleParties([
+        { name: 'Team (2)', phoneNumber: '1', balance: 30 },
+        { name: 'P1', phoneNumber: '2', balance: -50, entityId: 1 },
+        { name: 'P2', phoneNumber: '3', balance: 20, entityId: 2 },
+    ], [{ id: 1, name: 'Team' }, { id: 2, name: 'Team' }]);
+    assert.deepEqual(transactions.map(t => [t.from, t.to]), [['Team', 'Team (3)'], ['Team', 'Team (2)']]);
+});

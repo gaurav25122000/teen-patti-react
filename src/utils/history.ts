@@ -2,7 +2,7 @@ import { partialStats, summaryLines, type GameKind, type NightStats, type Player
 import { couldNot } from './formatters.ts';
 import type { Person, Transaction } from './owingsLogic.ts';
 import { playerNets } from './gameSettlement.ts';
-import { shareText } from './settlement.ts';
+import { isUnbalanced, shareText } from './settlement.ts';
 import { notifyLocalChange } from './localChange.ts';
 import type { SavedPlayer } from './savedPlayers.ts';
 
@@ -74,11 +74,13 @@ export const writeHistory = (list: HistoryEntry[], storage: HistoryStorage = loc
     notifyLocalChange();
 };
 
-// Newest first: the newest 50 live games, plus older ones that still have an unpaid transfer, up to 200 in all.
+// Newest first: the newest 50 live games, plus older ones still owed (an unpaid transfer, or books that
+// don't balance), up to 200 in all.
 // Tombstones don't count and are kept until sync prunes them.
 export const capHistory = (list: HistoryEntry[]) => {
     const live = liveHistory(list);
-    const kept = [...live.slice(0, MAX_HISTORY), ...live.slice(MAX_HISTORY).filter(e => e.transactions.some(t => !t.paid))].slice(0, MAX_WITH_UNPAID);
+    const owed = (e: HistoryEntry) => e.transactions.some(t => !t.paid) || isUnbalanced(e.summary);
+    const kept = [...live.slice(0, MAX_HISTORY), ...live.slice(MAX_HISTORY).filter(owed)].slice(0, MAX_WITH_UNPAID);
     return [...kept, ...list.filter(e => e.deleted)];
 };
 

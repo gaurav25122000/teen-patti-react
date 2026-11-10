@@ -46,3 +46,8 @@ test('share text with no transactions and no summary; a payee without a phone ge
 test('WhatsApp link carries the encoded text', () => {
     assert.equal(whatsappLink('a b\nc&d'), 'https://wa.me/?text=a%20b%0Ac%26d');
 });
+
+test('no transfers with books that are off reads "No transfers between players"', () => {
+    assert.equal(shareText([], ['Balances are off by +₹500: settle the difference by hand.'], []),
+        'Bets Manager settlement\nNo transfers between players\n\nNight summary\nBalances are off by +₹500: settle the difference by hand.');
+});

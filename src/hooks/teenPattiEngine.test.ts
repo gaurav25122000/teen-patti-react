@@ -154,3 +154,10 @@ test('the boot rises on schedule and is logged; the dealer sits before the start
     assert.equal(s.messages.includes('Boot is now ₹15.'), true);
     assert.equal(s.dealerId, 1);
 });
+
+test('an older save that cannot tell about carried-in balances stays unknown through round ends', () => {
+    let s: GameState = { ...E.newGame([player(1, 0), player(2, 0)]), carriedIn: undefined };
+    s = go(s, (x, io) => E.startRound(x, 0, 10, io));
+    s = go(s, (x, io) => E.endRound(x, 1, io));
+    assert.equal(s.carriedIn, undefined);
+});

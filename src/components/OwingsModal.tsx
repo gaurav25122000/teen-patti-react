@@ -5,7 +5,7 @@ import InteractionModal from './InteractionModal';
 import ShareButtons from './ShareButtons';
 import PayLink from './PayLink';
 import { loadSavedPlayers } from '../utils/savedPlayers';
-import { shareText, upiFor } from '../utils/settlement';
+import { isUnbalanced, shareText, upiFor } from '../utils/settlement';
 
 interface OwingsModalProps {
     isOpen: boolean;
@@ -46,7 +46,7 @@ const OwingsContent: React.FC<Omit<OwingsModalProps, 'isOpen'>> = ({ onClose, tr
                     })}
                 </ul>
             ) : (
-                <p>All settled up! No transfers needed.</p>
+                <p>{isUnbalanced(summary) ? 'No transfers between players.' : 'All settled up! No transfers needed.'}</p>
             )}
             {savedFailed && <p className="share-note">Couldn't load saved players, so PAY is unavailable.</p>}
             {payNote && <p className="share-note">{payNote}</p>}

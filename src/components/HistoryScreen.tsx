@@ -3,7 +3,7 @@ import { deleteHistoryEntry, hasUnreadableHistory, historyShareText, liveHistory
 import type { GameKind } from '../utils/nightStats';
 import { couldNot, formatAmount } from '../utils/formatters';
 import { readSavedPlayers } from '../utils/savedPlayers';
-import { upiFor } from '../utils/settlement';
+import { isUnbalanced, upiFor } from '../utils/settlement';
 import ShareButtons from './ShareButtons';
 import PayLink from './PayLink';
 
@@ -60,7 +60,7 @@ const HistoryScreen: React.FC = () => {
                     ))}
                 </ul>
                 <h4>Settlement</h4>
-                {open.transactions.length === 0 ? <p>All settled up</p> : (
+                {open.transactions.length === 0 ? <p>{isUnbalanced(open.summary) ? 'No transfers between players.' : 'All settled up'}</p> : (
                     <ul className="history-transactions">
                         {open.transactions.map((t, i) => {
                             const upi = t.paid ? undefined : upiFor(t.toPhone, saved);

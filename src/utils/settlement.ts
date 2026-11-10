@@ -12,10 +12,13 @@ export const upiLink = (upi: string, payee: string, amount: number) =>
 
 export const whatsappLink = (text: string) => `https://wa.me/?text=${encodeURIComponent(text)}`;
 
+// A summary that says the books are off (nets that don't sum to zero).
+export const isUnbalanced = (summary: string[]) => summary.some(line => line.startsWith('Balances are off by'));
+
 // Text for Copy and WhatsApp, from the live settlement or a history entry.
 export const shareText = (transactions: Transaction[], summary: string[], saved: SavedPlayer[]): string => {
     const lines = ['Bets Manager settlement'];
-    if (transactions.length === 0) lines.push('All settled up');
+    if (transactions.length === 0) lines.push(isUnbalanced(summary) ? 'No transfers between players' : 'All settled up');
     for (const t of transactions) {
         const upi = upiFor(t.toPhone, saved);
         lines.push(`${t.from} pays ${t.to} ₹${formatAmount(t.amount)}${upi ? ` (UPI: ${upi})` : ''}`);
