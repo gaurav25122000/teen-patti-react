@@ -55,6 +55,7 @@ const TeenPattiPanel: React.FC<TeenPattiPanelProps> = ({ gameState, currentPlaye
         <ActionPanel
             info={<><strong>{name}</strong> · {blind ? 'BLIND' : 'SEEN'} · <span className="panel-stake">Stake ₹{formatAmount(minBet)}</span>{timer && <> · ⏱ {timer}</>}</>}
             pot={potAmount}
+            infoOnPhone
             stepper={limitReached || mustSee ? undefined : {
                 amount,
                 onAmount: setAmount,

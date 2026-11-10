@@ -13,13 +13,14 @@ export interface PanelButton {
 interface ActionPanelProps {
     info: React.ReactNode; // row 0: whose turn, state, stake, timer
     pot?: number; // shown large on the right of row 0
+    infoOnPhone?: boolean; // row 0 only on one column: two columns show it in the screen instead
     stepper?: { amount: number; onAmount: (amount: number) => void; onMinus: () => void; onPlus: () => void; chips: { label: string; amount: number }[] };
     error?: string | null; // a refused action, shown under the stepper
     buttons: PanelButton[]; // row 2: fold first, secondary actions, primary last
 }
 
 // The docked panel at the foot of a game screen; every button press taps before its action.
-const ActionPanel: React.FC<ActionPanelProps> = ({ info, pot, stepper, error, buttons }) => {
+const ActionPanel: React.FC<ActionPanelProps> = ({ info, pot, infoOnPhone, stepper, error, buttons }) => {
     const [typed, setTyped] = useState<string | null>(null); // the field's text while typing; a step or chip clears it
     const press = (fn: () => void) => () => {
         cue('tap');
@@ -28,7 +29,7 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ info, pot, stepper, error, bu
     };
     return (
         <div className="action-panel">
-            <div className="panel-info">{info}{pot !== undefined && <span className="panel-pot">Pot ₹{formatAmount(pot)}</span>}</div>
+            <div className={`panel-info${infoOnPhone ? ' phone-only' : ''}`}>{info}{pot !== undefined && <span className="panel-pot">Pot ₹{formatAmount(pot)}</span>}</div>
             {stepper && (
                 <div className="panel-stepper">
                     <button className="btn btn-step" onClick={press(stepper.onMinus)} aria-label="Less">−</button>

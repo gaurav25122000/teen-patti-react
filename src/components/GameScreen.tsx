@@ -30,6 +30,7 @@ import { readAppSettings } from '../utils/appSettings';
 import { clockText, useTurnTimer } from '../hooks/useTurnTimer';
 import { END_GAME_CONFIRM } from '../utils/archive';
 import { useFormError } from '../hooks/useFormError';
+import { teenPattiMinBet } from '../utils/quickBets';
 
 // --- SVG Icons ---
 const IconTrophy = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9a9 9 0 119 0zM16.5 18.75a9 9 0 00-9 0m9 0a9 9 0 01-9 0m9 0v-4.5A3.375 3.375 0 0012 10.5h-1.5a3.375 3.375 0 00-3.375 3.375v4.5m5.906-9.043c.124.083.242.172.355.267.112.096.22.2.322.308.1.107.196.22.286.338a3.743 3.743 0 01.286.338c.107.112.208.228.308.347.1.118.19.242.27.375M8.094 9.457c.124-.083.242-.172.355-.267.112-.096.22-.2.322-.308.1-.107.196-.22.286-.338a3.743 3.743 0 00.286-.338c.107-.112.208-.228.308-.347.1-.118.19-.242.27-.375" /></svg>;
@@ -363,6 +364,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                         {!isReadOnly && canUndo && <button className="btn btn-secondary btn-compact" style={{ marginBottom: '1rem', alignSelf: 'center' }} onClick={undo}>↩ Undo</button>}
 
                     </div>
+                    {roundActive && currentPlayer && (
+                        <div className="round-info desktop-only">
+                            <div className="turn-info">
+                                <strong>{toTitleCase(currentPlayer.name)}</strong><br />
+                                {blinds.has(currentPlayer.id) ? 'BLIND' : 'SEEN'}{timerLeft !== null && ` · ⏱ ${clockText(timerLeft)}`}
+                            </div>
+                            <div className="current-stake">Stake<br />₹{formatAmount(teenPattiMinBet(gameState.currentStake, blinds.has(currentPlayer.id)))}</div>
+                            <div className="pot-info">Pot<br />₹{formatAmount(gameState.potAmount)}</div>
+                        </div>
+                    )}
                     <div className="side-panel-container">
                         <ActionLog messages={gameState.messages} />
                     </div>

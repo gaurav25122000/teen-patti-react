@@ -872,10 +872,17 @@ h1 {
   .blackjack-game-screen {
     flex-direction: column;
   }
+  .desktop-only {
+    display: none;
+  }
 }
 
 /* Two columns: the log fills the right column down to the bottom of the left one. */
 @media (min-width: 700px) {
+  .phone-only,
+  .panel-info.phone-only {
+    display: none;
+  }
   .main-content-container > .side-panel-container {
     flex: 1 1 auto;
   }
