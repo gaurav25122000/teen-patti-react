@@ -138,3 +138,17 @@ test('the synced time reads like "Synced 9:45 pm"', () => {
     assert.equal(syncedAt(new Date(2026, 10, 10, 0, 5).getTime()), 'Synced 12:05 am');
     assert.equal(syncedAt(new Date(2026, 10, 10, 12, 0).getTime()), 'Synced 12:00 pm');
 });
+
+test('unknown fields from the other app pass through; endedAt with or without an offset sorts by time', async () => {
+    const { playerFromWire, playerToWire, mergeHistory } = await import('./syncMerge.ts');
+    const wire = { phone: '9000000001', name: 'Asha', upi: null, color: 3, emoji: null, updatedAt: 5, deleted: false, nickname: 'A' };
+    const back = playerFromWire(wire as never)!;
+    assert.equal((back as unknown as { nickname: string }).nickname, 'A');
+    assert.deepEqual(playerToWire(back), wire);
+    const local = new Date(2026, 10, 10, 5, 40);
+    const offsetless = `2026-11-10T05:40:00.000`; // Android 1.2.0: local time, no offset
+    const later = new Date(local.getTime() + 60000).toISOString();
+    const merged = mergeHistory([{ ...entry('a', 1), endedAt: offsetless }], [{ ...entry('b', 1), endedAt: later, extra: 1 } as never], 0);
+    assert.deepEqual(merged.map(e => e.id), ['b', 'a']);
+    assert.equal((merged[0] as unknown as { extra: number }).extra, 1);
+});

@@ -41,28 +41,27 @@ export const mergeItems = <T extends Stamped>(local: T[], remote: T[], keyOf: (i
 export const pruneTombstones = <T extends Stamped>(items: T[], now: number) =>
     items.filter(item => !item.deleted || now - (item.updatedAt ?? 0) < TOMBSTONE_DAYS_MS);
 
-// The wire shape of a saved player (null where absent).
+// The wire shape of a saved player (null where absent). Fields this app doesn't know pass through untouched.
 export const playerToWire = (p: SavedPlayer) => ({
-    phone: p.phone, name: p.name, upi: p.upi ?? null, color: avatarColor(p), emoji: p.emoji ?? null,
+    ...p, phone: p.phone, name: p.name, upi: p.upi ?? null, color: avatarColor(p), emoji: p.emoji ?? null,
     updatedAt: p.updatedAt ?? 0, deleted: !!p.deleted,
 });
 
 type WirePlayer = ReturnType<typeof playerToWire>;
 
-// A wire item back to a saved player, or null when it isn't one.
+// A wire item back to a saved player (unknown fields kept), or null when it isn't one.
 export const playerFromWire = (w: WirePlayer): SavedPlayer | null => {
-    const p: SavedPlayer = { name: w?.name, phone: w?.phone, updatedAt: w?.updatedAt, ...(w?.deleted ? { deleted: true } : {}) };
-    if (w?.upi) p.upi = w.upi;
-    if (w?.emoji) p.emoji = w.emoji;
-    if (w?.color !== undefined && w?.color !== null) p.color = w.color;
+    if (!w || typeof w !== 'object') return null;
+    const { upi, emoji, color, deleted, ...rest } = w;
+    const p: SavedPlayer = { ...rest, ...(upi ? { upi } : {}), ...(emoji ? { emoji } : {}), ...(color !== null && color !== undefined ? { color } : {}), ...(deleted ? { deleted: true } : {}) };
     return isSavedPlayer(p) ? p : null;
 };
 
 export const mergePlayers = (local: SavedPlayer[], remote: SavedPlayer[], now: number) =>
     pruneTombstones(mergeItems(local, remote, p => p.phone), now);
 
-// History merges by id, newest game first, then keeps the live cap.
+// History merges by id, newest game first, then keeps the live cap. endedAt without an offset is local time.
 export const mergeHistory = (local: HistoryEntry[], remote: HistoryEntry[], now: number) =>
-    capHistory(pruneTombstones(mergeItems(local, remote, e => e.id), now).sort((a, b) => b.endedAt.localeCompare(a.endedAt)));
+    capHistory(pruneTombstones(mergeItems(local, remote, e => e.id), now).sort((a, b) => Date.parse(b.endedAt) - Date.parse(a.endedAt)));
 
 export const historyFromWire = (items: unknown[]) => items.filter(isEntry);
