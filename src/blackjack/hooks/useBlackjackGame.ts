@@ -131,7 +131,9 @@ export const useBlackjackGame = () => {
         addPlayer, removePlayer, addChipsToPlayer, togglePlayerBreak, updatePlayerHandCount, unlockAllBets, settleInsurance,
         applySettings, placeSideBet, settleSideBet]);
 
-    const recordedActions = useMemo(() => record(actions), [record, actions]);
+    // Final Owings' picker: kept with the game (and its History entry), not an undo step.
+    const setSettleThrough = useCallback((label: string | null) => setGameState(s => ({ ...s, settleThrough: label })), [setGameState]);
+    const recordedActions = useMemo(() => ({ ...record(actions), setSettleThrough }), [record, actions, setSettleThrough]);
 
     return { gameState, actions: recordedActions, undo, canUndo };
 };

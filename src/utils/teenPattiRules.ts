@@ -48,6 +48,7 @@ export const roundCarryOver = (prev: GameState) => ({
     bootRiseStep: prev.bootRiseStep,
     roundsStarted: prev.roundsStarted,
     startedAt: prev.startedAt,
+    settleThrough: prev.settleThrough,
 });
 
 // The boot for the next round: every N rounds since setup it rises by the step (at round N+1, 2N+1, …).

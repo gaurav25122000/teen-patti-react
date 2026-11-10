@@ -115,13 +115,20 @@ export const settleParties = (players: OwingsPlayer[], entities: Entity[] = []) 
         party.net += netOf(p);
     }
 
-    // Matched in whole paise, each side by amount ascending; equal amounts keep first-seen order.
-    const byAmount = (a: { cents: number; order: number }, b: { cents: number; order: number }) => a.cents - b.cents || a.order - b.order;
     const list = [...parties.values()];
     numberRepeats(list.map(p => p.label)).forEach((label, i) => { list[i].label = label; });
+    // offBy: what no transfer can cover when the nets don't sum to zero (carried-in balances).
+    const offBy = paise(list.reduce((sum, p) => sum + p.net, 0)) / 100;
+    const settled = list.map(({ label, phone, net }): Party => ({ label, phone, net }));
+    return { transactions: fewestTransfers(settled), people: [...people.values()], parties: settled, offBy };
+};
+
+// Fewest transfers between parties, matched in whole paise, each side by amount ascending; equal amounts keep party order.
+export const fewestTransfers = (list: Party[]): Transaction[] => {
+    const byAmount = (a: { cents: number; order: number }, b: { cents: number; order: number }) => a.cents - b.cents || a.order - b.order;
     const cents = toCents(list.map(p => p.net));
-    const debtors = list.map((p, i) => ({ ...p, cents: -cents[i] })).filter(p => p.cents > 0).sort(byAmount);
-    const creditors = list.map((p, i) => ({ ...p, cents: cents[i] })).filter(p => p.cents > 0).sort(byAmount);
+    const debtors = list.map((p, i) => ({ ...p, cents: -cents[i], order: i })).filter(p => p.cents > 0).sort(byAmount);
+    const creditors = list.map((p, i) => ({ ...p, cents: cents[i], order: i })).filter(p => p.cents > 0).sort(byAmount);
     const transactions: Transaction[] = [];
     let d = 0;
     let c = 0;
@@ -133,9 +140,13 @@ export const settleParties = (players: OwingsPlayer[], entities: Entity[] = []) 
         if (debtors[d].cents === 0) d++;
         if (creditors[c].cents === 0) c++;
     }
-    // offBy: what no transfer can cover when the nets don't sum to zero (carried-in balances).
-    const offBy = paise(list.reduce((sum, p) => sum + p.net, 0)) / 100;
-    return { transactions, people: [...people.values()], parties: list.map(({ label, phone, net }): Party => ({ label, phone, net })), offBy };
+    return transactions;
+};
+
+// The stored "Through <label>" when that label is still a party, else fewest transfers.
+export const settledTransfers = (parties: Party[], through: string | null | undefined) => {
+    const hub = through ? parties.findIndex(p => p.label === through) : -1;
+    return hub < 0 ? fewestTransfers(parties) : throughTransfers(parties, hub);
 };
 
 export interface Party {

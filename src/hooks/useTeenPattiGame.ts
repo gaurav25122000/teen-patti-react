@@ -131,6 +131,8 @@ export const useTeenPattiGame = () => {
   const updatePlayers = (players: Player[]) => step(s => engine.updatePlayers(s, players));
   const deductAndDistribute = (playerId: number, amount: number) => step((s, io) => engine.deductAndDistribute(s, playerId, amount, io));
   const togglePlayerBreak = (playerId: number) => step((s, io) => engine.togglePlayerBreak(s, playerId, io));
+  // Final Owings' picker: kept with the game (and its History entry), not an undo step.
+  const setSettleThrough = (label: string | null) => setGameState(s => ({ ...s, settleThrough: label }));
 
   return {
     gameState,
@@ -140,7 +142,9 @@ export const useTeenPattiGame = () => {
     precedingPlayer,
     undo,
     canUndo,
-    actions: record({
+    actions: {
+      setSettleThrough,
+      ...record({
       startNewGame,
       loadGame,
       startRound,
@@ -160,6 +164,7 @@ export const useTeenPattiGame = () => {
       togglePlayerBreak,
       clearGame,
       applySettings,
-    })
+    }),
+    },
   };
 };

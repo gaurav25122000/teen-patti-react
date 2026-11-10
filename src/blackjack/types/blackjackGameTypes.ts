@@ -55,6 +55,7 @@ export interface BlackjackGameState extends BlackjackSettings {
     isBettingLocked: boolean; // ADDED
     stats?: NightStats; // absent in saves from before the night summary
     startedAt?: number; // epoch ms at setup; absent in older saves
+    settleThrough?: string | null; // Final Owings "Through <party label>"; null or absent is fewest transfers
     departed?: Departure[]; // removed players, still settled
     bankerId?: number; // a player banking instead of the house
     bankerRounds?: number; // rounds banked so far this turn

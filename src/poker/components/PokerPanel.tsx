@@ -59,7 +59,7 @@ const PokerPanel: React.FC<PokerPanelProps> = ({ gameState, currentPlayer, timer
                 onAmount: setAmount,
                 onMinus: () => setAmount(a => stepDown(a, bigBlindAmount, floor)),
                 onPlus: () => setAmount(a => Math.min(maxTotal, stepUp(a, bigBlindAmount, floor))),
-                chips: pokerChips({ pot, currentBet, bigBlind: bigBlindAmount, minTotal, maxTotal }),
+                chips: pokerChips({ pot, currentBet, toCall: currentBet - p.roundBet, bigBlind: bigBlindAmount, minTotal, maxTotal }),
             } : undefined}
             error={error}
             buttons={buttons}

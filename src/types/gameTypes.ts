@@ -33,6 +33,7 @@ export interface GameState extends TeenPattiSettings {
   blindTurns?: Record<number, number>; // blind bets per player this round
   stats?: NightStats; // absent in saves from before the night summary
   startedAt?: number; // epoch ms at setup; absent in older saves
+  settleThrough?: string | null; // Final Owings "Through <party label>"; null or absent is fewest transfers
   carriedIn?: boolean; // a player started or joined with a non-zero balance; absent in older saves (unknown)
   departed?: Departure[]; // removed players, still settled
   dealerId?: number; // set when a round starts: the player before the starter

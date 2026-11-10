@@ -226,3 +226,11 @@ test('settling through one person: payers pay the hub, then the hub pays each pa
     const halves = [{ label: 'Asha', phone: null, net: 0.015 }, { label: 'Raj', phone: null, net: 0.015 }, { label: 'Dev', phone: null, net: -0.03 }];
     assert.deepEqual(throughTransfers(halves, 2).map(t => [t.to, t.amount]), [['Asha', 0.02], ['Raj', 0.01]]); // largest remainder, first-seen on a tie
 });
+
+test('a stored "Through <party>" drives the settlement (and so History); a hub no longer present falls back to fewest transfers', () => {
+    const players = [tpPlayer(1, 'Asha', 30, '9000000001'), tpPlayer(2, 'Raj', -10, '9000000002'), tpPlayer(3, 'Dev', -20, '9000000003')];
+    const rows = (through?: string | null) => teenPattiSettlement(tp(players, { settleThrough: through })).transactions.map(t => [t.from, t.to, t.amount]);
+    assert.deepEqual(rows('Raj'), [['Dev', 'Raj', 20], ['Raj', 'Asha', 30]]);
+    assert.deepEqual(rows(null), [['Raj', 'Asha', 10], ['Dev', 'Asha', 20]]);
+    assert.deepEqual(rows('Mira'), rows(null));
+});

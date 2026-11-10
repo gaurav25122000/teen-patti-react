@@ -11,7 +11,7 @@ import TableSheet from './TableSheet';
 import OwingsModal from './OwingsModal';
 import InteractionModal from './InteractionModal';
 import EntityManager from './EntityManager';
-import type { Party, Transaction } from '../utils/owingsLogic';
+import type { Party } from '../utils/owingsLogic';
 import { toTitleCase } from '../utils/formatters';
 import { emptyStats, sessionMinutes, summaryLines } from '../utils/nightStats';
 import { teenPattiSettlement } from '../utils/gameSettlement';
@@ -61,7 +61,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     const endGame = () => { if (window.confirm(END_GAME_CONFIRM)) onShowSetup(); };
     const [showOwings, setShowOwings] = useState(false);
     const [showEntityManager, setShowEntityManager] = useState(false);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [parties, setParties] = useState<Party[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
     const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
@@ -123,8 +122,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
 
     const handleShowOwings = () => {
-        const { people, transactions, carried, offBy, startedAt, parties } = teenPattiSettlement(gameState);
-        setTransactions(transactions);
+        const { people, carried, offBy, startedAt, parties } = teenPattiSettlement(gameState);
         setParties(parties);
         setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'teen-patti', carried, offBy, { minutes: sessionMinutes(startedAt, Date.now()) }));
         setShowOwings(true);
@@ -418,9 +416,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
             <OwingsModal
                 isOpen={showOwings}
                 onClose={() => setShowOwings(false)}
-                transactions={transactions}
                 summary={summary}
                 parties={parties}
+                settleThrough={gameState.settleThrough}
+                onSettleThrough={actions.setSettleThrough}
                 game="teen-patti"
             />
 

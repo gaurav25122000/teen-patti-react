@@ -99,6 +99,8 @@ export const usePokerGame = () => {
     const addChipsToPlayer = useCallback((playerId: number, amount: number) => step((s, io) => engine.addChipsToPlayer(s, playerId, amount, io)), [step]);
     const togglePlayerBreak = useCallback((playerId: number) => step((s, io) => engine.togglePlayerBreak(s, playerId, io)), [step]);
     const applyStreakWinnings = useCallback((winnerId: number, amount: number) => step((s, io) => engine.applyStreakWinnings(s, winnerId, amount, io)), [step]);
+    // Final Owings' picker: kept with the game (and its History entry), not an undo step.
+    const setSettleThrough = useCallback((label: string | null) => setGameState(s => ({ ...s, settleThrough: label })), [setGameState]);
     const bustChoice = useCallback((playerId: number, rebuy: boolean) => step((s, io) => engine.bustChoice(s, playerId, rebuy, io)), [step]);
     const chop = useCallback(() => step((s, io) => engine.chop(s, io)), [step]);
     const takeAddOn = useCallback((playerId: number) => step((s, io) => engine.takeAddOn(s, playerId, io)), [step]);
@@ -131,8 +133,8 @@ export const usePokerGame = () => {
 
     // Not undo steps: PAUSE, RESUME, and CHOP and End game, whose winnings and History entry are already out.
     const recordedActions = useMemo(
-        () => ({ ...record(actions), pauseBlindClock: unrecorded(pauseBlindClock), resumeBlindClock: unrecorded(resumeBlindClock), chop: unrecorded(chop), endGame: unrecorded(endGame) }),
-        [record, unrecorded, actions, pauseBlindClock, resumeBlindClock, chop, endGame]
+        () => ({ ...record(actions), pauseBlindClock: unrecorded(pauseBlindClock), resumeBlindClock: unrecorded(resumeBlindClock), chop: unrecorded(chop), endGame: unrecorded(endGame), setSettleThrough }),
+        [record, unrecorded, actions, pauseBlindClock, resumeBlindClock, chop, endGame, setSettleThrough]
     );
     const autoAwardPot = useMemo(() => unrecorded(awardPot), [unrecorded, awardPot]);
 

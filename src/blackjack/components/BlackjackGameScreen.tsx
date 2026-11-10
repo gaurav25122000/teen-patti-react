@@ -10,7 +10,7 @@ import BlackjackDealerDisplay from './BlackjackDealerDisplay';
 import BlackjackManageModal, { type ModalMode } from './BlackjackManageModal';
 import { toTitleCase } from '../../utils/formatters';
 import OwingsModal from '../../components/OwingsModal';
-import type { Party, Transaction } from '../../utils/owingsLogic';
+import type { Party } from '../../utils/owingsLogic';
 import { emptyStats, sessionMinutes, summaryLines } from '../../utils/nightStats';
 import { blackjackSettlement } from '../../utils/gameSettlement';
 import StreamControls from '../../components/StreamControls';
@@ -40,7 +40,6 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     useWakeLock(readAppSettings().keepAwake);
     const [showTable, setShowTable] = useState(false);
     const [showOwings, setShowOwings] = useState(false);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [parties, setParties] = useState<Party[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
     const [settingsForm, setSettingsForm] = useState<Record<string, string> | null>(null);
@@ -74,8 +73,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     };
 
     const handleShowOwings = () => {
-        const { people, transactions, offBy, startedAt, parties } = blackjackSettlement(gameState);
-        setTransactions(transactions);
+        const { people, offBy, startedAt, parties } = blackjackSettlement(gameState);
         setParties(parties);
         setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'blackjack', false, offBy, { minutes: sessionMinutes(startedAt, Date.now()) }));
         setShowOwings(true);
@@ -249,9 +247,10 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
             <OwingsModal
                 isOpen={showOwings}
                 onClose={handleCloseOwings}
-                transactions={transactions}
                 summary={summary}
                 parties={parties}
+                settleThrough={gameState.settleThrough}
+                onSettleThrough={actions.setSettleThrough}
                 game="blackjack"
             />
         </>

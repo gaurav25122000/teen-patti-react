@@ -273,3 +273,12 @@ test('tournament: a player with no chips can\'t take the add-on, whether the bus
     const placed = go(s, (x, io) => E.bustChoice(x, 2, false, io));
     assert.deepEqual(newLines(placed, go(placed, (x, io) => E.takeAddOn(x, 2, io))), ['Raj is out of chips.']);
 });
+
+test('the stored settle-through hub carries across hands; a new game clears it; the add-on is refused once the tournament is over', () => {
+    let s = { ...table(['Asha', 'Raj']), settleThrough: 'Raj' };
+    s = act(deal(s), 'fold');
+    assert.equal(s.settleThrough, 'Raj');
+    assert.equal(table(['Asha', 'Raj']).settleThrough, undefined);
+    const over = { ...tournament({ addOnPrice: 200, addOnChips: 1500 }), tournamentOver: true };
+    assert.deepEqual(newLines(over, go(over, (x, io) => E.takeAddOn(x, 1, io))), ['The tournament is over.']);
+});

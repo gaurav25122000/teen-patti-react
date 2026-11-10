@@ -10,7 +10,7 @@ import { END_GAME_CONFIRM } from '../../utils/archive';
 import ActionLog from '../../components/ActionLog';
 import InteractionModal from '../../components/InteractionModal';
 import OwingsModal from '../../components/OwingsModal';
-import type { Party, Transaction } from '../../utils/owingsLogic';
+import type { Party } from '../../utils/owingsLogic';
 import { toTitleCase } from '../../utils/formatters';
 import { emptyStats, sessionMinutes, summaryLines } from '../../utils/nightStats';
 import { pokerSettlement } from '../../utils/gameSettlement';
@@ -52,7 +52,6 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     const [addPlayerPhone, setAddPlayerPhone] = useState('');
     const [addChipsAmount, setAddChipsAmount] = useState('1000');
     const [streakAmount, setStreakAmount] = useState('50');
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [parties, setParties] = useState<Party[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
     const [owingsNotice, setOwingsNotice] = useState<string | undefined>();
@@ -151,8 +150,7 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
     };
 
     const handleShowOwings = () => {
-        const { people, transactions, offBy, notice, tournament, startedAt, parties } = pokerSettlement(gameState);
-        setTransactions(transactions);
+        const { people, offBy, notice, tournament, startedAt, parties } = pokerSettlement(gameState);
         setParties(parties);
         setOwingsNotice(notice);
         setSummary(notice ? [] : summaryLines(gameState.stats ?? emptyStats(), people, 'poker', false, offBy, { tournament, minutes: sessionMinutes(startedAt, Date.now()) }));
@@ -244,7 +242,8 @@ const PokerGameScreen: React.FC<PokerGameScreenProps> = ({ pokerHook, onInteract
         }
 
         if (modalMode === 'owings') {
-            return <OwingsModal isOpen={true} onClose={closeModal} transactions={transactions} summary={summary} notice={owingsNotice} parties={parties} game="poker" />;
+            return <OwingsModal isOpen={true} onClose={closeModal} summary={summary} notice={owingsNotice} parties={parties} game="poker"
+                settleThrough={gameState.settleThrough} onSettleThrough={actions.setSettleThrough} />;
         }
 
         if (modalMode !== 'showdown') {

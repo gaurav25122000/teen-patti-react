@@ -15,9 +15,11 @@ test('Teen Patti chips are 1×, 2× and 4× the minimum bet (the stake when blin
     assert.deepEqual(teenPattiChips(20).map(c => c.amount), [20, 40, 80]);
 });
 
-test('poker chips: ½ POT, POT, 2× and 3× the bet, clamped to [min raise, all-in]', () => {
-    assert.deepEqual(pokerChips({ pot: 75, currentBet: 20, bigBlind: 10, minTotal: 40, maxTotal: 500 }).map(c => [c.label, c.amount]),
-        [['½ POT', 40], ['POT', 75], ['2×', 40], ['3×', 60]]);
-    assert.deepEqual(pokerChips({ pot: 1000, currentBet: 0, bigBlind: 10, minTotal: 10, maxTotal: 300 }).map(c => c.amount), [300, 300, 20, 30]);
-    assert.deepEqual(pokerChips({ pot: 15, currentBet: 0, bigBlind: 10, minTotal: 10, maxTotal: 300 }).map(c => c.amount), [10, 15, 20, 30]);
+test('poker chips: pot-sized ½ POT and POT, 2× and 3× the bet, clamped to [min raise, all-in]', () => {
+    // Heads-up 5/10, the small blind to act: pot 15, 5 to call.
+    assert.deepEqual(pokerChips({ pot: 15, currentBet: 10, toCall: 5, bigBlind: 10, minTotal: 20, maxTotal: 1000 }).map(c => [c.label, c.amount]),
+        [['½ POT', 20], ['POT', 30], ['2×', 20], ['3×', 30]]);
+    assert.deepEqual(pokerChips({ pot: 75, currentBet: 20, toCall: 20, bigBlind: 10, minTotal: 40, maxTotal: 500 }).map(c => c.amount), [67.5, 115, 40, 60]);
+    assert.deepEqual(pokerChips({ pot: 1000, currentBet: 0, toCall: 0, bigBlind: 10, minTotal: 10, maxTotal: 300 }).map(c => c.amount), [300, 300, 20, 30]);
+    assert.deepEqual(pokerChips({ pot: 15, currentBet: 0, toCall: 0, bigBlind: 10, minTotal: 10, maxTotal: 300 }).map(c => c.amount), [10, 15, 20, 30]);
 });

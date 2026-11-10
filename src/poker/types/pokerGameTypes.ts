@@ -56,6 +56,7 @@ export interface PokerGameState extends BlindClock, Omit<PokerSettings, 'smallBl
     bigBlindAmount: number;
     stats?: NightStats; // absent in saves from before the night summary
     startedAt?: number; // epoch ms at setup; absent in older saves
+    settleThrough?: string | null; // Final Owings "Through <party label>"; null or absent is fewest transfers
     departed?: Departure[]; // removed players, still settled
     handNumber?: number;
     bombNext?: boolean; // a one-off bomb pot on the next hand
