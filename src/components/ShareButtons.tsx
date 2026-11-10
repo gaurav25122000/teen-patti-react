@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { whatsappLink } from '../utils/settlement';
+import { cardLines, shareCard } from '../utils/settlementImage';
 
-// COPY and WHATSAPP for a settlement's share text.
-const ShareButtons: React.FC<{ text: string }> = ({ text }) => {
+// COPY, WHATSAPP and SHARE IMAGE for a settlement's share text; subtitle is the card's game and date.
+const ShareButtons: React.FC<{ text: string; subtitle: string }> = ({ text, subtitle }) => {
     const [note, setNote] = useState<string | null>(null);
 
     const copy = () => {
@@ -21,6 +22,7 @@ const ShareButtons: React.FC<{ text: string }> = ({ text }) => {
         <div className="share-actions">
             <button className="btn btn-primary" onClick={copy}>COPY</button>
             <button className="btn btn-success" onClick={openWhatsapp}>WHATSAPP</button>
+            <button className="btn btn-secondary" onClick={() => shareCard(cardLines(text, subtitle)).then(ok => { if (!ok) setNote("Couldn't share the image."); })}>SHARE IMAGE</button>
             {note && <p className="share-note">{note}</p>}
         </div>
     );

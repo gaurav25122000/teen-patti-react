@@ -8,8 +8,8 @@ import BlackjackDealerDisplay from './BlackjackDealerDisplay';
 import BlackjackManageModal, { type ModalMode } from './BlackjackManageModal';
 import { toTitleCase } from '../../utils/formatters';
 import OwingsModal from '../../components/OwingsModal';
-import type { Transaction } from '../../utils/owingsLogic';
-import { emptyStats, summaryLines } from '../../utils/nightStats';
+import type { Party, Transaction } from '../../utils/owingsLogic';
+import { emptyStats, sessionMinutes, summaryLines } from '../../utils/nightStats';
 import { blackjackSettlement } from '../../utils/gameSettlement';
 import StreamControls from '../../components/StreamControls';
 import ActionToast from '../../components/ActionToast';
@@ -34,6 +34,7 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     const [modalMode, setModalMode] = useState<ModalMode>('none');
     const [showOwings, setShowOwings] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [parties, setParties] = useState<Party[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
     const [settingsForm, setSettingsForm] = useState<Record<string, string> | null>(null);
     const banker = players.find(p => p.id === gameState.bankerId);
@@ -66,9 +67,10 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
     };
 
     const handleShowOwings = () => {
-        const { people, transactions, offBy } = blackjackSettlement(gameState);
+        const { people, transactions, offBy, startedAt, parties } = blackjackSettlement(gameState);
         setTransactions(transactions);
-        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'blackjack', false, offBy));
+        setParties(parties);
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'blackjack', false, offBy, { minutes: sessionMinutes(startedAt, Date.now()) }));
         setShowOwings(true);
         onInteractionChange(true);
     };
@@ -209,6 +211,8 @@ const BlackjackGameScreen: React.FC<BlackjackGameScreenProps> = ({ blackjackHook
                 onClose={handleCloseOwings}
                 transactions={transactions}
                 summary={summary}
+                parties={parties}
+                game="blackjack"
             />
         </>
     );

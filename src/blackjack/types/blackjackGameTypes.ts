@@ -54,6 +54,7 @@ export interface BlackjackGameState extends BlackjackSettings {
     dealerNet: number;
     isBettingLocked: boolean; // ADDED
     stats?: NightStats; // absent in saves from before the night summary
+    startedAt?: number; // epoch ms at setup; absent in older saves
     departed?: Departure[]; // removed players, still settled
     bankerId?: number; // a player banking instead of the house
     bankerRounds?: number; // rounds banked so far this turn

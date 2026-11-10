@@ -10,9 +10,9 @@ import RoundControls from './RoundControls';
 import OwingsModal from './OwingsModal';
 import InteractionModal from './InteractionModal';
 import EntityManager from './EntityManager';
-import type { Transaction } from '../utils/owingsLogic';
+import type { Party, Transaction } from '../utils/owingsLogic';
 import { toTitleCase } from '../utils/formatters';
-import { emptyStats, summaryLines } from '../utils/nightStats';
+import { emptyStats, sessionMinutes, summaryLines } from '../utils/nightStats';
 import { teenPattiSettlement } from '../utils/gameSettlement';
 import { bootRefusal, nextBoot, potLimitReached } from '../utils/teenPattiRules';
 import { parseTeenPatti } from '../utils/gameSettings';
@@ -46,6 +46,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
     const [showOwings, setShowOwings] = useState(false);
     const [showEntityManager, setShowEntityManager] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [parties, setParties] = useState<Party[]>([]);
     const [summary, setSummary] = useState<string[]>([]);
     const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
 
@@ -106,9 +107,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
 
 
     const handleShowOwings = () => {
-        const { people, transactions, carried, offBy } = teenPattiSettlement(gameState);
+        const { people, transactions, carried, offBy, startedAt, parties } = teenPattiSettlement(gameState);
         setTransactions(transactions);
-        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'teen-patti', carried, offBy));
+        setParties(parties);
+        setSummary(summaryLines(gameState.stats ?? emptyStats(), people, 'teen-patti', carried, offBy, { minutes: sessionMinutes(startedAt, Date.now()) }));
         setShowOwings(true);
     };
 
@@ -388,6 +390,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ gameHook, onShowSetup, isReadOn
                 onClose={() => setShowOwings(false)}
                 transactions={transactions}
                 summary={summary}
+                parties={parties}
+                game="teen-patti"
             />
 
             {showEntityManager && (

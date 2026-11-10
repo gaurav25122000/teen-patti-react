@@ -2,6 +2,7 @@ import { formatAmount, toTitleCase } from './formatters.ts';
 import { HOUSE_KEY, partyKey, partyLabels, phoneOfKey, type Person } from './owingsLogic.ts';
 
 export type GameKind = 'teen-patti' | 'poker' | 'blackjack';
+export const GAME_LABELS: Record<GameKind, string> = { 'teen-patti': 'Teen Patti', poker: 'Poker', blackjack: 'Blackjack' };
 
 export interface PlayerNet {
     name: string;
@@ -54,8 +55,12 @@ export const recordRound = (
 // people: the settlement's people (the house is ignored for winner and loser). Labels come from
 // partyLabels over the people first, then stats names for anyone no longer at the table.
 // carried: true, false, or undefined for an older Teen Patti save that can't tell.
-// tournament: the prizes line; a tournament's biggest pot is in chips.
-export const summaryLines = (stats: NightStats, people: Person[], game: GameKind, carried: boolean | undefined, offBy = 0, tournament?: string): string[] => {
+// Whole minutes since setup, or undefined for an older save without startedAt.
+export const sessionMinutes = (startedAt: number | undefined, now: number) => (startedAt === undefined ? undefined : Math.floor((now - startedAt) / 60_000));
+
+// tournament: the prizes line (a tournament's biggest pot is in chips); minutes: session length, from 1 minute.
+export const summaryLines = (stats: NightStats, people: Person[], game: GameKind, carried: boolean | undefined, offBy = 0,
+    { tournament, minutes }: { tournament?: string; minutes?: number } = {}): string[] => {
     const labels = partyLabels([
         ...people.map(p => ({ key: p.key, name: p.title, phone: p.phone })),
         ...Object.entries(stats.names ?? {}).map(([key, name]) => ({ key, name, phone: phoneOfKey(key) })),
@@ -82,6 +87,10 @@ export const summaryLines = (stats: NightStats, people: Person[], game: GameKind
     }
     if (winner) lines.push(`Biggest winner: ${labels[winner.key]} +₹${formatAmount(winner.net)}`);
     if (loser) lines.push(`Biggest loser: ${labels[loser.key]} -₹${formatAmount(-loser.net)}`);
+    if (minutes !== undefined && minutes >= 1) {
+        lines.push(`Session: ${minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`}`);
+        if (winner) lines.push(`${labels[winner.key]} won ₹${formatAmount(Math.round(winner.net / (minutes / 60)))}/hour`); // net > 0: round is half away from zero
+    }
     if (tournament) lines.push(tournament);
     if (carried) lines.push('Includes balances carried into this game.');
     if (carried === undefined) lines.push('May include balances carried into this game.');

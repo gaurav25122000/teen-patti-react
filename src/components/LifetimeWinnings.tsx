@@ -4,12 +4,18 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import './LifetimeWinnings.css'; // Import the updated CSS
 import { toTitleCase } from '../utils/formatters';
 import { readSavedPlayers } from '../utils/savedPlayers';
+import { gameTotals, inRange, type RangeKind, type WinningsRecord } from '../utils/winningsRange';
+
+const RANGES: [RangeKind, string][] = [['all', 'All time'], ['month', 'This month'], ['30d', 'Last 30 days'], ['year', 'This year'], ['custom', 'Custom']];
 
 const LifetimeWinnings: React.FC = () => {
     const [phoneNumbers, setPhoneNumbers] = useState('');
     const [winningsData, setWinningsData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [range, setRange] = useState<RangeKind>('all');
+    const [from, setFrom] = useState('');
+    const [to, setTo] = useState('');
 
     const handleFetchWinnings = async (text: string) => {
         const numbers = text.split(',').map(n => n.trim()).filter(n => /^\d{10}$/.test(n));
@@ -38,8 +44,23 @@ const LifetimeWinnings: React.FC = () => {
 
     const COLORS = ['#00ffff', '#ff00ff', '#39ff14', '#ffd700', '#e8e8e8', '#ff6600'];
 
-    const processedTableData = useMemo(() => {
+    // The fetched records within the chosen range, totalled the way getWinnings does.
+    const view = useMemo(() => {
         if (!winningsData) return null;
+        const servers: ReturnType<typeof gameTotals>[] = [winningsData.teenPatti, winningsData.poker, winningsData.blackjack];
+        const hashes = servers[0].players.map(p => p.phoneHash);
+        const names = Object.fromEntries(servers.flatMap(g => g.players).filter(p => p.playerName !== 'Unknown').map(p => [p.phoneHash, p.playerName]));
+        const records = (winningsData.allRecords as WinningsRecord[]).filter(r => inRange(r.timestamp, range, new Date(), from, to));
+        return {
+            teenPatti: gameTotals(records, hashes, names, 'teen-patti'),
+            poker: gameTotals(records, hashes, names, 'poker'),
+            blackjack: gameTotals(records, hashes, names, 'blackjack'),
+            allRecords: records,
+        };
+    }, [winningsData, range, from, to]);
+
+    const processedTableData = useMemo(() => {
+        if (!view) return null;
 
         const summary: { [key: string]: { teenPatti: number, poker: number, blackjack: number, playerName: string } } = {};
 
@@ -49,23 +70,23 @@ const LifetimeWinnings: React.FC = () => {
             }
         };
 
-        winningsData.teenPatti.players.forEach((p: any) => {
+        view.teenPatti.players.forEach((p: any) => {
             initializeSummary(p.phoneHash, p.playerName);
             summary[p.phoneHash].teenPatti = p.total;
         });
 
-        winningsData.poker.players.forEach((p: any) => {
+        view.poker.players.forEach((p: any) => {
             initializeSummary(p.phoneHash, p.playerName);
             summary[p.phoneHash].poker = p.total;
         });
 
         // ADDED: Process blackjack data
-        winningsData.blackjack.players.forEach((p: any) => {
+        view.blackjack.players.forEach((p: any) => {
             initializeSummary(p.phoneHash, p.playerName);
             summary[p.phoneHash].blackjack = p.total;
         });
 
-        const allRecords = winningsData.allRecords.sort((a: any, b: any) => {
+        const allRecords = [...view.allRecords].sort((a: any, b: any) => {
             const nameA = a.player_name.toUpperCase();
             const nameB = b.player_name.toUpperCase();
             if (nameA < nameB) return -1;
@@ -89,7 +110,7 @@ const LifetimeWinnings: React.FC = () => {
 
         return { summary, allRecords, summaryArray };
 
-    }, [winningsData]);
+    }, [view]);
 
     return (
         <div className="setup-screen">
@@ -112,7 +133,21 @@ const LifetimeWinnings: React.FC = () => {
             </div>
             {error && <p style={{ color: 'var(--color-glow-magenta)', textAlign: 'center' }}>{error}</p>}
 
-            {winningsData && processedTableData && (
+            {winningsData && (
+                <div className="game-actions" style={{ justifyContent: 'center' }}>
+                    {RANGES.map(([kind, label]) => (
+                        <button key={kind} className={range === kind ? 'btn-primary' : 'btn-secondary'} onClick={() => setRange(kind)}>{label}</button>
+                    ))}
+                    {range === 'custom' && (
+                        <>
+                            <input type="date" aria-label="From" value={from} onChange={e => setFrom(e.target.value)} />
+                            <input type="date" aria-label="To" value={to} onChange={e => setTo(e.target.value)} />
+                        </>
+                    )}
+                </div>
+            )}
+
+            {view && processedTableData && (
                 <div className="winnings-layout">
                     {/* Table Container is now at the top */}
                     <div className="table-container">
@@ -183,13 +218,13 @@ const LifetimeWinnings: React.FC = () => {
                             <h2>Teen Patti Winnings Trend</h2>
                         </div>
                         <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={winningsData.teenPatti.trend}>
+                            <LineChart data={view.teenPatti.trend}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-text-muted)" />
                                 <XAxis dataKey="date" stroke="var(--color-text)" />
                                 <YAxis stroke="var(--color-text)" />
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-cyan)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-cyan)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
-                                {winningsData.teenPatti.players.map((p: any, i: number) => (
+                                {view.teenPatti.players.map((p: any, i: number) => (
                                     <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={toTitleCase(p.playerName)} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>
@@ -199,13 +234,13 @@ const LifetimeWinnings: React.FC = () => {
                             <h2>Poker Winnings Trend</h2>
                         </div>
                         <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={winningsData.poker.trend}>
+                            <LineChart data={view.poker.trend}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-text-muted)" />
                                 <XAxis dataKey="date" stroke="var(--color-text)" />
                                 <YAxis stroke="var(--color-text)" />
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-gold)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-gold)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
-                                {winningsData.poker.players.map((p: any, i: number) => (
+                                {view.poker.players.map((p: any, i: number) => (
                                     <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={toTitleCase(p.playerName)} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>
@@ -216,13 +251,13 @@ const LifetimeWinnings: React.FC = () => {
                             <h2>Blackjack Winnings Trend</h2>
                         </div>
                         <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={winningsData.blackjack.trend}>
+                            <LineChart data={view.blackjack.trend}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-text-muted)" />
                                 <XAxis dataKey="date" stroke="var(--color-text)" />
                                 <YAxis stroke="var(--color-text)" />
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-glow-magenta)', color: 'var(--color-text)' }} labelStyle={{ color: 'var(--color-glow-magenta)' }} />
                                 <Legend wrapperStyle={{ color: 'var(--color-text)' }} />
-                                {winningsData.blackjack.players.map((p: any, i: number) => (
+                                {view.blackjack.players.map((p: any, i: number) => (
                                     <Line key={p.phoneHash} type="monotone" dataKey={p.phoneHash} name={toTitleCase(p.playerName)} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
                                 ))}
                             </LineChart>

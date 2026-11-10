@@ -193,3 +193,9 @@ test('an unbalanced game is kept past the newest 50 like an unpaid one', () => {
     for (let i = 1; i <= 50; i++) list = addEntry(list, entry(`g${i}`));
     assert.equal(list.some(e => e.id === 'off'), true);
 });
+
+test('an archived entry gets its session lines from the setup time to the archive time', () => {
+    const at = new Date('2026-11-10T16:15:00.000Z');
+    const built = buildEntry('poker', emptyStats(), { people: [person(A, 'Asha', 300), person(R, 'Raj', -300)], transactions: [], carried: false, startedAt: at.getTime() - 200 * 60_000 - 59_000 }, at);
+    assert.deepEqual(built.summary.slice(-2), ['Session: 3h 20m', 'Asha won ₹90/hour']);
+});

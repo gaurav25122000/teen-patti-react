@@ -135,5 +135,23 @@ export const settleParties = (players: OwingsPlayer[], entities: Entity[] = []) 
     }
     // offBy: what no transfer can cover when the nets don't sum to zero (carried-in balances).
     const offBy = paise(list.reduce((sum, p) => sum + p.net, 0)) / 100;
-    return { transactions, people: [...people.values()], parties: list.map(({ label, phone, net }) => ({ label, phone, net })), offBy };
+    return { transactions, people: [...people.values()], parties: list.map(({ label, phone, net }): Party => ({ label, phone, net })), offBy };
+};
+
+export interface Party {
+    label: string;
+    phone: string | null;
+    net: number;
+}
+
+// "Through <hub>": the others settle with the hub alone, payers first, then payees, each in party order.
+// Amounts are the same whole paise as fewest transfers.
+export const throughTransfers = (parties: Party[], hub: number): Transaction[] => {
+    const cents = toCents(parties.map(p => p.net));
+    const others = parties.map((p, i) => ({ p, cents: cents[i] })).filter((_, i) => i !== hub);
+    const to = parties[hub];
+    return [
+        ...others.filter(o => o.cents < 0).map(o => ({ from: o.p.label, to: to.label, amount: -o.cents / 100, toPhone: to.phone })),
+        ...others.filter(o => o.cents > 0).map(o => ({ from: to.label, to: o.p.label, amount: o.cents / 100, toPhone: o.p.phone })),
+    ];
 };

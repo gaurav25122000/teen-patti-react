@@ -73,6 +73,7 @@ export const newPokerGame = (players: { name: string; stack: number; phoneNumber
         ...createInitialPokerState(),
         ...settings,
         ...startClock(settings.levelMinutes, now),
+        startedAt: now,
         players: seated,
         entrants: settings.tournament ? seated.map(p => entrant(p, settings.buyIn!)) : undefined,
         dealerButtonIndex: -1,

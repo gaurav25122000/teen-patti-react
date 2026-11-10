@@ -40,10 +40,10 @@ test('a blind player past the blind-turn limit cannot show; a seen player can', 
     assert.equal(betRefusal(s, 'show', 20, 'Raj', 3, false), null);
 });
 
-test('a round reset keeps groups, departures, every setting and the round count', () => {
+test('a round reset keeps groups, departures, every setting, the round count and the start time', () => {
     const entities = [{ id: 1, name: 'Team A' }];
     const departed = [{ name: 'Dev', net: -5 }];
-    const kept = { entities, departed, carriedIn: true, potLimit: 500, maxBlindTurns: 3, maxChaal: 100, defaultBoot: 20, turnTimer: 30, bootRiseEvery: 5, bootRiseStep: 10, roundsStarted: 7 };
+    const kept = { entities, departed, carriedIn: true, potLimit: 500, maxBlindTurns: 3, maxChaal: 100, defaultBoot: 20, turnTimer: 30, bootRiseEvery: 5, bootRiseStep: 10, roundsStarted: 7, startedAt: 1234 };
     assert.deepEqual(roundCarryOver({ ...kept, players: [], potAmount: 99 } as never), kept);
 });
 

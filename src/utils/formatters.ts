@@ -13,3 +13,6 @@ export const couldNot = (verb: 'save' | 'delete', error: unknown) =>
 // Up to 2 decimals, trailing zeros trimmed, no separators (same as the Android app).
 export const formatAmount = (amount: number): string =>
   Math.abs(amount) < 0.005 ? '0' : amount.toFixed(2).replace(/\.?0+$/, '');
+
+// "+₹50", "-₹20", or "₹0" under half a paisa.
+export const signedAmount = (net: number) => (Math.abs(net) < 0.005 ? '₹0' : `${net > 0 ? '+' : '-'}₹${formatAmount(Math.abs(net))}`);

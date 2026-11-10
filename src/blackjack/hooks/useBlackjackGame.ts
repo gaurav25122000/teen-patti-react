@@ -68,7 +68,7 @@ export const useBlackjackGame = () => {
     }, [setGameState]);
 
     const setupGame = useCallback((players: { name: string, stack: number, phoneNumber: string, numHands: number }[], settings: BlackjackSettings) => {
-        const next = engine.newBlackjackGame(players, settings);
+        const next = engine.newBlackjackGame(players, settings, Date.now());
         setGameState(prev => {
             afterCommit(() => archiveBlackjack(prev));
             return next;

@@ -47,7 +47,7 @@ export const useTeenPattiGame = () => {
   const startNewGame = (newPlayers: Player[], settings: TeenPattiSettings = {}) => {
     setGameState(prev => {
       afterCommit(() => archiveOrWarn('teen-patti', prev.stats, teenPattiSettlement(prev)));
-      return engine.newGame(newPlayers, settings);
+      return engine.newGame(newPlayers, settings, Date.now());
     });
     const full = rememberPlayers(newPlayers.map(p => ({ name: p.name, phone: p.phoneNumber })));
     if (full) addMessage(full);

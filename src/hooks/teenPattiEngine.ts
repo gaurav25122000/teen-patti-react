@@ -123,9 +123,10 @@ export const endRound = (prev: GameState, winnerId: number | null, io: Io): Game
   };
 };
 
-export const newGame = (newPlayers: Player[], settings: TeenPattiSettings = {}): GameState => ({
+export const newGame = (newPlayers: Player[], settings: TeenPattiSettings = {}, startedAt?: number): GameState => ({
   ...createInitialGameState(),
   ...settings,
+  startedAt,
   carriedIn: carried(newPlayers.map(p => p.balance)),
   players: newPlayers.map(p => ({ ...p, isTakingBreak: false })),
   messages: newPlayers.length > 0 ? [`New game started with ${newPlayers.length} players. Please set the boot amount.`] : ["Returning to setup..."],

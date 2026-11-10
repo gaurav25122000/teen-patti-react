@@ -139,10 +139,11 @@ export const applySettings = (prev: BlackjackGameState, settings: BlackjackSetti
     return withBanker(next, next.players.find(p => p.id === prev.bankerId) ?? nextBanker(next.players));
 };
 
-export const newBlackjackGame = (players: { name: string; stack: number; phoneNumber: string; numHands: number }[], settings?: BlackjackSettings): BlackjackGameState => {
+export const newBlackjackGame = (players: { name: string; stack: number; phoneNumber: string; numHands: number }[], settings?: BlackjackSettings, startedAt?: number): BlackjackGameState => {
     const initial = { ...createInitialBlackjackState(), ...settings };
     const game: BlackjackGameState = {
         ...initial,
+        startedAt,
         players: players.map((p, i) => ({
             id: i + 1,
             name: toTitleCase(p.name),

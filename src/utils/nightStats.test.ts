@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { biggestWin, emptyStats, partialStats, recordRound, statsNames, summaryLines } from './nightStats.ts';
+import { biggestWin, emptyStats, partialStats, recordRound, sessionMinutes, statsNames, summaryLines } from './nightStats.ts';
 import { formatAmount, toTitleCase } from './formatters.ts';
 import type { Person } from './owingsLogic.ts';
 
@@ -130,4 +130,21 @@ test('the imbalance line comes last, signed, only when a paisa or more is uncove
     assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', true, 500), ['Includes balances carried into this game.', 'Balances are off by +₹500: settle the difference by hand.']);
     assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', false, -12.5), ['Balances are off by -₹12.5: settle the difference by hand.']);
     assert.deepEqual(summaryLines(emptyStats(), [], 'teen-patti', false, 0.004), []);
+});
+
+test('session lines: whole minutes, hours from 60, and the winner per hour from 1 minute, before the carry, tournament and imbalance lines', () => {
+    const people = [person(A, 'Asha', 101), person(R, 'Raj', -101)];
+    const lines = (minutes?: number) => summaryLines(emptyStats(), people, 'poker', false, 0, { minutes });
+    assert.deepEqual(lines(120).slice(-2), ['Session: 2h 0m', 'Asha won ₹51/hour']); // 50.5 rounds away from zero
+    assert.deepEqual(lines(200).slice(-2), ['Session: 3h 20m', 'Asha won ₹30/hour']); // 30.3
+    assert.deepEqual(lines(45).slice(-2), ['Session: 45m', 'Asha won ₹135/hour']); // 134.67
+    assert.ok(!lines(0).some(l => l.startsWith('Session')));
+    assert.ok(!lines(undefined).some(l => l.startsWith('Session')));
+    assert.deepEqual(summaryLines(emptyStats(), [], 'poker', false, 0, { minutes: 45 }), ['Session: 45m']);
+    assert.deepEqual(summaryLines(emptyStats(), people, 'poker', true, 1, { minutes: 45, tournament: 'Tournament: 1st Asha ₹101' }).slice(2), [
+        'Session: 45m', 'Asha won ₹135/hour', 'Tournament: 1st Asha ₹101', 'Includes balances carried into this game.', 'Balances are off by +₹1: settle the difference by hand.',
+    ]);
+    assert.equal(sessionMinutes(1000, 1000 + 59_999), 0);
+    assert.equal(sessionMinutes(1000, 1000 + 60_000), 1);
+    assert.equal(sessionMinutes(undefined, 5), undefined);
 });

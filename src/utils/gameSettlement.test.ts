@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { blackjackSettlement, playerNets, pokerSettlement, teenPattiSettlement } from './gameSettlement.ts';
-import { partyKey, partyLabels, settleParties } from './owingsLogic.ts';
+import { partyKey, partyLabels, settleParties, throughTransfers } from './owingsLogic.ts';
 
 const tpPlayer = (id: number, name: string, balance: number, phoneNumber?: string, more = {}) =>
     ({ id, name, balance, phoneNumber, isTakingBreak: false, ...more });
@@ -211,4 +211,18 @@ test('numbering skips a label already in use', () => {
         { name: 'P2', phoneNumber: '3', balance: 20, entityId: 2 },
     ], [{ id: 1, name: 'Team' }, { id: 2, name: 'Team' }]);
     assert.deepEqual(transactions.map(t => [t.from, t.to]), [['Team', 'Team (3)'], ['Team', 'Team (2)']]);
+});
+
+test('settling through one person: payers pay the hub, then the hub pays each payee, in the same paise', () => {
+    const parties = [
+        { label: 'Asha', phone: '9000000001', net: 300 },
+        { label: 'Raj', phone: '9000000002', net: -100 },
+        { label: 'Dev', phone: null, net: -250 },
+        { label: 'Mira', phone: '9000000004', net: 50 },
+    ];
+    const rows = (hub: number) => throughTransfers(parties, hub).map(t => [t.from, t.to, t.amount, t.toPhone]);
+    assert.deepEqual(rows(1), [['Dev', 'Raj', 250, '9000000002'], ['Raj', 'Asha', 300, '9000000001'], ['Raj', 'Mira', 50, '9000000004']]);
+    assert.deepEqual(rows(0), [['Raj', 'Asha', 100, '9000000001'], ['Dev', 'Asha', 250, '9000000001'], ['Asha', 'Mira', 50, '9000000004']]);
+    const halves = [{ label: 'Asha', phone: null, net: 0.015 }, { label: 'Raj', phone: null, net: 0.015 }, { label: 'Dev', phone: null, net: -0.03 }];
+    assert.deepEqual(throughTransfers(halves, 2).map(t => [t.to, t.amount]), [['Asha', 0.02], ['Raj', 0.01]]); // largest remainder, first-seen on a tie
 });

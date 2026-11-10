@@ -101,13 +101,14 @@ test('a fold that leaves one player ends the round and pays them the pot', () =>
     assert.deepEqual(state.messages.slice(-4), ['P1 folds.', 'P2 is the last player remaining.', '--- ROUND OVER ---', 'Congratulations! P2 won the pot of ₹20']);
 });
 
-test('a round reset keeps groups, rules and the carried-in flag', () => {
-    let s = { ...E.newGame([player(1, 50), player(2, -50)], { potLimit: 500 }), entities: [{ id: 7, name: 'Team' }] };
+test('a round reset keeps groups, rules, the carried-in flag and the start time', () => {
+    let s = { ...E.newGame([player(1, 50), player(2, -50)], { potLimit: 500 }, 1234), entities: [{ id: 7, name: 'Team' }] };
     s = go(s, (x, io) => E.startRound(x, 0, 10, io));
     s = go(s, (x, io) => E.endRound(x, 1, io));
     assert.deepEqual(s.entities, [{ id: 7, name: 'Team' }]);
     assert.equal(s.potLimit, 500);
     assert.equal(s.carriedIn, true);
+    assert.equal(s.startedAt, 1234);
 });
 
 test('round stats are keyed by party, so a namesake joining later changes nothing', () => {

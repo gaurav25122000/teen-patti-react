@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { deleteHistoryEntry, hasUnreadableHistory, historyShareText, liveHistory, readHistory, setPaid, writeHistory, type HistoryEntry } from '../utils/history';
-import type { GameKind } from '../utils/nightStats';
-import { couldNot, formatAmount } from '../utils/formatters';
+import { GAME_LABELS } from '../utils/nightStats';
+import { couldNot, formatAmount, signedAmount } from '../utils/formatters';
 import { readSavedPlayers } from '../utils/savedPlayers';
 import { isUnbalanced, upiFor } from '../utils/settlement';
 import ShareButtons from './ShareButtons';
 import PayLink from './PayLink';
 
-const GAME_LABEL: Record<GameKind, string> = { 'teen-patti': 'Teen Patti', poker: 'Poker', blackjack: 'Blackjack' };
-
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-
-const signed = (net: number) => (Math.abs(net) < 0.005 ? '₹0' : `${net > 0 ? '+' : '-'}₹${formatAmount(Math.abs(net))}`);
+const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
 
 // readHistory may keep an unreadable value aside, so the notice is checked after it.
 const loadHistory = () => {
@@ -52,11 +50,11 @@ const HistoryScreen: React.FC = () => {
         return (
             <div className="setup-screen">
                 <button className="btn-secondary" onClick={() => { setOpenId(null); setPayNote(null); }}>← History</button>
-                <h2>{GAME_LABEL[open.game]}</h2>
+                <h2>{GAME_LABELS[open.game]}</h2>
                 <p>{when(open.endedAt)}</p>
                 <ul className="owings-list">
                     {open.nets.map((n, i) => (
-                        <li key={i}><span className="from">{n.name}</span><span className="amount">{signed(n.net)}</span></li>
+                        <li key={i}><span className="from">{n.name}</span><span className="amount">{signedAmount(n.net)}</span></li>
                     ))}
                 </ul>
                 <h4>Settlement</h4>
@@ -83,7 +81,7 @@ const HistoryScreen: React.FC = () => {
                         <ul className="summary-list">{open.summary.map(line => <li key={line}>{line}</li>)}</ul>
                     </>
                 )}
-                {(open.transactions.length > 0 || open.summary.length > 0) && <ShareButtons text={historyShareText(open, saved)} />}
+                {(open.transactions.length > 0 || open.summary.length > 0) && <ShareButtons text={historyShareText(open, saved)} subtitle={`${GAME_LABELS[open.game]} · ${day(open.endedAt)}`} />}
                 {error && <p className="form-error">{error}</p>}
                 <button className="btn btn-danger" onClick={remove}>Delete</button>
             </div>
@@ -93,13 +91,14 @@ const HistoryScreen: React.FC = () => {
     return (
         <div className="setup-screen">
             <h2>History</h2>
+            <Link to="/stats" className="btn-secondary">Player stats</Link>
             {notice && <p className="form-error">{notice}</p>}
             {liveHistory(entries).length === 0 ? <p>No finished games yet. A game is kept here when you end it.</p> : (
                 <ul className="history-list">
                     {liveHistory(entries).map(e => (
                         <li key={e.id}>
                             <button className="btn-secondary" onClick={() => setOpenId(e.id)}>
-                                {when(e.endedAt)} · {GAME_LABEL[e.game]} · {e.nets.length} players
+                                {when(e.endedAt)} · {GAME_LABELS[e.game]} · {e.nets.length} players
                             </button>
                         </li>
                     ))}

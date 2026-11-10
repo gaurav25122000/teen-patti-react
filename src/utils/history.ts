@@ -1,4 +1,4 @@
-import { partialStats, summaryLines, type GameKind, type NightStats, type PlayerNet } from './nightStats.ts';
+import { partialStats, sessionMinutes, summaryLines, type GameKind, type NightStats, type PlayerNet } from './nightStats.ts';
 import { couldNot } from './formatters.ts';
 import type { Person, Transaction } from './owingsLogic.ts';
 import { playerNets } from './gameSettlement.ts';
@@ -12,6 +12,7 @@ interface SettlementParts {
     carried: boolean | undefined; // someone started or joined with a balance (undefined: an older save can't tell)
     offBy?: number; // nets that no transfer covers; the summary says so
     tournament?: string; // poker tournament prizes line
+    startedAt?: number; // game setup time, for the session lines
 }
 
 export interface HistoryEntry {
@@ -93,7 +94,7 @@ export const buildEntry = (game: GameKind, stats: NightStats, s: SettlementParts
     game,
     nets: playerNets(s.people),
     transactions: s.transactions.map(t => ({ ...t, paid: false })),
-    summary: summaryLines(stats, s.people, game, s.carried, s.offBy, s.tournament),
+    summary: summaryLines(stats, s.people, game, s.carried, s.offBy, { tournament: s.tournament, minutes: sessionMinutes(s.startedAt, now.getTime()) }),
     updatedAt: now.getTime(),
 });
 

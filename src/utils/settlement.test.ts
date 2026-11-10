@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { shareText, upiFor, upiLink, whatsappLink } from './settlement.ts';
+import { cardLines } from './settlementImage.ts';
 
 const saved = [
     { name: 'asha', phone: '9000000001', upi: 'asha@okhdfc' },
@@ -50,4 +51,9 @@ test('WhatsApp link carries the encoded text', () => {
 test('no transfers with books that are off reads "No transfers between players"', () => {
     assert.equal(shareText([], ['Balances are off by +₹500: settle the difference by hand.'], []),
         'Bets Manager settlement\nNo transfers between players\n\nNight summary\nBalances are off by +₹500: settle the difference by hand.');
+});
+
+test('the image card: title, game and date, then the share text under its heading', () => {
+    assert.deepEqual(cardLines('Bets Manager settlement\nDev pays Asha ₹500 (UPI: asha@okhdfc)\n\nNight summary\nBiggest pot: ₹2400 (Asha)', 'Poker · 10 Nov 2026'),
+        ['Bets Manager', 'Poker · 10 Nov 2026', '', 'Dev pays Asha ₹500 (UPI: asha@okhdfc)', '', 'Night summary', 'Biggest pot: ₹2400 (Asha)']);
 });
